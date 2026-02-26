@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+/* Base styles */
+body {
+  font-family: 'Sarabun', sans-serif;
+}
+
+/* Toast styles */
+.Toastify__toast {
+  border-radius: 0.5rem;
+}

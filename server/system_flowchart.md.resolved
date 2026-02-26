@@ -1,0 +1,305 @@
+# 📊 Flowchart การทำงานของระบบ BRU Food Court Management
+
+## 1. ภาพรวมระบบ (System Overview)
+
+```mermaid
+flowchart TD
+    START(["🟢 Start"]) --> A["🌐 ผู้ใช้งานเข้าเว็บ"]
+    A --> B{"มีบัญชีหรือไม่?"}
+    B -- ไม่มี --> C["📝 ลงทะเบียน /register"]
+    B -- มี --> D["🔐 เข้าสู่ระบบ /login"]
+    C --> D
+    D --> E{"ตรวจสอบ Role"}
+    E -- ADMIN --> F["🛡️ Admin Dashboard"]
+    E -- TENANT --> G["🏪 Tenant Dashboard"]
+    E -- MAINTENANCE --> H["🔧 Maintenance Dashboard"]
+    E -- EXECUTIVE --> I["📈 Executive Dashboard"]
+    F --> END(["🔴 End"])
+    G --> END
+    H --> END
+    I --> END
+```
+
+---
+
+## 2. ระบบ Authentication
+
+```mermaid
+flowchart TD
+    START(["🟢 Start"]) --> A["ผู้ใช้กรอก Email + Password"]
+    A --> B["POST /api/auth/login"]
+    B --> C{"ตรวจสอบข้อมูล"}
+    C -- ❌ ไม่ถูกต้อง --> D["แจ้ง Error"]
+    D --> END1(["🔴 End"])
+    C -- ✅ ถูกต้อง --> E["สร้าง JWT Token"]
+    E --> F["ส่ง Token + User Data กลับ"]
+    F --> G["เก็บ Token ใน Zustand Store"]
+    G --> H["Redirect ตาม Role"]
+    H --> END2(["🔴 End"])
+```
+
+```mermaid
+flowchart TD
+    START(["🟢 Start"]) --> I["ผู้ใช้กรอกข้อมูลลงทะเบียน"]
+    I --> J["POST /api/auth/register"]
+    J --> K{"Validate ข้อมูล"}
+    K -- ❌ ไม่ผ่าน --> L["แจ้ง Error"]
+    L --> END1(["🔴 End"])
+    K -- ✅ ผ่าน --> M["Hash Password + บันทึก DB"]
+    M --> N["สร้าง User role: TENANT"]
+    N --> END2(["🔴 End"])
+```
+
+---
+
+## 3. Flow ของ Admin (ผู้ดูแลระบบ)
+
+```mermaid
+flowchart TD
+    START(["🟢 Start"]) --> A["🛡️ Admin Dashboard"]
+    A --> B["จัดการแผงค้า"]
+    A --> C["จัดการผู้เช่า"]
+    A --> D["บันทึกมิเตอร์"]
+    A --> E["จัดการบิล"]
+    A --> F["จัดการซ่อมบำรุง"]
+    A --> G["รายงาน"]
+    A --> H["ตั้งค่าระบบ"]
+
+    B --> B1["ดูแผงค้าทั้งหมด"]
+    B --> B2["เปลี่ยนสถานะ: VACANT / OCCUPIED / MAINTENANCE"]
+    B --> B3["กำหนดผู้เช่า"]
+    B1 --> END(["🔴 End"])
+    B2 --> END
+    B3 --> END
+
+    C --> C1["ดูรายชื่อผู้เช่า"]
+    C --> C2["จัดการสัญญาเช่า"]
+    C1 --> END
+    C2 --> END
+
+    D --> D1["บันทึกค่าน้ำ/ไฟ"]
+    D1 --> D2["คำนวณหน่วยที่ใช้"]
+    D2 --> END
+
+    E --> E1["สร้างบิลรายเดือน"]
+    E --> E2["ตรวจสอบหลักฐานการชำระ"]
+    E --> E3["อัปเดตสถานะ: PENDING / PAID / OVERDUE"]
+    E1 --> END
+    E2 --> END
+    E3 --> END
+
+    F --> F1["รับแจ้งซ่อม"]
+    F1 --> F2["มอบหมายช่าง"]
+    F2 --> F3["ติดตามสถานะ"]
+    F3 --> END
+
+    G --> END
+    H --> H1["ตั้งค่าอัตราค่าน้ำ/ไฟ"]
+    H --> H2["ตั้งค่าค่าบ่อดักไขมัน"]
+    H1 --> END
+    H2 --> END
+```
+
+---
+
+## 4. Flow ของ Tenant (ผู้เช่า)
+
+```mermaid
+flowchart TD
+    START(["🟢 Start"]) --> A["🏪 Tenant Dashboard"]
+    A --> B["ดูค่าใช้จ่าย"]
+    A --> C["อัปโหลดหลักฐานชำระ"]
+    A --> D["ดูประวัติชำระเงิน"]
+    A --> E["ดูสัญญาเช่า"]
+    A --> F["แจ้งซ่อม"]
+    A --> G["ติดตามการซ่อม"]
+    A --> H["ดูสถานะแผงค้า"]
+
+    B --> B1["ดูบิลค่าเช่า + ค่าน้ำ + ค่าไฟ"]
+    B1 --> END(["🔴 End"])
+
+    C --> C1["เลือกบิลที่ต้องชำระ"]
+    C1 --> C2["อัปโหลดสลิปการโอน"]
+    C2 --> C3["รอ Admin ตรวจสอบ"]
+    C3 --> END
+
+    D --> END
+    E --> END
+    H --> END
+
+    F --> F1["กรอกรายละเอียดปัญหา"]
+    F1 --> F2["แนบรูปภาพ"]
+    F2 --> F3["ส่งแจ้งซ่อม"]
+    F3 --> F4["สถานะ: PENDING"]
+    F4 --> END
+
+    G --> G1["ดูสถานะ: PENDING / IN_PROGRESS / COMPLETED"]
+    G1 --> END
+```
+
+---
+
+## 5. Flow ของ Maintenance (ช่างซ่อมบำรุง)
+
+```mermaid
+flowchart TD
+    START(["🟢 Start"]) --> A["🔧 Maintenance Dashboard"]
+    A --> B["ดูงานทั้งหมด"]
+    B --> C["เลือกงานซ่อม"]
+    C --> D["ดูรายละเอียด + รูปภาพ"]
+    D --> E{"เปลี่ยนสถานะ"}
+    E -- เริ่มงาน --> F["IN_PROGRESS"]
+    E -- เสร็จแล้ว --> G["COMPLETED"]
+    F --> END(["🔴 End"])
+    G --> H["อัปโหลดหลักฐานการซ่อม"]
+    H --> I["บันทึกวันที่ซ่อมเสร็จ"]
+    I --> END
+```
+
+---
+
+## 6. Flow ของ Executive (ผู้บริหาร)
+
+```mermaid
+flowchart TD
+    START(["🟢 Start"]) --> A["📈 Executive Dashboard"]
+    A --> B["ดูภาพรวมแผงค้า"]
+    A --> C["ดูข้อมูลผู้เช่า"]
+    A --> D["ดูข้อมูลบิล/รายรับ"]
+    A --> E["ดูข้อมูลการซ่อมบำรุง"]
+
+    B --> B1["สถิติ: VACANT / OCCUPIED / MAINTENANCE"]
+    B1 --> END(["🔴 End"])
+    C --> END
+    D --> D1["สถิติ: PENDING / PAID / OVERDUE"]
+    D1 --> END
+    E --> E1["สถิติ: PENDING / IN_PROGRESS / COMPLETED"]
+    E1 --> END
+```
+
+---
+
+## 7. Flow การเรียกเก็บค่าเช่ารายเดือน (Billing Process)
+
+```mermaid
+flowchart TD
+    START(["🟢 Start"]) --> A["📅 เริ่มรอบเดือนใหม่"]
+    A --> B["Admin บันทึกมิเตอร์น้ำ/ไฟ"]
+    B --> C["ระบบคำนวณหน่วยที่ใช้"]
+    C --> D["Admin สร้างบิล"]
+    D --> E["คำนวณ: ค่าเช่า + ค่าน้ำ + ค่าไฟ + ค่าบ่อดักไขมัน"]
+    E --> F["บิลสถานะ: PENDING"]
+    F --> G["ผู้เช่าเห็นบิลใน Dashboard"]
+    G --> H["ผู้เช่าชำระเงิน + อัปโหลดสลิป"]
+    H --> I["Admin ตรวจสอบหลักฐาน"]
+    I --> J{"ถูกต้อง?"}
+    J -- ✅ ใช่ --> K["สถานะ: PAID"]
+    J -- ❌ ไม่ --> L["สถานะ: OVERDUE"]
+    K --> END(["🔴 End"])
+    L --> END
+```
+
+---
+
+## 8. Flow การแจ้งซ่อม (Maintenance Request Process)
+
+```mermaid
+flowchart TD
+    START(["🟢 Start"]) --> A["🏪 ผู้เช่าพบปัญหา"]
+    A --> B["แจ้งซ่อมผ่านระบบ"]
+    B --> C["กรอกหัวข้อ + รายละเอียด + แนบรูป"]
+    C --> D["สถานะ: PENDING"]
+    D --> E["Admin เห็นรายการแจ้งซ่อม"]
+    E --> F["Admin มอบหมายช่าง"]
+    F --> G["ช่างได้รับงาน"]
+    G --> H["ช่างเริ่มดำเนินการ"]
+    H --> I["สถานะ: IN_PROGRESS"]
+    I --> J["ช่างซ่อมเสร็จ + อัปโหลดหลักฐาน"]
+    J --> K["สถานะ: COMPLETED"]
+    K --> L["ผู้เช่าเห็นผลการซ่อม"]
+    L --> END(["🔴 End"])
+```
+
+---
+
+## 9. Database Schema Overview
+
+```mermaid
+erDiagram
+    User ||--o| Stall : "เช่า"
+    User ||--o{ Bill : "มีบิล"
+    User ||--o{ Contract : "มีสัญญา"
+    User ||--o{ MaintenanceRequest : "แจ้งซ่อม"
+    User ||--o{ MaintenanceRequest : "ได้รับมอบหมาย"
+    Stall ||--o{ MeterReading : "บันทึกมิเตอร์"
+    Stall ||--o{ Bill : "มีบิล"
+    Stall ||--o{ Contract : "มีสัญญา"
+    Stall ||--o{ MaintenanceRequest : "มีรายการซ่อม"
+
+    User {
+        string id PK
+        string email
+        string password
+        string name
+        enum role "ADMIN | TENANT | MAINTENANCE | EXECUTIVE"
+    }
+
+    Stall {
+        string id PK
+        string stallNumber
+        int foodCourt
+        enum status "VACANT | OCCUPIED | MAINTENANCE"
+        float monthlyRent
+    }
+
+    Bill {
+        string id PK
+        float rentAmount
+        float waterAmount
+        float electricAmount
+        float totalAmount
+        enum status "PENDING | PAID | OVERDUE"
+    }
+
+    Contract {
+        string id PK
+        date startDate
+        date endDate
+        boolean isActive
+    }
+
+    MaintenanceRequest {
+        string id PK
+        string title
+        string description
+        enum status "PENDING | IN_PROGRESS | COMPLETED"
+    }
+
+    MeterReading {
+        string id PK
+        date month
+        float waterReading
+        float electricReading
+    }
+
+    Settings {
+        string id PK
+        string key
+        string value
+    }
+```
+
+---
+
+## 10. Technology Stack
+
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | React + Vite |
+| **Routing** | React Router DOM |
+| **State** | Zustand |
+| **UI** | Custom CSS |
+| **Backend** | Node.js + Express |
+| **ORM** | Prisma |
+| **Database** | PostgreSQL |
+| **Auth** | JWT |

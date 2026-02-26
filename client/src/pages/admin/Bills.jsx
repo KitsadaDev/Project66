@@ -1,0 +1,524 @@
+import { useEffect, useState } from "react";
+import {
+  Search,
+  FileText,
+  Plus,
+  CheckCircle,
+  XCircle,
+  Clock,
+  ExternalLink,
+  Calculator,
+  Save,
+  Trash2,
+} from "lucide-react";
+import { toast } from "react-toastify";
+import { billsAPI, stallsAPI } from "../../api";
+import { generateBillPDF } from "../../utils/pdfGenerator";
+
+const Bills = () => {
+  const [bills, setBills] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+
+  // Create Modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [stalls, setStalls] = useState([]);
+  const [calculating, setCalculating] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  const [formData, setFormData] = useState({
+    slot_id: "",
+    billing_month: new Date().toISOString().slice(0, 7),
+    dueDate: "",
+    water_cost: "",
+    electricity_cost: "",
+    rent_amount: "",
+    greaseTrapFee: "",
+    total_amount: 0,
+  });
+
+  const [calculationResult, setCalculationResult] = useState(null);
+
+  useEffect(() => {
+    fetchBills();
+    fetchStalls();
+  }, []);
+
+  const fetchBills = async () => {
+    try {
+      const response = await billsAPI.getAll();
+      setBills(response.data.data || []);
+    } catch (error) {
+      toast.error("ไม่สามารถโหลดข้อมูลบิลได้");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchStalls = async () => {
+    try {
+      const response = await stallsAPI.getAll();
+      setStalls(
+        (response.data.data || []).filter((s) => s.status === "OCCUPIED"),
+      );
+    } catch (error) {
+      console.error("Error fetching stalls:", error);
+    }
+  };
+
+  const handleCalculate = async () => {
+    if (!formData.slot_id || !formData.billing_month) {
+      toast.error("กรุณาเลือกล็อคและเดือน");
+      return;
+    }
+
+    setCalculating(true);
+    setCalculationResult(null);
+    try {
+      const response = await billsAPI.calculate({
+        slot_id: formData.slot_id,
+        month: formData.billing_month + "-01",
+      });
+
+      const { amounts, units, rates } = response.data.data;
+
+      setFormData((prev) => ({
+        ...prev,
+        water_cost: amounts.water,
+        electricity_cost: amounts.electric,
+        rent_amount: amounts.rent,
+        greaseTrapFee: amounts.greaseTrapFee,
+        total_amount: amounts.total,
+      }));
+
+      setCalculationResult(response.data.data);
+      toast.success("คำนวณยอดเงินเรียบร้อยแล้ว");
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error.response?.data?.message ||
+          "ไม่สามารถคำนวณยอดเงินได้ (อาจยังไม่ได้บันทึกมิเตอร์)",
+      );
+    } finally {
+      setCalculating(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setCreating(true);
+    try {
+      await billsAPI.create({
+        slot_id: formData.slot_id,
+        billing_month: formData.billing_month + "-01",
+        water_cost: formData.water_cost,
+        electricity_cost: formData.electricity_cost,
+        dueDate: formData.dueDate,
+      });
+      toast.success("สร้างบิลสำเร็จ");
+      setIsModalOpen(false);
+      fetchBills();
+      setFormData({
+        slot_id: "",
+        billing_month: new Date().toISOString().slice(0, 7),
+        dueDate: "",
+        water_cost: "",
+        electricity_cost: "",
+        rent_amount: "",
+        greaseTrapFee: "",
+        total_amount: 0,
+      });
+      setCalculationResult(null);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "สร้างบิลไม่สำเร็จ");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case "PAID":
+        return (
+          <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-green-100 text-green-700 flex items-center gap-1">
+            <CheckCircle size={14} /> ชำระแล้ว
+          </span>
+        );
+      case "PENDING":
+        return (
+          <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-yellow-100 text-yellow-700 flex items-center gap-1">
+            <Clock size={14} /> รอชำระ
+          </span>
+        );
+      case "OVERDUE":
+        return (
+          <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-red-100 text-red-700 flex items-center gap-1">
+            <XCircle size={14} /> เกินกำหนด
+          </span>
+        );
+      default:
+        return (
+          <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-gray-100 text-gray-700">
+            {status}
+          </span>
+        );
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  const filteredBills = bills.filter((bill) => {
+    const matchesSearch =
+      bill.rental_slot?.slot_number
+        ?.toLowerCase()
+        .includes(search.toLowerCase()) ||
+      bill.rental_contract?.tenant?.first_name
+        ?.toLowerCase()
+        .includes(search.toLowerCase());
+    const matchesStatus =
+      statusFilter === "ALL" || bill.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  return (
+    <div>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-800">
+            จัดการบิลค่าเช่า
+          </h1>
+          <p className="text-gray-500 text-sm">
+            ออกบิล ตรวจสอบสถานะการชำระเงิน
+          </p>
+        </div>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="flex items-center gap-2 bg-purple-500 hover:bg-purple-600 text-white px-4 py-2.5 rounded-xl font-semibold transition-colors shadow-lg shadow-purple-200"
+        >
+          <Plus size={20} /> ออกบิลใหม่
+        </button>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="relative flex-1">
+          <Search
+            size={20}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          />
+          <input
+            type="text"
+            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
+            placeholder="ค้นหา ล็อค, ชื่อผู้เช่า..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <select
+          className="px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-purple-400 bg-white"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="ALL">สถานะทั้งหมด</option>
+          <option value="PENDING">รอชำระ</option>
+          <option value="PAID">ชำระแล้ว</option>
+          <option value="OVERDUE">เกินกำหนด</option>
+        </select>
+      </div>
+
+      {/* Bills Table */}
+      <div className="bg-white rounded-2xl shadow-lg border border-purple-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                <th className="text-left py-4 px-6 font-semibold text-gray-600">
+                  บิลประจำเดือน
+                </th>
+                <th className="text-left py-4 px-6 font-semibold text-gray-600">
+                  ล็อก
+                </th>
+                <th className="text-left py-4 px-6 font-semibold text-gray-600">
+                  ผู้เช่า
+                </th>
+                <th className="text-right py-4 px-6 font-semibold text-gray-600">
+                  ยอดรวม
+                </th>
+                <th className="text-center py-4 px-6 font-semibold text-gray-600">
+                  สถานะ
+                </th>
+                <th className="text-left py-4 px-6 font-semibold text-gray-600">
+                  จัดการ
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredBills.map((bill) => (
+                <tr
+                  key={bill.expense_id}
+                  className="border-b border-gray-50 hover:bg-purple-50/30 transition-colors"
+                >
+                  <td className="py-4 px-6">
+                    <span className="font-medium text-gray-800">
+                      {new Date(bill.billing_month).toLocaleDateString(
+                        "th-TH",
+                        {
+                          month: "long",
+                          year: "numeric",
+                        },
+                      )}
+                    </span>
+                  </td>
+                  <td className="py-4 px-6">
+                    <span className="px-2.5 py-1 bg-purple-100 text-purple-700 rounded-lg text-sm font-bold">
+                      {bill.rental_slot?.slot_number ||
+                        bill.rental_contract?.rental_slot?.slot_number}
+                    </span>
+                  </td>
+                  <td className="py-4 px-6 text-sm text-gray-600">
+                    {bill.rental_contract?.tenant?.first_name || "-"}
+                  </td>
+                  <td className="py-4 px-6 text-right font-bold text-gray-800">
+                    ฿{(bill.total_amount || 0).toLocaleString()}
+                  </td>
+                  <td className="py-4 px-6 flex justify-center">
+                    {getStatusBadge(bill.status)}
+                  </td>
+                  <td className="py-4 px-6">
+                    <button className="p-2 text-gray-400 hover:text-purple-600 transition-colors">
+                      <ExternalLink size={18} />
+                    </button>
+                    <button
+                      onClick={() => generateBillPDF(bill)}
+                      className="p-2 text-gray-400 hover:text-purple-600 transition-colors"
+                      title="ดาวน์โหลด PDF"
+                    >
+                      <FileText size={18} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {filteredBills.length === 0 && (
+                <tr>
+                  <td colSpan="6" className="py-12 text-center text-gray-400">
+                    ไม่พบข้อมูลบิล
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Create Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <FileText size={24} className="text-purple-500" />
+                ออกบิลค่าเช่าใหม่
+              </h2>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XCircle size={24} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    เลือกล็อก *
+                  </label>
+                  <select
+                    required
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100 bg-white"
+                    value={formData.slot_id}
+                    onChange={(e) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        slot_id: e.target.value,
+                      }));
+                      setCalculationResult(null); // Reset calc when stall changes
+                    }}
+                  >
+                    <option value="">-- กรุณาเลือก --</option>
+                    {stalls.map((stall) => (
+                      <option key={stall.slot_id} value={stall.slot_id}>
+                        {stall.slot_number} ({stall.tenant?.first_name})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    ประจำเดือน *
+                  </label>
+                  <input
+                    type="month"
+                    required
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100"
+                    value={formData.billing_month}
+                    onChange={(e) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        billing_month: e.target.value,
+                      }));
+                      setCalculationResult(null);
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Auto Calculate Button */}
+              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-blue-800 text-sm">
+                    คำนวณอัตโนมัติจากมิเตอร์
+                  </h3>
+                  <p className="text-xs text-blue-600">
+                    ระบบจะดึงค่ามิเตอร์ล่าสุดมาคำนวณค่าน้ำ/ไฟให้
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCalculate}
+                  disabled={calculating || !formData.stallId}
+                  className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {calculating ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <Calculator size={16} />
+                  )}
+                  {calculating ? "กำลังคำนวณ..." : "ดึงยอดเงิน"}
+                </button>
+              </div>
+
+              {/* Amount Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                    ค่าเช่า
+                  </label>
+                  <input
+                    type="number"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
+                    value={formData.rent_amount}
+                    readOnly
+                    placeholder="รอการคำนวณ..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                    ค่าดักไขมัน
+                  </label>
+                  <input
+                    type="number"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
+                    value={formData.greaseTrapFee}
+                    readOnly
+                    placeholder="รอการคำนวณ..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    ค่าน้ำ (บาท)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-100"
+                    value={formData.water_cost}
+                    onChange={(e) =>
+                      setFormData({ ...formData, water_cost: e.target.value })
+                    }
+                  />
+                  {calculationResult && (
+                    <span className="text-[10px] text-gray-400">
+                      ใช้ไป {calculationResult.units.water} หน่วย x{" "}
+                      {calculationResult.rates.water} บาท
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    ค่าไฟ (บาท)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-100"
+                    value={formData.electricity_cost}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        electricity_cost: e.target.value,
+                      })
+                    }
+                  />
+                  {calculationResult && (
+                    <span className="text-[10px] text-gray-400">
+                      ใช้ไป {calculationResult.units.electric} หน่วย x{" "}
+                      {calculationResult.rates.electric} บาท
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Total & Due Date */}
+              <div className="flex flex-col md:flex-row gap-6 items-end">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    กำหนดชำระ *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100"
+                    value={formData.dueDate}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        dueDate: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="flex-1 bg-purple-50 p-4 rounded-xl border border-purple-100 text-right">
+                  <span className="block text-sm text-purple-600 mb-1">
+                    ยอดรวมทั้งสิ้น
+                  </span>
+                  <span className="text-2xl font-bold text-purple-700">
+                    ฿{parseFloat(formData.total_amount || 0).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={creating}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-purple-200 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {creating ? "กำลังสร้างบิล..." : "บันทึกและสร้างบิล"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Bills;
