@@ -22,6 +22,7 @@ import PaymentHistory from "./pages/tenant/PaymentHistory";
 import StallStatus from "./pages/tenant/StallStatus";
 import ReportRepair from "./pages/tenant/ReportRepair";
 import TrackRepairs from "./pages/tenant/TrackRepairs";
+import TenantDishware from "./pages/tenant/Dishware";
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/Dashboard";
@@ -32,6 +33,7 @@ import AdminRepairs from "./pages/admin/Repairs";
 import AdminSettings from "./pages/admin/Settings";
 import AdminBills from "./pages/admin/Bills";
 import AdminReports from "./pages/admin/Reports";
+import AdminDishware from "./pages/admin/Dishware";
 
 // Maintenance Pages
 import MaintenanceDashboard from "./pages/maintenance/Dashboard";
@@ -117,6 +119,7 @@ function App() {
           <Route path="upload-bill" element={<UploadBill />} />
           <Route path="payment-history" element={<PaymentHistory />} />
           <Route path="stall-status" element={<StallStatus />} />
+          <Route path="dishware" element={<TenantDishware />} />
           <Route path="report-repair" element={<ReportRepair />} />
           <Route path="track-repairs" element={<TrackRepairs />} />
         </Route>
@@ -135,6 +138,7 @@ function App() {
           <Route path="meter-recording" element={<MeterRecording />} />
           <Route path="stalls" element={<Stalls />} />
           <Route path="bills" element={<AdminBills />} />
+          <Route path="dishware" element={<AdminDishware />} />
           <Route path="reports" element={<AdminReports />} />
           <Route path="repairs" element={<AdminRepairs />} />
           <Route path="settings" element={<AdminSettings />} />

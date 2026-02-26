@@ -75,3 +75,21 @@ export const settingsAPI = {
   updateUtilityRates: (data) => api.put('/settings/utility-rates', data),
   update: (settings) => api.put('/settings', { settings })
 };
+
+export const dishwareAPI = {
+  getAll: (params) => api.get('/dishware', { params }),
+  create: (data) => api.post('/dishware', data),
+  delete: (id) => api.delete(`/dishware/${id}`),
+  getSummary: (params) => api.get('/dishware/summary', { params }),
+  approve: (id) => api.patch(`/dishware/${id}/approve`),
+  reject: (id, data) => api.patch(`/dishware/${id}/reject`, data)
+};
+
+export const dishwareTypeAPI = {
+  getAll: (params) => api.get('/dishware-types', { params }),
+  create: (data) => api.post('/dishware-types', data),
+  update: (id, data) => api.patch(`/dishware-types/${id}`, data),
+  delete: (id) => api.delete(`/dishware-types/${id}`)
+};
+
+

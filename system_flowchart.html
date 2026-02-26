@@ -1,0 +1,835 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flowchart ระบบ BRU Food Court Management</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Inter", "Noto Sans Thai", sans-serif;
+        background: #0f0f1a;
+        color: #e0e0e0;
+        min-height: 100vh;
+      }
+
+      .header {
+        background: linear-gradient(
+          135deg,
+          #1a1a2e 0%,
+          #16213e 50%,
+          #0f3460 100%
+        );
+        padding: 28px 40px;
+        text-align: center;
+        border-bottom: 2px solid rgba(99, 102, 241, 0.3);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        backdrop-filter: blur(10px);
+      }
+
+      .header h1 {
+        font-size: 1.6rem;
+        font-weight: 700;
+        background: linear-gradient(90deg, #818cf8, #a78bfa, #c084fc);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .header p {
+        margin-top: 6px;
+        font-size: 0.85rem;
+        color: #94a3b8;
+      }
+
+      .controls {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .controls button {
+        padding: 6px 16px;
+        border: 1px solid rgba(99, 102, 241, 0.4);
+        background: rgba(99, 102, 241, 0.15);
+        color: #a5b4fc;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 600;
+        transition: all 0.2s;
+      }
+
+      .controls button:hover {
+        background: rgba(99, 102, 241, 0.3);
+        border-color: rgba(99, 102, 241, 0.6);
+      }
+
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 30px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+      }
+
+      .chart-card {
+        background: linear-gradient(145deg, #1e1e32, #1a1a2e);
+        border: 1px solid rgba(99, 102, 241, 0.15);
+        border-radius: 16px;
+        overflow: hidden;
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+      }
+
+      .chart-card:hover {
+        box-shadow: 0 8px 32px rgba(99, 102, 241, 0.1);
+      }
+
+      .chart-title {
+        padding: 16px 24px;
+        font-size: 1.15rem;
+        font-weight: 700;
+        background: rgba(99, 102, 241, 0.08);
+        border-bottom: 1px solid rgba(99, 102, 241, 0.12);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .chart-title span {
+        background: linear-gradient(90deg, #818cf8, #c084fc);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .zoom-btns {
+        display: flex;
+        gap: 6px;
+      }
+
+      .zoom-btns button {
+        width: 32px;
+        height: 32px;
+        border: 1px solid rgba(99, 102, 241, 0.3);
+        background: rgba(99, 102, 241, 0.1);
+        color: #a5b4fc;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+      }
+
+      .zoom-btns button:hover {
+        background: rgba(99, 102, 241, 0.25);
+      }
+
+      .chart-body {
+        padding: 24px;
+        overflow: auto;
+        position: relative;
+        min-height: 200px;
+      }
+
+      .chart-wrapper {
+        transform-origin: top left;
+        transition: transform 0.2s ease;
+        display: inline-block;
+        min-width: 100%;
+      }
+
+      .mermaid {
+        display: flex;
+        justify-content: center;
+      }
+
+      .mermaid svg {
+        max-width: none !important;
+      }
+
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(99, 102, 241, 0.3);
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(99, 102, 241, 0.5);
+      }
+
+      .nav-sidebar {
+        position: fixed;
+        right: 20px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        z-index: 50;
+      }
+
+      .nav-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: rgba(99, 102, 241, 0.3);
+        border: 1px solid rgba(99, 102, 241, 0.5);
+        cursor: pointer;
+        transition: all 0.2s;
+        position: relative;
+      }
+
+      .nav-dot:hover {
+        background: rgba(99, 102, 241, 0.7);
+        transform: scale(1.4);
+      }
+
+      .nav-dot:hover::after {
+        content: attr(data-label);
+        position: absolute;
+        right: 20px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: #1e1e32;
+        color: #a5b4fc;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        white-space: nowrap;
+        border: 1px solid rgba(99, 102, 241, 0.3);
+      }
+
+      .tech-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 1rem;
+      }
+      .tech-table th {
+        text-align: left;
+        padding: 12px 16px;
+        color: #a5b4fc;
+        font-weight: 700;
+        border-bottom: 2px solid rgba(99, 102, 241, 0.3);
+      }
+      .tech-table td {
+        padding: 10px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      }
+      .tech-table td:first-child {
+        font-weight: 600;
+      }
+
+      @media (max-width: 768px) {
+        .header h1 {
+          font-size: 1.2rem;
+        }
+        .container {
+          padding: 16px 10px;
+        }
+        .nav-sidebar {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Flowchart การทำงานของระบบ BRU Food Court Management</h1>
+      <p>
+        Ctrl + Scroll เพื่อซูมทั้งหน้า | ใช้ปุ่ม +/- ที่แต่ละ Flowchart
+        เพื่อซูมแยก
+      </p>
+      <div class="controls">
+        <button onclick="zoomAll(1.5)">ซูม 150%</button>
+        <button onclick="zoomAll(2)">ซูม 200%</button>
+        <button onclick="zoomAll(2.5)">ซูม 250%</button>
+        <button onclick="zoomAll(1)">รีเซ็ต</button>
+      </div>
+    </div>
+
+    <nav class="nav-sidebar" id="navSidebar"></nav>
+
+    <div class="container" id="container">
+      <!-- 1 -->
+      <div class="chart-card" id="section-1">
+        <div class="chart-title">
+          <span>1. ภาพรวมระบบ (System Overview)</span>
+          <div class="zoom-btns">
+            <button onclick="zoomChart(this, -0.25)">−</button>
+            <button onclick="zoomChart(this, 0.25)">+</button>
+            <button onclick="resetChart(this)">↩</button>
+          </div>
+        </div>
+        <div class="chart-body">
+          <div class="chart-wrapper" data-zoom="1">
+            <pre class="mermaid">
+flowchart TD
+    START([Start]) --> A[ผู้ใช้งานเข้าเว็บ]
+    A --> B{มีบัญชีหรือไม่?}
+    B -- "ไม่มี" --> C[ลงทะเบียน /register]
+    B -- "มี" --> D[เข้าสู่ระบบ /login]
+    C --> D
+    D --> E{ตรวจสอบ Role}
+    E -- "ADMIN" --> F[Admin Dashboard]
+    E -- "TENANT" --> G[Tenant Dashboard]
+    E -- "MAINTENANCE" --> H[Maintenance Dashboard]
+    E -- "EXECUTIVE" --> I[Executive Dashboard]
+    F --> END1([End])
+    G --> END1
+    H --> END1
+    I --> END1
+                </pre
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- 2 Login -->
+      <div class="chart-card" id="section-2">
+        <div class="chart-title">
+          <span>2. ระบบ Authentication — Login</span>
+          <div class="zoom-btns">
+            <button onclick="zoomChart(this, -0.25)">−</button>
+            <button onclick="zoomChart(this, 0.25)">+</button>
+            <button onclick="resetChart(this)">↩</button>
+          </div>
+        </div>
+        <div class="chart-body">
+          <div class="chart-wrapper" data-zoom="1">
+            <pre class="mermaid">
+flowchart TD
+    START([Start]) --> A[ผู้ใช้กรอก Email + Password]
+    A --> B[POST /api/auth/login]
+    B --> C{ตรวจสอบข้อมูล}
+    C -- "ไม่ถูกต้อง" --> D[แจ้ง Error]
+    D --> END1([End])
+    C -- "ถูกต้อง" --> E[สร้าง JWT Token]
+    E --> F[ส่ง Token + User Data กลับ]
+    F --> G[เก็บ Token ใน Zustand Store]
+    G --> H[Redirect ตาม Role]
+    H --> END2([End])
+                </pre
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- 2b Register -->
+      <div class="chart-card" id="section-2b">
+        <div class="chart-title">
+          <span>2. ระบบ Authentication — Register</span>
+          <div class="zoom-btns">
+            <button onclick="zoomChart(this, -0.25)">−</button>
+            <button onclick="zoomChart(this, 0.25)">+</button>
+            <button onclick="resetChart(this)">↩</button>
+          </div>
+        </div>
+        <div class="chart-body">
+          <div class="chart-wrapper" data-zoom="1">
+            <pre class="mermaid">
+flowchart TD
+    START([Start]) --> A[ผู้ใช้กรอกข้อมูลลงทะเบียน]
+    A --> B[POST /api/auth/register]
+    B --> C{Validate ข้อมูล}
+    C -- "ไม่ผ่าน" --> D[แจ้ง Error]
+    D --> END1([End])
+    C -- "ผ่าน" --> E[Hash Password + บันทึก DB]
+    E --> F[สร้าง User role: TENANT]
+    F --> END2([End])
+                </pre
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- 3 Admin -->
+      <div class="chart-card" id="section-3">
+        <div class="chart-title">
+          <span>3. Flow ของ Admin - ผู้ดูแลระบบ</span>
+          <div class="zoom-btns">
+            <button onclick="zoomChart(this, -0.25)">−</button>
+            <button onclick="zoomChart(this, 0.25)">+</button>
+            <button onclick="resetChart(this)">↩</button>
+          </div>
+        </div>
+        <div class="chart-body">
+          <div class="chart-wrapper" data-zoom="1">
+            <pre class="mermaid">
+flowchart TD
+    START([Start]) --> A[Admin Dashboard]
+    A --> B[จัดการแผงค้า]
+    A --> C[จัดการผู้เช่า]
+    A --> D[บันทึกมิเตอร์]
+    A --> E[จัดการบิล]
+    A --> F[จัดการซ่อมบำรุง]
+    A --> G[รายงาน]
+    A --> H[ตั้งค่าระบบ]
+
+    B --> B1[ดูแผงค้าทั้งหมด]
+    B --> B2[เปลี่ยนสถานะ VACANT / OCCUPIED / MAINTENANCE]
+    B --> B3[กำหนดผู้เช่า]
+    B1 --> END1([End])
+    B2 --> END1
+    B3 --> END1
+
+    C --> C1[ดูรายชื่อผู้เช่า]
+    C --> C2[จัดการสัญญาเช่า]
+    C1 --> END1
+    C2 --> END1
+
+    D --> D1[บันทึกค่าน้ำ/ไฟ]
+    D1 --> D2[คำนวณหน่วยที่ใช้]
+    D2 --> END1
+
+    E --> E1[สร้างบิลรายเดือน]
+    E --> E2[ตรวจสอบหลักฐานการชำระ]
+    E --> E3[อัปเดตสถานะ PENDING / PAID / OVERDUE]
+    E1 --> END1
+    E2 --> END1
+    E3 --> END1
+
+    F --> F1[รับแจ้งซ่อม]
+    F1 --> F2[มอบหมายช่าง]
+    F2 --> F3[ติดตามสถานะ]
+    F3 --> END1
+
+    G --> END1
+    H --> H1[ตั้งค่าอัตราค่าน้ำ/ไฟ]
+    H --> H2[ตั้งค่าค่าบ่อดักไขมัน]
+    H1 --> END1
+    H2 --> END1
+                </pre
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- 4 Tenant -->
+      <div class="chart-card" id="section-4">
+        <div class="chart-title">
+          <span>4. Flow ของ Tenant - ผู้เช่า</span>
+          <div class="zoom-btns">
+            <button onclick="zoomChart(this, -0.25)">−</button>
+            <button onclick="zoomChart(this, 0.25)">+</button>
+            <button onclick="resetChart(this)">↩</button>
+          </div>
+        </div>
+        <div class="chart-body">
+          <div class="chart-wrapper" data-zoom="1">
+            <pre class="mermaid">
+flowchart TD
+    START([Start]) --> A[Tenant Dashboard]
+    A --> B[ดูค่าใช้จ่าย]
+    A --> C[อัปโหลดหลักฐานชำระ]
+    A --> D[ดูประวัติชำระเงิน]
+    A --> E[ดูสัญญาเช่า]
+    A --> F[แจ้งซ่อม]
+    A --> G[ติดตามการซ่อม]
+    A --> H[ดูสถานะแผงค้า]
+
+    B --> B1[ดูบิลค่าเช่า + ค่าน้ำ + ค่าไฟ]
+    B1 --> END1([End])
+
+    C --> C1[เลือกบิลที่ต้องชำระ]
+    C1 --> C2[อัปโหลดสลิปการโอน]
+    C2 --> C3[รอ Admin ตรวจสอบ]
+    C3 --> END1
+
+    D --> END1
+    E --> END1
+    H --> END1
+
+    F --> F1[กรอกรายละเอียดปัญหา]
+    F1 --> F2[แนบรูปภาพ]
+    F2 --> F3[ส่งแจ้งซ่อม]
+    F3 --> F4[สถานะ: PENDING]
+    F4 --> END1
+
+    G --> G1[ดูสถานะ: PENDING / IN_PROGRESS / COMPLETED]
+    G1 --> END1
+                </pre
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- 5 Maintenance -->
+      <div class="chart-card" id="section-5">
+        <div class="chart-title">
+          <span>5. Flow ของ Maintenance - ช่างซ่อมบำรุง</span>
+          <div class="zoom-btns">
+            <button onclick="zoomChart(this, -0.25)">−</button>
+            <button onclick="zoomChart(this, 0.25)">+</button>
+            <button onclick="resetChart(this)">↩</button>
+          </div>
+        </div>
+        <div class="chart-body">
+          <div class="chart-wrapper" data-zoom="1">
+            <pre class="mermaid">
+flowchart TD
+    START([Start]) --> A[Maintenance Dashboard]
+    A --> B[ดูงานทั้งหมด]
+    B --> C[เลือกงานซ่อม]
+    C --> D[ดูรายละเอียด + รูปภาพ]
+    D --> E{เปลี่ยนสถานะ}
+    E -- "เริ่มงาน" --> F[IN_PROGRESS]
+    E -- "เสร็จแล้ว" --> G[COMPLETED]
+    F --> END1([End])
+    G --> H[อัปโหลดหลักฐานการซ่อม]
+    H --> I[บันทึกวันที่ซ่อมเสร็จ]
+    I --> END1
+                </pre
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- 6 Executive -->
+      <div class="chart-card" id="section-6">
+        <div class="chart-title">
+          <span>6. Flow ของ Executive - ผู้บริหาร</span>
+          <div class="zoom-btns">
+            <button onclick="zoomChart(this, -0.25)">−</button>
+            <button onclick="zoomChart(this, 0.25)">+</button>
+            <button onclick="resetChart(this)">↩</button>
+          </div>
+        </div>
+        <div class="chart-body">
+          <div class="chart-wrapper" data-zoom="1">
+            <pre class="mermaid">
+flowchart TD
+    START([Start]) --> A[Executive Dashboard]
+    A --> B[ดูภาพรวมแผงค้า]
+    A --> C[ดูข้อมูลผู้เช่า]
+    A --> D[ดูข้อมูลบิล/รายรับ]
+    A --> E[ดูข้อมูลการซ่อมบำรุง]
+
+    B --> B1[สถิติ: VACANT / OCCUPIED / MAINTENANCE]
+    B1 --> END1([End])
+    C --> END1
+    D --> D1[สถิติ: PENDING / PAID / OVERDUE]
+    D1 --> END1
+    E --> E1[สถิติ: PENDING / IN_PROGRESS / COMPLETED]
+    E1 --> END1
+                </pre
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- 7 Billing -->
+      <div class="chart-card" id="section-7">
+        <div class="chart-title">
+          <span>7. Flow การเรียกเก็บค่าเช่ารายเดือน (Billing Process)</span>
+          <div class="zoom-btns">
+            <button onclick="zoomChart(this, -0.25)">−</button>
+            <button onclick="zoomChart(this, 0.25)">+</button>
+            <button onclick="resetChart(this)">↩</button>
+          </div>
+        </div>
+        <div class="chart-body">
+          <div class="chart-wrapper" data-zoom="1">
+            <pre class="mermaid">
+flowchart TD
+    START([Start]) --> A[เริ่มรอบเดือนใหม่]
+    A --> B[Admin บันทึกมิเตอร์น้ำ/ไฟ]
+    B --> C[ระบบคำนวณหน่วยที่ใช้]
+    C --> D[Admin สร้างบิล]
+    D --> E[คำนวณ: ค่าเช่า + ค่าน้ำ + ค่าไฟ + ค่าบ่อดักไขมัน]
+    E --> F[บิลสถานะ: PENDING]
+    F --> G[ผู้เช่าเห็นบิลใน Dashboard]
+    G --> H[ผู้เช่าชำระเงิน + อัปโหลดสลิป]
+    H --> I[Admin ตรวจสอบหลักฐาน]
+    I --> J{ถูกต้อง?}
+    J -- "ใช่" --> K[สถานะ: PAID]
+    J -- "ไม่" --> L[สถานะ: OVERDUE]
+    K --> END1([End])
+    L --> END1
+                </pre
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- 8 Maintenance Request -->
+      <div class="chart-card" id="section-8">
+        <div class="chart-title">
+          <span>8. Flow การแจ้งซ่อม (Maintenance Request Process)</span>
+          <div class="zoom-btns">
+            <button onclick="zoomChart(this, -0.25)">−</button>
+            <button onclick="zoomChart(this, 0.25)">+</button>
+            <button onclick="resetChart(this)">↩</button>
+          </div>
+        </div>
+        <div class="chart-body">
+          <div class="chart-wrapper" data-zoom="1">
+            <pre class="mermaid">
+flowchart TD
+    START([Start]) --> A[ผู้เช่าพบปัญหา]
+    A --> B[แจ้งซ่อมผ่านระบบ]
+    B --> C[กรอกหัวข้อ + รายละเอียด + แนบรูป]
+    C --> D[สถานะ: PENDING]
+    D --> E[Admin เห็นรายการแจ้งซ่อม]
+    E --> F[Admin มอบหมายช่าง]
+    F --> G[ช่างได้รับงาน]
+    G --> H[ช่างเริ่มดำเนินการ]
+    H --> I[สถานะ: IN_PROGRESS]
+    I --> J[ช่างซ่อมเสร็จ + อัปโหลดหลักฐาน]
+    J --> K[สถานะ: COMPLETED]
+    K --> L[ผู้เช่าเห็นผลการซ่อม]
+    L --> END1([End])
+                </pre
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- 9 Database -->
+      <div class="chart-card" id="section-9">
+        <div class="chart-title">
+          <span>9. Database Schema Overview</span>
+          <div class="zoom-btns">
+            <button onclick="zoomChart(this, -0.25)">−</button>
+            <button onclick="zoomChart(this, 0.25)">+</button>
+            <button onclick="resetChart(this)">↩</button>
+          </div>
+        </div>
+        <div class="chart-body">
+          <div class="chart-wrapper" data-zoom="1">
+            <pre class="mermaid">
+erDiagram
+    User ||--o| Stall : rents
+    User ||--o{ Bill : has
+    User ||--o{ Contract : has
+    User ||--o{ MaintenanceRequest : creates
+    Stall ||--o{ MeterReading : records
+    Stall ||--o{ Bill : has
+    Stall ||--o{ Contract : has
+    Stall ||--o{ MaintenanceRequest : has
+
+    User {
+        string id PK
+        string email
+        string password
+        string name
+        enum role
+    }
+
+    Stall {
+        string id PK
+        string stallNumber
+        int foodCourt
+        enum status
+        float monthlyRent
+    }
+
+    Bill {
+        string id PK
+        float rentAmount
+        float waterAmount
+        float electricAmount
+        float totalAmount
+        enum status
+    }
+
+    Contract {
+        string id PK
+        date startDate
+        date endDate
+        boolean isActive
+    }
+
+    MaintenanceRequest {
+        string id PK
+        string title
+        string description
+        enum status
+    }
+
+    MeterReading {
+        string id PK
+        date month
+        float waterReading
+        float electricReading
+    }
+
+    Settings {
+        string id PK
+        string key
+        string value
+    }
+                </pre
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- 10 Tech Stack -->
+      <div class="chart-card" id="section-10">
+        <div class="chart-title">
+          <span>10. Technology Stack</span>
+        </div>
+        <div class="chart-body" style="padding: 32px">
+          <table class="tech-table">
+            <thead>
+              <tr>
+                <th>Layer</th>
+                <th>Technology</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Frontend</td>
+                <td>React + Vite</td>
+              </tr>
+              <tr>
+                <td>Routing</td>
+                <td>React Router DOM</td>
+              </tr>
+              <tr>
+                <td>State</td>
+                <td>Zustand</td>
+              </tr>
+              <tr>
+                <td>UI</td>
+                <td>Custom CSS</td>
+              </tr>
+              <tr>
+                <td>Backend</td>
+                <td>Node.js + Express</td>
+              </tr>
+              <tr>
+                <td>ORM</td>
+                <td>Prisma</td>
+              </tr>
+              <tr>
+                <td>Database</td>
+                <td>PostgreSQL</td>
+              </tr>
+              <tr>
+                <td>Auth</td>
+                <td>JWT</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: "dark",
+        themeVariables: {
+          primaryColor: "#4f46e5",
+          primaryTextColor: "#e0e7ff",
+          primaryBorderColor: "#6366f1",
+          lineColor: "#818cf8",
+          secondaryColor: "#1e1b4b",
+          tertiaryColor: "#312e81",
+          fontFamily: "Inter, Noto Sans Thai, sans-serif",
+          fontSize: "14px",
+        },
+        flowchart: {
+          htmlLabels: true,
+          curve: "basis",
+          padding: 20,
+          nodeSpacing: 50,
+          rankSpacing: 60,
+        },
+      });
+
+      // Build navigation dots
+      const sections = [
+        { id: "section-1", label: "1. ภาพรวมระบบ" },
+        { id: "section-2", label: "2. Login" },
+        { id: "section-2b", label: "2. Register" },
+        { id: "section-3", label: "3. Admin" },
+        { id: "section-4", label: "4. Tenant" },
+        { id: "section-5", label: "5. Maintenance" },
+        { id: "section-6", label: "6. Executive" },
+        { id: "section-7", label: "7. Billing" },
+        { id: "section-8", label: "8. แจ้งซ่อม" },
+        { id: "section-9", label: "9. Database" },
+        { id: "section-10", label: "10. Tech Stack" },
+      ];
+
+      const nav = document.getElementById("navSidebar");
+      sections.forEach((s) => {
+        const dot = document.createElement("div");
+        dot.className = "nav-dot";
+        dot.dataset.label = s.label;
+        dot.onclick = () =>
+          document.getElementById(s.id).scrollIntoView({ behavior: "smooth" });
+        nav.appendChild(dot);
+      });
+    </script>
+
+    <script>
+      function zoomChart(btn, delta) {
+        const wrapper = btn
+          .closest(".chart-card")
+          .querySelector(".chart-wrapper");
+        let zoom = parseFloat(wrapper.dataset.zoom) || 1;
+        zoom = Math.max(0.5, Math.min(4, zoom + delta));
+        wrapper.dataset.zoom = zoom;
+        wrapper.style.transform = "scale(" + zoom + ")";
+      }
+
+      function resetChart(btn) {
+        const wrapper = btn
+          .closest(".chart-card")
+          .querySelector(".chart-wrapper");
+        wrapper.dataset.zoom = 1;
+        wrapper.style.transform = "scale(1)";
+      }
+
+      function zoomAll(level) {
+        document.querySelectorAll(".chart-wrapper").forEach(function (w) {
+          w.dataset.zoom = level;
+          w.style.transform = "scale(" + level + ")";
+        });
+      }
+
+      // Ctrl + Scroll to zoom all charts
+      let globalZoom = 1;
+      document.addEventListener(
+        "wheel",
+        function (e) {
+          if (e.ctrlKey) {
+            e.preventDefault();
+            globalZoom = Math.max(
+              0.5,
+              Math.min(4, globalZoom - e.deltaY * 0.001),
+            );
+            zoomAll(globalZoom);
+          }
+        },
+        { passive: false },
+      );
+    </script>
+  </body>
+</html>

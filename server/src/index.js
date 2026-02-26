@@ -12,6 +12,8 @@ const billRoutes = require("./routes/bills");
 const contractRoutes = require("./routes/contracts");
 const maintenanceRoutes = require("./routes/maintenance");
 const settingsRoutes = require("./routes/settings");
+const dishwareRoutes = require('./routes/dishware');
+const dishwareTypeRoutes = require('./routes/dishwareTypes');
 
 const app = express();
 
@@ -32,6 +34,8 @@ app.use("/api/bills", billRoutes);
 app.use("/api/contracts", contractRoutes);
 app.use("/api/maintenance", maintenanceRoutes);
 app.use("/api/settings", settingsRoutes);
+app.use("/api/dishware", dishwareRoutes);
+app.use("/api/dishware-types", dishwareTypeRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {

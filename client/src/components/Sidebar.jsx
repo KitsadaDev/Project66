@@ -14,6 +14,7 @@ import {
   Gauge,
   Settings,
   FileBarChart,
+  ShoppingBag,
 } from "lucide-react";
 import { useAuthStore, useUIStore } from "../store";
 import { maintenanceAPI } from "../api";
@@ -57,6 +58,7 @@ const Sidebar = () => {
       { to: "/tenant/upload-bill", icon: Upload, label: "อัปโหลดบิล" },
       { to: "/tenant/payment-history", icon: History, label: "ประวัติชำระ" },
       { to: "/tenant/stall-status", icon: Store, label: "สถานะล็อค" },
+      { to: "/tenant/dishware", icon: ShoppingBag, label: "ถ้วยชาม" },
       { to: "/tenant/report-repair", icon: Wrench, label: "แจ้งซ่อม" },
       { to: "/tenant/track-repairs", icon: ClipboardList, label: "ติดตามซ่อม" },
     ],
@@ -66,6 +68,7 @@ const Sidebar = () => {
       { to: "/admin/stalls", icon: Building2, label: "แก้ไขสถานะล็อก" },
       { to: "/admin/meter-recording", icon: Gauge, label: "บันทึกมิเตอร์" },
       { to: "/admin/bills", icon: Receipt, label: "จัดการบิล" },
+      { to: "/admin/dishware", icon: ShoppingBag, label: "ถ้วยชามรายวัน" },
       { to: "/admin/reports", icon: FileBarChart, label: "รายงานสรุป" },
       {
         to: "/admin/repairs",

@@ -48,6 +48,19 @@ enum MeterType {
   ELECTRICITY
 }
 
+enum DishwareStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum DishwareCategory {
+  PLATE
+  BOWL
+  CUP
+  OTHER
+}
+
 enum NotificationStatus {
   UNREAD
   READ
@@ -85,10 +98,11 @@ model User {
   email         String?
 
   // Relations – tenant side
-  rental_contracts      RentalContract[]     @relation("TenantContracts")
-  maintenance_requests  MaintenanceRequest[] @relation("TenantRequests")
-  daily_dishware_usages DailyDishwareUsage[] @relation("RecordedByUser")
-  utility_meters        UtilityMeter[]       @relation("RecordedByUser")
+  rental_contracts        RentalContract[]     @relation("TenantContracts")
+  maintenance_requests    MaintenanceRequest[] @relation("TenantRequests")
+  daily_dishware_usages   DailyDishwareUsage[] @relation("RecordedByUser")
+  daily_dishware_reviewed DailyDishwareUsage[] @relation("ReviewedByUser")
+  utility_meters          UtilityMeter[]       @relation("RecordedByUser")
 
   // Relations – staff side
   maintenance_assignments_assigned MaintenanceAssignment[] @relation("AssignedToUser")
@@ -276,12 +290,13 @@ model MaintenanceUpdate {
 // D12 – notifications (ตารางการแจ้งเตือน)
 // ─────────────────────────────────────────────
 model Notification {
-  notification_id Int      @id @default(autoincrement())
+  notification_id Int                @id @default(autoincrement())
   user_id         Int
   title           String
   message         String?
   reference_id    Int?
-  created_at      DateTime @default(now())
+  status          NotificationStatus @default(UNREAD)
+  created_at      DateTime           @default(now())
 
   // Relations
   user User @relation("UserNotifications", fields: [user_id], references: [user_id])
@@ -304,29 +319,61 @@ model SystemSetting {
 }
 
 // ─────────────────────────────────────────────
-// D14 – daily_dishware_usage (ตารางการใช้ภาชนะรายวัน)
+// D14 – dishware_types (ประเภท+ขนาดภาชนะ)
 // ─────────────────────────────────────────────
-model DailyDishwareUsage {
-  usage_id             Int      @id @default(autoincrement())
-  contract_id          Int
-  usage_date           DateTime
-  plate_quantity       Int      @default(0)
-  bowl_quantity        Int      @default(0)
-  small_cup_quantity   Int      @default(0)
-  plate_unit_price     Float
-  bowl_unit_price      Float
-  small_cup_unit_price Float
-  total_cost           Float
-  recorded_by          Int
-  created_at           DateTime @default(now())
+model DishwareType {
+  dishware_type_id Int              @id @default(autoincrement())
+  name             String // เช่น "จาน (S)", "ชาม (M)"
+  category         DishwareCategory // PLATE | BOWL | CUP | OTHER
+  size_label       String // "S" | "M" | "L" | "-"
+  unit_price       Float
+  is_active        Boolean          @default(true)
+  created_at       DateTime         @default(now())
 
   // Relations
-  contract RentalContract @relation(fields: [contract_id], references: [contract_id])
-  recorder User           @relation("RecordedByUser", fields: [recorded_by], references: [user_id])
+  order_items DishwareOrderItem[]
 }
 
 // ─────────────────────────────────────────────
-// D15 – shop_types (ประเภทร้านค้า)
+// D15 – daily_dishware_usage (ตารางคำสั่งซื้อภาชนะรายวัน)
+// ─────────────────────────────────────────────
+model DailyDishwareUsage {
+  usage_id      Int            @id @default(autoincrement())
+  contract_id   Int
+  usage_date    DateTime
+  total_cost    Float
+  recorded_by   Int
+  status        DishwareStatus @default(PENDING)
+  reviewed_by   Int?
+  reviewed_at   DateTime?
+  reject_reason String?
+  created_at    DateTime       @default(now())
+
+  // Relations
+  contract RentalContract      @relation(fields: [contract_id], references: [contract_id])
+  recorder User                @relation("RecordedByUser", fields: [recorded_by], references: [user_id])
+  reviewer User?               @relation("ReviewedByUser", fields: [reviewed_by], references: [user_id])
+  items    DishwareOrderItem[]
+}
+
+// ─────────────────────────────────────────────
+// D16 – dishware_order_items (รายการย่อยของคำสั่งซื้อ)
+// ─────────────────────────────────────────────
+model DishwareOrderItem {
+  item_id          Int   @id @default(autoincrement())
+  usage_id         Int
+  dishware_type_id Int
+  quantity         Int
+  unit_price       Float // snapshot ราคา ณ เวลาสั่ง
+  subtotal         Float
+
+  // Relations
+  usage         DailyDishwareUsage @relation(fields: [usage_id], references: [usage_id])
+  dishware_type DishwareType       @relation(fields: [dishware_type_id], references: [dishware_type_id])
+}
+
+// ─────────────────────────────────────────────
+// D17 – shop_types (ประเภทร้านค้า)
 // ─────────────────────────────────────────────
 model ShopType {
   shop_type_id        Int      @id @default(autoincrement())
