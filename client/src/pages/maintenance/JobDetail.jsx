@@ -184,7 +184,7 @@ const JobDetail = () => {
                 <div>
                   <p className="text-xs text-gray-500">สถานที่ / ล็อค</p>
                   <p className="font-bold text-gray-800">
-                    {job.slot_number || job.stall?.slot_number || "?"}
+                    {job.slot?.slot_number || "?"}
                   </p>
                 </div>
               </div>
@@ -196,23 +196,9 @@ const JobDetail = () => {
                 <div>
                   <p className="text-xs text-gray-500">ผู้แจ้ง</p>
                   <p className="font-bold text-gray-800">
-                    {job.reporter?.name || job.tenant?.name || "-"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-purple-600 shadow-sm">
-                  <Clock size={20} />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">ความเร่งด่วน</p>
-                  <p className="font-bold text-gray-800">
-                    {job.urgency === "HIGH"
-                      ? "เร่งด่วน"
-                      : job.urgency === "LOW"
-                        ? "ไม่เร่งด่วน"
-                        : "ปกติ"}
+                    {job.tenant
+                      ? `${job.tenant.first_name} ${job.tenant.last_name || ""}`
+                      : "-"}
                   </p>
                 </div>
               </div>
@@ -240,9 +226,10 @@ const JobDetail = () => {
                       className="aspect-square rounded-xl overflow-hidden border border-gray-200"
                     >
                       <img
-                        src={img}
+                        src={img.image_url}
                         alt={`Problem ${index + 1}`}
-                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer"
+                        onClick={() => window.open(img.image_url, "_blank")}
                       />
                     </div>
                   ))}

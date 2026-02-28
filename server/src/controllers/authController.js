@@ -10,8 +10,9 @@ const register = async (req, res, next) => {
     const { username, password, first_name, last_name, email, phone, role, title,
             address_line, subdistrict, district, province, postal_code } = req.body;
 
+    const trimmedUsername = username?.trim();
     // Check duplicate username
-    const existingUsername = await prisma.user.findUnique({ where: { username } });
+    const existingUsername = await prisma.user.findUnique({ where: { username: trimmedUsername } });
     if (existingUsername) {
       return res.status(400).json({ success: false, message: 'Username already taken.' });
     }
@@ -21,7 +22,7 @@ const register = async (req, res, next) => {
 
     const user = await prisma.user.create({
       data: {
-        username,
+        username: trimmedUsername,
         password_hash,
         first_name,
         last_name: last_name || undefined,
@@ -63,9 +64,21 @@ const register = async (req, res, next) => {
 };
 
 // Login user (ด้วย email หรือ username)
+const fs = require('fs');
+const path = require('path');
+
 const login = async (req, res, next) => {
   try {
-    const { login: loginField, password } = req.body;
+    let { login: loginField, password } = req.body;
+    const logPath = path.join(__dirname, '../../debug.log');
+    fs.appendFileSync(logPath, `\n--- Login Attempt ${new Date().toISOString()} ---\n`);
+    fs.appendFileSync(logPath, `Raw loginField: ${JSON.stringify(loginField)}\n`);
+    fs.appendFileSync(logPath, `Raw password: ${JSON.stringify(password)}\n`);
+    console.log('--- Login Attempt ---');
+    console.log('Raw loginField:', JSON.stringify(loginField));
+    console.log('Raw password:', JSON.stringify(password));
+
+    loginField = typeof loginField === 'string' ? loginField.trim() : loginField;
 
     // หา user ด้วย email หรือ username
     const user = await prisma.user.findFirst({
@@ -77,12 +90,22 @@ const login = async (req, res, next) => {
       }
     });
 
+    fs.appendFileSync(logPath, `Found user in DB? ${!!user}\n`);
+    console.log('Found user in DB?', !!user);
+
     if (!user) {
+      fs.appendFileSync(logPath, `User not found in DB!\n`);
+      console.log('User not found in DB!');
       return res.status(401).json({ success: false, message: 'Invalid credentials.' });
     }
 
     const isMatch = await bcrypt.compare(password, user.password_hash);
+    fs.appendFileSync(logPath, `Password match? ${isMatch}\n`);
+    console.log('Password match?', isMatch);
+    
     if (!isMatch) {
+      fs.appendFileSync(logPath, `Password hash mismatch!\n`);
+      console.log('Password hash mismatch!');
       return res.status(401).json({ success: false, message: 'Invalid credentials.' });
     }
 

@@ -23,6 +23,7 @@ import StallStatus from "./pages/tenant/StallStatus";
 import ReportRepair from "./pages/tenant/ReportRepair";
 import TrackRepairs from "./pages/tenant/TrackRepairs";
 import TenantDishware from "./pages/tenant/Dishware";
+import Notifications from "./pages/tenant/Notifications";
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/Dashboard";
@@ -121,7 +122,9 @@ function App() {
           <Route path="stall-status" element={<StallStatus />} />
           <Route path="dishware" element={<TenantDishware />} />
           <Route path="report-repair" element={<ReportRepair />} />
+          <Route path="report-repair" element={<ReportRepair />} />
           <Route path="track-repairs" element={<TrackRepairs />} />
+          <Route path="notifications" element={<Notifications />} />
         </Route>
 
         {/* Admin Routes */}

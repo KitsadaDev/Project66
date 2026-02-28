@@ -10,7 +10,8 @@ const {
   uploadPaymentProof,
   verifyPayment,
   getPaymentHistory,
-  getDueBills
+  getDueBills,
+  calculateAmount
 } = require('../controllers/billController');
 
 // All routes require authentication
@@ -18,6 +19,7 @@ router.use(authenticate);
 
 // Expense routes
 router.get('/', getAllBills);
+router.post('/calculate', authorize('ADMIN', 'EXECUTIVE'), calculateAmount);
 router.get('/history', getPaymentHistory);
 router.get('/due-soon', getDueBills);
 router.get('/:id', getBillById);

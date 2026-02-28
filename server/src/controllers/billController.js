@@ -93,7 +93,13 @@ const createBill = async (req, res, next) => {
     }
 
     const rent_amount = contract.monthly_rent;
-    const total_amount = parseFloat(rent_amount) + parseFloat(water_cost) + parseFloat(electricity_cost);
+    
+    // Fetch global grease trap fee, but only apply if menuType is 'ของคาว'
+    const greaseTrapSetting = await prisma.systemSetting.findUnique({ where: { setting_key: 'GREASE_TRAP_FEE' } });
+    const baseGreaseTrapFee = parseFloat(greaseTrapSetting?.setting_value || '500');
+    const greaseTrapFee = contract.menuType === 'ของคาว' ? baseGreaseTrapFee : 0;
+
+    const total_amount = parseFloat(rent_amount) + parseFloat(water_cost) + parseFloat(electricity_cost) + greaseTrapFee;
 
     const expense = await prisma.monthlyExpense.create({
       data: {
@@ -162,7 +168,8 @@ const uploadPaymentProof = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'No file uploaded.' });
     }
 
-    const payment_slip_url = `/uploads/payments/${req.file.filename}`;
+    // Using Cloudinary, the full URL is in req.file.path
+    const payment_slip_url = req.file.path;
 
     const payment = await prisma.payment.create({
       data: {
@@ -275,6 +282,88 @@ const getDueBills = async (req, res, next) => {
   }
 };
 
+// Calculate expenses from meter readings
+const calculateAmount = async (req, res, next) => {
+  try {
+    const { slot_id, month } = req.body;
+    
+    if (!slot_id || !month) {
+      return res.status(400).json({ success: false, message: 'Missing slot_id or month.' });
+    }
+
+    const contract = await prisma.rentalContract.findFirst({
+      where: { slot_id: parseInt(slot_id), status: 'ACTIVE' }
+    });
+    
+    if (!contract) {
+      return res.status(404).json({ success: false, message: 'ไม่พบสัญญาเช่าที่ทำงานอยู่สำหรับล็อคนี้ (No active contract)' });
+    }
+
+    const date = new Date(month);
+    // End of the billing month
+    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    // Get the latest water meter recorded on or before the end of the billing month
+    const waterMeter = await prisma.utilityMeter.findFirst({
+      where: { 
+        slot_id: parseInt(slot_id), 
+        meter_type: 'WATER',
+        created_at: { lte: endOfMonth }
+      },
+      orderBy: { created_at: 'desc' }
+    });
+
+    // Get the latest electric meter recorded on or before the end of the billing month
+    const electricMeter = await prisma.utilityMeter.findFirst({
+      where: { 
+        slot_id: parseInt(slot_id), 
+        meter_type: 'ELECTRICITY',
+        created_at: { lte: endOfMonth }
+      },
+      orderBy: { created_at: 'desc' }
+    });
+
+    if (!waterMeter && !electricMeter) {
+      return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลการจดมิเตอร์' });
+    }
+
+    const waterCost = waterMeter ? waterMeter.total_cost : 0;
+    const electricCost = electricMeter ? electricMeter.total_cost : 0;
+    const rent = contract.monthly_rent;
+    
+    // Fetch global grease trap fee, but only apply if menuType is 'ของคาว'
+    const greaseTrapSetting = await prisma.systemSetting.findUnique({ where: { setting_key: 'GREASE_TRAP_FEE' } });
+    const baseGreaseTrapFee = parseFloat(greaseTrapSetting?.setting_value || '500');
+    const greaseTrapFee = contract.menuType === 'ของคาว' ? baseGreaseTrapFee : 0;
+
+    const total = rent + waterCost + electricCost + greaseTrapFee;
+
+    res.json({
+      success: true,
+      data: {
+        amounts: {
+          rent,
+          water: waterCost,
+          electric: electricCost,
+          greaseTrapFee,
+          total
+        },
+        units: {
+          water: waterMeter ? waterMeter.unit_used : 0,
+          electric: electricMeter ? electricMeter.unit_used : 0
+        },
+        rates: {
+          water: waterMeter ? waterMeter.unit_price : 0,
+          electric: electricMeter ? electricMeter.unit_price : 0
+        }
+      }
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllBills,
   getBillById,
@@ -283,5 +372,6 @@ module.exports = {
   uploadPaymentProof,
   verifyPayment,
   getPaymentHistory,
-  getDueBills
+  getDueBills,
+  calculateAmount
 };

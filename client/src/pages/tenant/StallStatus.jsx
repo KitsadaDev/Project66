@@ -65,16 +65,16 @@ const StallStatus = () => {
       : "hover:scale-105 hover:shadow-md";
 
     switch (status) {
-      case "occupied": // Occupied (Normal & Pending mixed for privacy)
-        colorClass =
-          "bg-green-100 border-green-300 text-green-700 hover:bg-green-200";
+      case "occupied":
+        colorClass = "bg-red-100 border-red-300 text-red-700 hover:bg-red-200";
         break;
       case "vacant":
         colorClass =
-          "bg-white border-purple-200 text-purple-700 hover:border-purple-300";
+          "bg-green-100 border-green-300 text-green-700 hover:bg-green-200";
         break;
       case "maintenance":
-        colorClass = "bg-gray-100 border-gray-300 text-gray-500";
+        colorClass =
+          "bg-yellow-100 border-yellow-300 text-yellow-700 hover:bg-yellow-200";
         break;
       default: // empty
         colorClass = "bg-gray-50 border-dashed border-gray-300 text-gray-400";
@@ -200,67 +200,54 @@ const StallStatus = () => {
             ผังศูนย์อาหาร {foodCourt}
           </h2>
 
-          {foodCourt === "1" && (
-            <div className="flex flex-col gap-6">
-              {/* Row B + D1 */}
-              <div className="flex gap-4">
-                {["B1", "B2", "B3", "B4", "B5", "B6"].map((id) => (
-                  <StallCell key={id} id={id} />
-                ))}
-                <div className="w-10"></div>
-                <StallCell id="D1" />
-              </div>
-
-              {/* Spacer + D2 */}
-              <div className="flex gap-4">
-                <div className="flex-1"></div>
-                <div className="w-10"></div>
-                <StallCell id="D2" />
-              </div>
-
-              {/* Row A + D3 */}
-              <div className="flex gap-4">
-                {["A1", "A2", "A3", "A4", "A5", "A6"].map((id) => (
-                  <StallCell key={id} id={id} />
-                ))}
-                <div className="w-10"></div>
-                <StallCell id="D3" />
-              </div>
-
-              <div className="h-4"></div>
-
-              {/* Row C */}
-              <div className="flex gap-4">
-                {["C1", "C2", "C3", "C4", "C5", "C6"].map((id) => (
-                  <StallCell key={id} id={id} />
-                ))}
-              </div>
+          <div className="flex flex-col gap-6">
+            {/* Row B + D1 */}
+            <div className="flex gap-4">
+              {["B1", "B2", "B3", "B4", "B5", "B6"].map((id) => (
+                <StallCell key={id} id={id} />
+              ))}
+              <div className="w-10"></div>
+              <StallCell id="D1" />
             </div>
-          )}
 
-          {foodCourt === "2" && (
-            <div className="flex flex-col gap-6 items-center">
-              {["D1", "D2", "D3", "D4", "D5"].map((id) => (
-                <div key={id} className="flex gap-4">
-                  <StallCell id={id} />
-                </div>
+            {/* Spacer + D2 */}
+            <div className="flex gap-4">
+              <div className="flex-1"></div>
+              <div className="w-10"></div>
+              <StallCell id="D2" />
+            </div>
+
+            {/* Row A + D3 */}
+            <div className="flex gap-4">
+              {["A1", "A2", "A3", "A4", "A5", "A6"].map((id) => (
+                <StallCell key={id} id={id} />
+              ))}
+              <div className="w-10"></div>
+              <StallCell id="D3" />
+            </div>
+
+            <div className="h-4"></div>
+
+            {/* Row C */}
+            <div className="flex gap-4">
+              {["C1", "C2", "C3", "C4", "C5", "C6"].map((id) => (
+                <StallCell key={id} id={id} />
               ))}
             </div>
-          )}
+          </div>
 
           {/* Legend */}
           <div className="mt-12 flex flex-wrap justify-center gap-6 border-t border-gray-100 pt-6">
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded border border-purple-200 bg-white"></div>
+              <div className="w-4 h-4 rounded border border-green-300 bg-green-100"></div>
               <span className="text-sm text-gray-600">ว่าง (พร้อมเช่า)</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded border border-green-300 bg-green-100"></div>
-              <span className="text-sm text-gray-600">มีผู้เช่า (ปกติ)</span>
+              <div className="w-4 h-4 rounded border border-red-300 bg-red-100"></div>
+              <span className="text-sm text-gray-600">มีผู้เช่าแล้ว</span>
             </div>
-            {/* Pending Payment removed for privacy */}
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded border border-gray-300 bg-gray-100"></div>
+              <div className="w-4 h-4 rounded border border-yellow-300 bg-yellow-100"></div>
               <span className="text-sm text-gray-600">ปิดปรับปรุง</span>
             </div>
             <div className="flex items-center gap-2">
@@ -293,7 +280,7 @@ const StallStatus = () => {
               <div className="flex flex-col items-center mb-8">
                 <div
                   className={`w-24 h-24 rounded-full flex items-center justify-center mb-4 border-4 border-white shadow-lg text-4xl font-bold
-                    ${selectedStall.status === "OCCUPIED" ? "bg-green-100 text-green-600" : "bg-gray-100 text-gray-400"}
+                    ${selectedStall.status === "OCCUPIED" ? "bg-red-100 text-red-600" : selectedStall.status === "MAINTENANCE" ? "bg-yellow-100 text-yellow-600" : selectedStall.status === "VACANT" ? "bg-green-100 text-green-600" : "bg-gray-100 text-gray-400"}
                   `}
                 >
                   {selectedStall.slot_number}
@@ -307,8 +294,12 @@ const StallStatus = () => {
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-bold ${
                       selectedStall.status === "OCCUPIED"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-600"
+                        ? "bg-red-100 text-red-700"
+                        : selectedStall.status === "MAINTENANCE"
+                          ? "bg-yellow-100 text-yellow-700"
+                          : selectedStall.status === "VACANT"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-100 text-gray-600"
                     }`}
                   >
                     {selectedStall.status === "OCCUPIED"

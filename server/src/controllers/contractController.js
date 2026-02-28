@@ -63,10 +63,13 @@ const getContractById = async (req, res, next) => {
   }
 };
 
-// Create contract (Admin only)
 const createContract = async (req, res, next) => {
   try {
-    const { slot_id, tenant_id, startDate, endDate, securityDeposit } = req.body;
+    const { 
+      slot_id, tenant_id, startDate, endDate, securityDeposit,
+      idCard, phone, address, receiptNumber, receiptDate,
+      lateRentFine, lateUtilityFine, menuType
+    } = req.body;
 
     const slot = await prisma.rentalSlot.findUnique({ where: { slot_id: parseInt(slot_id) } });
     if (!slot) {
@@ -93,7 +96,16 @@ const createContract = async (req, res, next) => {
           start_date: new Date(startDate),
           end_date: new Date(endDate),
           monthly_rent: parseFloat(slot.rent),
-          deposit_amount: parseFloat(securityDeposit) || 0,
+          deposit_amount: securityDeposit && securityDeposit !== '' ? parseFloat(securityDeposit) : 0,
+          idCard: idCard && idCard !== '' ? idCard : null,
+          phone: phone && phone !== '' ? phone : null,
+          address: address && address !== '' ? address : null,
+          receiptNumber: receiptNumber && receiptNumber !== '' ? receiptNumber : null,
+          receiptDate: receiptDate && receiptDate !== '' ? new Date(receiptDate) : null,
+          // greaseTrapFee has been moved to global System Settings
+          lateRentFine: lateRentFine && lateRentFine !== '' ? parseFloat(lateRentFine) : null,
+          lateUtilityFine: lateUtilityFine && lateUtilityFine !== '' ? parseFloat(lateUtilityFine) : null,
+          menuType: menuType && menuType !== '' ? menuType : null,
           status: 'ACTIVE'
         },
         include: {
@@ -109,6 +121,7 @@ const createContract = async (req, res, next) => {
 
     res.status(201).json({ success: true, message: 'Contract created successfully.', data: contract });
   } catch (error) {
+    console.error("Error creating contract:", error);
     next(error);
   }
 };
@@ -117,7 +130,11 @@ const createContract = async (req, res, next) => {
 const updateContract = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { startDate, endDate, securityDeposit, status } = req.body;
+    const { 
+      startDate, endDate, securityDeposit, status,
+      idCard, phone, address, receiptNumber, receiptDate,
+      lateRentFine, lateUtilityFine, menuType
+    } = req.body;
 
     const existing = await prisma.rentalContract.findUnique({ where: { contract_id: parseInt(id) } });
     if (!existing) {
@@ -125,10 +142,23 @@ const updateContract = async (req, res, next) => {
     }
 
     const updateData = {};
-    if (startDate) updateData.start_date = new Date(startDate);
-    if (endDate) updateData.end_date = new Date(endDate);
-    if (securityDeposit) updateData.deposit_amount = parseFloat(securityDeposit);
+    if (startDate && startDate !== '') updateData.start_date = new Date(startDate);
+    if (endDate && endDate !== '') updateData.end_date = new Date(endDate);
+    if (securityDeposit !== undefined && securityDeposit !== '') updateData.deposit_amount = parseFloat(securityDeposit);
     if (status) updateData.status = status;
+    
+    // New fields
+    if (idCard !== undefined) updateData.idCard = idCard === '' ? null : idCard;
+    if (phone !== undefined) updateData.phone = phone === '' ? null : phone;
+    if (address !== undefined) updateData.address = address === '' ? null : address;
+    if (receiptNumber !== undefined) updateData.receiptNumber = receiptNumber === '' ? null : receiptNumber;
+    if (receiptDate !== undefined) {
+      updateData.receiptDate = receiptDate === '' ? null : new Date(receiptDate);
+    }
+    // greaseTrapFee is now a global setting, so we don't update it per contract
+    if (lateRentFine !== undefined) updateData.lateRentFine = lateRentFine === '' ? null : parseFloat(lateRentFine);
+    if (lateUtilityFine !== undefined) updateData.lateUtilityFine = lateUtilityFine === '' ? null : parseFloat(lateUtilityFine);
+    if (menuType !== undefined) updateData.menuType = menuType === '' ? null : menuType;
 
     const updatedContract = await prisma.rentalContract.update({
       where: { contract_id: parseInt(id) },

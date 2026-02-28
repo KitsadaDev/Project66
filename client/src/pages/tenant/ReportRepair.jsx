@@ -12,7 +12,6 @@ const ReportRepair = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
-  const [urgency, setUrgency] = useState("NORMAL");
   const [photos, setPhotos] = useState([]);
   const [photoUrls, setPhotoUrls] = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -62,18 +61,12 @@ const ReportRepair = () => {
       formData.append("title", title);
       formData.append("description", description);
       formData.append("category", category);
-      formData.append("urgency", urgency);
 
       photos.forEach((photo) => {
-        formData.append("photos", photo);
+        formData.append("images", photo);
       });
 
-      await maintenanceAPI.create({
-        title,
-        description,
-        category,
-        urgency,
-      });
+      await maintenanceAPI.create(formData);
 
       toast.success("แจ้งซ่อมสำเร็จ รอการดำเนินการ");
       navigate("/tenant/track-repairs");
@@ -135,53 +128,6 @@ const ReportRepair = () => {
                       </option>
                     ))}
                   </select>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-gray-700">
-                  ความเร่งด่วน
-                </label>
-                <div className="flex flex-wrap gap-4">
-                  {[
-                    {
-                      value: "LOW",
-                      label: "ไม่เร่งด่วน",
-                      color: "bg-green-100 text-green-700 border-green-200",
-                    },
-                    {
-                      value: "NORMAL",
-                      label: "ปกติ",
-                      color: "bg-orange-100 text-orange-700 border-orange-200",
-                    },
-                    {
-                      value: "HIGH",
-                      label: "เร่งด่วน",
-                      color: "bg-red-100 text-red-700 border-red-200",
-                    },
-                  ].map((opt) => (
-                    <label
-                      key={opt.value}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 cursor-pointer transition-all ${
-                        urgency === opt.value
-                          ? opt.color
-                          : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="urgency"
-                        value={opt.value}
-                        checked={urgency === opt.value}
-                        onChange={(e) => setUrgency(e.target.value)}
-                        className="hidden"
-                      />
-                      <div
-                        className={`w-3 h-3 rounded-full ${urgency === opt.value ? "bg-current" : "bg-gray-300"}`}
-                      ></div>
-                      <span className="font-medium">{opt.label}</span>
-                    </label>
-                  ))}
                 </div>
               </div>
 

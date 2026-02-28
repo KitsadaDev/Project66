@@ -1,4 +1,5 @@
-require("dotenv").config();
+require("dotenv").config(); // Restarting server to apply Prisma client manual patch
+
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
@@ -14,6 +15,9 @@ const maintenanceRoutes = require("./routes/maintenance");
 const settingsRoutes = require("./routes/settings");
 const dishwareRoutes = require('./routes/dishware');
 const dishwareTypeRoutes = require('./routes/dishwareTypes');
+const notificationRoutes = require('./routes/notifications'); // Import notification routes
+
+const notificationService = require('./services/notificationService');
 
 const app = express();
 

@@ -144,28 +144,32 @@ const RepairDetailsModal = ({ repair, onClose }) => {
             {repair.images && repair.images.length > 0 ? (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {repair.images.map((imgObj, index) => {
-                  const img = imgObj.image_url || imgObj;
+                  const imgUrl =
+                    typeof imgObj === "string"
+                      ? imgObj
+                      : imgObj?.image_url || "";
+                  if (!imgUrl) return null;
+
+                  const imgSrc = imgUrl.startsWith("http")
+                    ? imgUrl
+                    : imgUrl.startsWith("/")
+                      ? `${import.meta.env.VITE_API_URL || "http://localhost:5000"}${imgUrl}`
+                      : `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/${imgUrl}`;
+
                   return (
                     <div
                       key={index}
                       className="group relative aspect-video bg-gray-100 rounded-xl overflow-hidden shadow-sm border border-gray-100"
                     >
                       <img
-                        src={
-                          img.startsWith("http")
-                            ? img
-                            : `${import.meta.env.VITE_API_URL || "http://localhost:5000"}${img}`
-                        }
+                        src={imgSrc}
                         alt={`Repair ${index + 1}`}
                         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 cursor-pointer"
-                        onClick={() =>
-                          window.open(
-                            img.startsWith("http")
-                              ? img
-                              : `${import.meta.env.VITE_API_URL || "http://localhost:5000"}${img}`,
-                            "_blank",
-                          )
-                        }
+                        onError={(e) => {
+                          e.target.src =
+                            "https://via.placeholder.com/400x300?text=Image+Not+Found";
+                        }}
+                        onClick={() => window.open(imgSrc, "_blank")}
                       />
                     </div>
                   );

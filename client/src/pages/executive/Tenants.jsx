@@ -108,7 +108,7 @@ const ExecutiveTenants = () => {
                   เบอร์โทร
                 </th>
                 <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
-                  ล็อค
+                  แผงค้า
                 </th>
                 <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
                   ประเภทอาหาร
@@ -157,7 +157,7 @@ const ExecutiveTenants = () => {
                         </span>
                       </div>
                     ) : (
-                      <span className="text-gray-400 text-sm">ไม่มีล็อค</span>
+                      <span className="text-gray-400 text-sm">ไม่มีแผงค้า</span>
                     )}
                   </td>
                   <td className="py-4 px-6">

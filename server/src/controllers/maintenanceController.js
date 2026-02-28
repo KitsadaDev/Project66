@@ -108,7 +108,7 @@ const createRequest = async (req, res, next) => {
       await prisma.maintenanceImage.createMany({
         data: req.files.map(file => ({
           request_id: request.request_id,
-          image_url: `/uploads/maintenance/${file.filename}`,
+          image_url: file.path,
           image_type: 'request'
         }))
       });
@@ -152,7 +152,7 @@ const updateRequest = async (req, res, next) => {
       await prisma.maintenanceImage.createMany({
         data: req.files.map(file => ({
           request_id: request.request_id,
-          image_url: `/uploads/maintenance/${file.filename}`,
+          image_url: file.path,
           image_type: 'request'
         }))
       });
@@ -252,7 +252,7 @@ const uploadCompletionProof = async (req, res, next) => {
     const images = await prisma.maintenanceImage.createMany({
       data: req.files.map(file => ({
         request_id: parseInt(id),
-        image_url: `/uploads/maintenance/${file.filename}`,
+        image_url: file.path,
         image_type: 'completion'
       }))
     });

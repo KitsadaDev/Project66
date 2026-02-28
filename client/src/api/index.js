@@ -92,4 +92,10 @@ export const dishwareTypeAPI = {
   delete: (id) => api.delete(`/dishware-types/${id}`)
 };
 
+export const notificationsAPI = {
+  getAll: () => api.get('/notifications'),
+  markAsRead: (id) => api.patch(`/notifications/${id}/read`),
+  delete: (id) => api.delete(`/notifications/${id}`)
+};
+
 

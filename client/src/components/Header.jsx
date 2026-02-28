@@ -1,19 +1,12 @@
 import { useNavigate } from "react-router-dom";
-import { LogOut, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useAuthStore, useUIStore } from "../store";
 
 const Header = () => {
-  const { user, logout, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
 
   const { toggleMobileMenu } = useUIStore();
-
-  const handleLogout = () => {
-    if (window.confirm("ต้องการออกจากระบบหรือไม่?")) {
-      logout();
-      navigate("/login");
-    }
-  };
 
   return (
     <header className="sticky top-0 z-40 bg-white shadow-sm transition-colors duration-300">
@@ -22,7 +15,7 @@ const Header = () => {
           {/* Mobile Menu Button */}
           <button
             onClick={toggleMobileMenu}
-            className="md:hidden p-2 -ml-2 text-purple-700 hover:bg-purple-200/50 rounded-lg transition-colors"
+            className="md:hidden p-2 -ml-2 text-purple-700 hover:bg-purple-200/50 rounded-lg transition-colors cursor-pointer"
           >
             <Menu size={24} />
           </button>
@@ -47,22 +40,13 @@ const Header = () => {
 
         <div className="flex items-center gap-3">
           {isAuthenticated && user ? (
-            <>
-              <span className="hidden md:inline text-sm text-gray-700">
-                สวัสดี, คุณ{user.first_name || user.username}
-              </span>
-              <button
-                onClick={handleLogout}
-                className="p-2 rounded-lg hover:bg-red-50 text-red-500 transition-colors"
-                title="ออกจากระบบ"
-              >
-                <LogOut size={18} />
-              </button>
-            </>
+            <span className="hidden md:inline text-sm text-gray-700">
+              สวัสดี, คุณ{user.first_name || user.username}
+            </span>
           ) : (
             <button
               onClick={() => navigate("/login")}
-              className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-full font-semibold text-sm transition-colors"
+              className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-full font-semibold text-sm transition-colors cursor-pointer"
             >
               Login
             </button>

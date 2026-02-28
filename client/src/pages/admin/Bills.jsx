@@ -34,7 +34,6 @@ const Bills = () => {
     water_cost: "",
     electricity_cost: "",
     rent_amount: "",
-    greaseTrapFee: "",
     total_amount: 0,
   });
 
@@ -88,7 +87,6 @@ const Bills = () => {
         water_cost: amounts.water,
         electricity_cost: amounts.electric,
         rent_amount: amounts.rent,
-        greaseTrapFee: amounts.greaseTrapFee,
         total_amount: amounts.total,
       }));
 
@@ -126,7 +124,6 @@ const Bills = () => {
         water_cost: "",
         electricity_cost: "",
         rent_amount: "",
-        greaseTrapFee: "",
         total_amount: 0,
       });
       setCalculationResult(null);
@@ -192,7 +189,7 @@ const Bills = () => {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-800">
-            จัดการบิลค่าเช่า
+            จัดการบิลการชำระเงิน
           </h1>
           <p className="text-gray-500 text-sm">
             ออกบิล ตรวจสอบสถานะการชำระเงิน
@@ -243,7 +240,7 @@ const Bills = () => {
                   บิลประจำเดือน
                 </th>
                 <th className="text-left py-4 px-6 font-semibold text-gray-600">
-                  ล็อก
+                  แผงค้า
                 </th>
                 <th className="text-left py-4 px-6 font-semibold text-gray-600">
                   ผู้เช่า
@@ -324,7 +321,7 @@ const Bills = () => {
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                 <FileText size={24} className="text-purple-500" />
-                ออกบิลค่าเช่าใหม่
+                ออกบิลการชำระเงิน
               </h2>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -338,7 +335,7 @@ const Bills = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    เลือกล็อก *
+                    เลือกแผงค้า *
                   </label>
                   <select
                     required
@@ -353,11 +350,21 @@ const Bills = () => {
                     }}
                   >
                     <option value="">-- กรุณาเลือก --</option>
-                    {stalls.map((stall) => (
-                      <option key={stall.slot_id} value={stall.slot_id}>
-                        {stall.slot_number} ({stall.tenant?.first_name})
-                      </option>
-                    ))}
+                    {stalls.map((stall) => {
+                      const fcName =
+                        stall.food_court?.name ||
+                        `ศูนย์อาหาร ${stall.food_court_id}`;
+                      const tenantName =
+                        stall.rental_contracts?.[0]?.tenant?.first_name;
+                      const display = tenantName
+                        ? `${fcName} - ${tenantName}`
+                        : fcName;
+                      return (
+                        <option key={stall.slot_id} value={stall.slot_id}>
+                          {stall.slot_number} ({display})
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -394,7 +401,7 @@ const Bills = () => {
                 <button
                   type="button"
                   onClick={handleCalculate}
-                  disabled={calculating || !formData.stallId}
+                  disabled={calculating || !formData.slot_id}
                   className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {calculating ? (
@@ -416,18 +423,6 @@ const Bills = () => {
                     type="number"
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
                     value={formData.rent_amount}
-                    readOnly
-                    placeholder="รอการคำนวณ..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">
-                    ค่าดักไขมัน
-                  </label>
-                  <input
-                    type="number"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
-                    value={formData.greaseTrapFee}
                     readOnly
                     placeholder="รอการคำนวณ..."
                   />

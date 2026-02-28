@@ -30,12 +30,14 @@ router.get('/utility-rates', authenticate, async (req, res) => {
   try {
     const waterRate = await prisma.systemSetting.findUnique({ where: { setting_key: 'WATER_RATE_PER_UNIT' } });
     const electricRate = await prisma.systemSetting.findUnique({ where: { setting_key: 'ELECTRIC_RATE_PER_UNIT' } });
+    const greaseTrap = await prisma.systemSetting.findUnique({ where: { setting_key: 'GREASE_TRAP_FEE' } });
 
     res.json({
       success: true,
       data: {
         waterRatePerUnit: parseFloat(waterRate?.setting_value || '18'),
-        electricRatePerUnit: parseFloat(electricRate?.setting_value || '7')
+        electricRatePerUnit: parseFloat(electricRate?.setting_value || '7'),
+        greaseTrapFee: parseFloat(greaseTrap?.setting_value || '500')
       }
     });
   } catch (error) {
@@ -80,7 +82,7 @@ router.put('/', authenticate, authorize('ADMIN'), async (req, res) => {
 // Update utility rates (Admin only)
 router.put('/utility-rates', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
-    const { waterRatePerUnit, electricRatePerUnit } = req.body;
+    const { waterRatePerUnit, electricRatePerUnit, greaseTrapFee } = req.body;
 
     const updates = [];
 
@@ -116,8 +118,24 @@ router.put('/utility-rates', authenticate, authorize('ADMIN'), async (req, res) 
       );
     }
 
+    if (greaseTrapFee !== undefined) {
+      updates.push(
+        prisma.systemSetting.upsert({
+          where: { setting_key: 'GREASE_TRAP_FEE' },
+          update: { setting_value: String(greaseTrapFee), updated_by: req.user.user_id },
+          create: {
+            setting_key: 'GREASE_TRAP_FEE',
+            setting_value: String(greaseTrapFee),
+            description: 'ค่าดักไขมันรายเดือน (บาท)',
+            data_type: 'number',
+            updated_by: req.user.user_id
+          }
+        })
+      );
+    }
+
     await prisma.$transaction(updates);
-    res.json({ success: true, message: 'Utility rates updated successfully', data: { waterRatePerUnit, electricRatePerUnit } });
+    res.json({ success: true, message: 'Utility rates updated successfully', data: { waterRatePerUnit, electricRatePerUnit, greaseTrapFee } });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to update utility rates' });
   }

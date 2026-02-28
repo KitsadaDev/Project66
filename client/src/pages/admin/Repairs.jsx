@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { maintenanceAPI, usersAPI } from "../../api";
+import { useUIStore } from "../../store";
 import RepairDetailsModal from "../../components/RepairDetailsModal";
 
 const AdminRepairs = () => {
@@ -25,6 +26,9 @@ const AdminRepairs = () => {
   const [selectedStaff, setSelectedStaff] = useState("");
 
   const [maintenanceStaff, setMaintenanceStaff] = useState([]);
+  const decrementPendingRepairs = useUIStore(
+    (state) => state.decrementPendingRepairs,
+  );
 
   useEffect(() => {
     fetchRepairs();
@@ -63,12 +67,13 @@ const AdminRepairs = () => {
     }
 
     try {
-      await maintenanceAPI.assignStaff(assignModal.repair.id, {
+      await maintenanceAPI.assignStaff(assignModal.repair.request_id, {
         staffId: selectedStaff,
       });
       toast.success("มอบหมายงานสำเร็จ");
       setAssignModal({ open: false, repair: null });
       fetchRepairs();
+      decrementPendingRepairs();
     } catch (error) {
       console.error("Assignment Error:", error);
       const status = error.response?.status;
@@ -206,7 +211,7 @@ const AdminRepairs = () => {
             <tbody>
               {filteredRepairs.map((repair) => (
                 <tr
-                  key={repair.id}
+                  key={repair.request_id}
                   className="border-b border-gray-50 hover:bg-purple-50/50 transition-colors"
                 >
                   <td className="py-3 px-4">
@@ -321,8 +326,8 @@ const AdminRepairs = () => {
               >
                 <option value="">-- เลือกเจ้าหน้าที่ --</option>
                 {maintenanceStaff.map((staff) => (
-                  <option key={staff.id} value={staff.id}>
-                    {staff.name}
+                  <option key={staff.user_id} value={staff.user_id}>
+                    {staff.first_name} {staff.last_name || ""}
                   </option>
                 ))}
               </select>

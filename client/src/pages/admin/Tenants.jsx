@@ -48,11 +48,20 @@ const Tenants = () => {
     receiptDate: "",
     contractFee: "", // mapped to securityDeposit or general fee? User said "ค่าประกันสัญญา" -> securityDeposit
     securityDeposit: "",
-    greaseTrapFee: "500",
     lateRentFine: "",
     lateUtilityFine: "",
+    menuType: "",
   });
   const [selectedTenantName, setSelectedTenantName] = useState("");
+
+  // Thai Address Cascading Dropdown States
+  const [addressObj, setAddressObj] = useState({
+    houseNoMoo: "",
+    province: "",
+    district: "",
+    subDistrict: "",
+    zipCode: "",
+  });
 
   useEffect(() => {
     fetchData();
@@ -170,7 +179,9 @@ const Tenants = () => {
   // --- Contract Management ---
   const handleManageContract = (tenant) => {
     if (!tenant.stall) {
-      toast.warn("ผู้เช่ารายนี้ยังไม่มีล็อกเช่า กรุณากำหนดล็อกก่อนจัดการสัญญา");
+      toast.warn(
+        "ผู้เช่ารายนี้ยังไม่มีแผงค้าเช่า กรุณากำหนดแผงค้าก่อนจัดการสัญญา",
+      );
       return;
     }
 
@@ -182,8 +193,8 @@ const Tenants = () => {
     if (existingContract) {
       setContractForm({
         id: existingContract.contract_id,
-        slot_id: existingContract.slot_id,
-        tenant_id: tenant.user_id,
+        stallId: existingContract.slot_id,
+        tenantId: tenant.user_id,
         startDate: existingContract.start_date
           ? existingContract.start_date.split("T")[0]
           : "",
@@ -197,12 +208,33 @@ const Tenants = () => {
         receiptDate: existingContract.receiptDate
           ? existingContract.receiptDate.split("T")[0]
           : "",
-        securityDeposit: existingContract.securityDeposit || "",
-        greaseTrapFee: existingContract.greaseTrapFee || "500",
+        securityDeposit: existingContract.deposit_amount || "",
         lateRentFine: existingContract.lateRentFine || "",
         lateUtilityFine: existingContract.lateUtilityFine || "",
         menuType: existingContract.menuType || "",
       });
+
+      // Simple parse attempt for existing address, or fallback to houseNoMoo
+      const addrGroups = (existingContract.address || "").match(
+        /บ้านเลขที่\s(.*?),\sตำบล(.*?),\sอำเภอ(.*?),\sจังหวัด(.*?)\s(\d{5})/,
+      );
+      if (addrGroups) {
+        setAddressObj({
+          houseNoMoo: addrGroups[1] || "",
+          subDistrict: addrGroups[2] || "",
+          district: addrGroups[3] || "",
+          province: addrGroups[4] || "",
+          zipCode: addrGroups[5] || "",
+        });
+      } else {
+        setAddressObj({
+          houseNoMoo: existingContract.address || "",
+          province: "",
+          district: "",
+          subDistrict: "",
+          zipCode: "",
+        });
+      }
     } else {
       // New Contract Defaults
       const today = new Date();
@@ -211,8 +243,8 @@ const Tenants = () => {
 
       setContractForm({
         id: null,
-        slot_id: tenant.stall.slot_id,
-        tenant_id: tenant.user_id,
+        stallId: tenant.stall.slot_id,
+        tenantId: tenant.user_id,
         startDate: today.toISOString().split("T")[0],
         endDate: next3Years.toISOString().split("T")[0],
         idCard: "",
@@ -221,10 +253,16 @@ const Tenants = () => {
         receiptNumber: "",
         receiptDate: "",
         securityDeposit: tenant.stall.rent ? tenant.stall.rent * 2 : "",
-        greaseTrapFee: "500",
         lateRentFine: "",
         lateUtilityFine: "",
         menuType: "",
+      });
+      setAddressObj({
+        houseNoMoo: "",
+        province: "",
+        district: "",
+        subDistrict: "",
+        zipCode: "",
       });
     }
     setIsContractModalOpen(true);
@@ -233,10 +271,14 @@ const Tenants = () => {
   const handleContractSubmit = async (e) => {
     e.preventDefault();
     try {
+      // Combine address before submit
+      const combinedAddress = `บ้านเลขที่ ${addressObj.houseNoMoo}, ตำบล${addressObj.subDistrict}, อำเภอ${addressObj.district}, จังหวัด${addressObj.province} ${addressObj.zipCode}`;
+      const finalForm = { ...contractForm, address: combinedAddress };
+
       const formData = new FormData();
-      Object.keys(contractForm).forEach((key) => {
-        if (contractForm[key] !== null && contractForm[key] !== undefined) {
-          formData.append(key, contractForm[key]);
+      Object.keys(finalForm).forEach((key) => {
+        if (finalForm[key] !== null && finalForm[key] !== undefined) {
+          formData.append(key, finalForm[key]);
         }
       });
 
@@ -305,7 +347,7 @@ const Tenants = () => {
             />
             <input
               type="text"
-              placeholder="ค้นหาชื่อ, อีเมล หรือเลขห้อง..."
+              placeholder="ค้นหาชื่อ, อีเมล หรือเลขแผงค้า..."
               className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -318,7 +360,9 @@ const Tenants = () => {
             <thead className="bg-gray-50 text-gray-500 text-sm">
               <tr>
                 <th className="py-4 px-6 text-left font-medium">ชื่อผู้เช่า</th>
-                <th className="py-4 px-6 text-left font-medium">ล็อกที่เช่า</th>
+                <th className="py-4 px-6 text-left font-medium">
+                  แผงค้าที่เช่า
+                </th>
                 <th className="py-4 px-6 text-left font-medium">
                   ข้อมูลติดต่อ
                 </th>
@@ -332,36 +376,24 @@ const Tenants = () => {
                   className="hover:bg-gray-50/50 transition-colors"
                 >
                   <td className="py-4 px-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold">
-                        {(tenant.first_name || tenant.username || "?").charAt(
-                          0,
-                        )}
-                      </div>
-                      <div>
-                        {editingId === tenant.user_id ? (
-                          <input
-                            type="text"
-                            className="w-full px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500 mb-1"
-                            value={editForm.first_name || ""}
-                            onChange={(e) =>
-                              setEditForm({
-                                ...editForm,
-                                first_name: e.target.value,
-                              })
-                            }
-                            placeholder="ชื่อผู้เช่า"
-                          />
-                        ) : (
-                          <p className="font-semibold text-gray-800">
-                            {tenant.first_name} {tenant.last_name || ""}
-                          </p>
-                        )}
-                        <p className="text-xs text-gray-500">
-                          ID: {tenant.user_id}
-                        </p>
-                      </div>
-                    </div>
+                    {editingId === tenant.user_id ? (
+                      <input
+                        type="text"
+                        className="w-full px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500"
+                        value={editForm.first_name || ""}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            first_name: e.target.value,
+                          })
+                        }
+                        placeholder="ชื่อผู้เช่า"
+                      />
+                    ) : (
+                      <p className="font-semibold text-gray-800">
+                        {tenant.first_name} {tenant.last_name || ""}
+                      </p>
+                    )}
                   </td>
                   <td className="py-4 px-6">
                     {editingId === tenant.user_id ? (
@@ -382,16 +414,16 @@ const Tenants = () => {
                           .filter((s) => s.status === "VACANT")
                           .map((s) => (
                             <option key={s.slot_id} value={s.slot_id}>
-                              {s.slot_number}
+                              {s.slot_number} (ศูนย์ {s.food_court_id})
                             </option>
                           ))}
                       </select>
                     ) : (
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${
                           tenant.stall
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-800"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-100 text-gray-500"
                         }`}
                       >
                         {tenant.stall ? tenant.stall.slot_number : "ไม่มี"}
@@ -400,10 +432,6 @@ const Tenants = () => {
                   </td>
                   <td className="py-4 px-6">
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Mail size={14} />
-                        {tenant.email}
-                      </div>
                       <div className="flex items-center gap-1 text-gray-500">
                         <Phone size={14} />
                         {editingId === tenant.user_id ? (
@@ -548,21 +576,94 @@ const Tenants = () => {
                       }}
                     />
                   </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <div className="md:col-span-2 space-y-4">
+                    <label className="block text-sm font-medium text-gray-700">
                       ที่อยู่ตามทะเบียนบ้าน/ปัจจุบัน
                     </label>
-                    <textarea
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl"
-                      rows="2"
-                      value={contractForm.address}
-                      onChange={(e) =>
-                        setContractForm({
-                          ...contractForm,
-                          address: e.target.value,
-                        })
-                      }
-                    ></textarea>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <input
+                          type="text"
+                          className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100"
+                          placeholder="บ้านเลขที่และหมู่"
+                          value={addressObj.houseNoMoo}
+                          onChange={(e) =>
+                            setAddressObj({
+                              ...addressObj,
+                              houseNoMoo: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          จังหวัด
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full px-4 py-2 border border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="ชื่อจังหวัด..."
+                          value={addressObj.province}
+                          onChange={(e) =>
+                            setAddressObj({
+                              ...addressObj,
+                              province: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          อำเภอ/เขต
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full px-4 py-2 border border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="ชื่ออำเภอ/เขต..."
+                          value={addressObj.district}
+                          onChange={(e) =>
+                            setAddressObj({
+                              ...addressObj,
+                              district: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          ตำบล/แขวง
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full px-4 py-2 border border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="ชื่อตำบล/แขวง..."
+                          value={addressObj.subDistrict}
+                          onChange={(e) =>
+                            setAddressObj({
+                              ...addressObj,
+                              subDistrict: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          รหัสไปรษณีย์
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full px-4 py-2 border border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="รหัสไปรษณีย์..."
+                          value={addressObj.zipCode}
+                          onChange={(e) =>
+                            setAddressObj({
+                              ...addressObj,
+                              zipCode: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -607,30 +708,13 @@ const Tenants = () => {
                       }
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      เลขที่ใบเสร็จรับเงิน
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl"
-                      value={contractForm.receiptNumber}
-                      onChange={(e) =>
-                        setContractForm({
-                          ...contractForm,
-                          receiptNumber: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       ประเภทเมนูอาหาร
                     </label>
-                    <input
-                      type="text"
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl"
-                      placeholder="เช่น อาหารตามสั่ง, ก๋วยเตี๋ยว"
+                    <select
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100"
                       value={contractForm.menuType}
                       onChange={(e) =>
                         setContractForm({
@@ -638,23 +722,12 @@ const Tenants = () => {
                           menuType: e.target.value,
                         })
                       }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      วันที่ในใบเสร็จ
-                    </label>
-                    <input
-                      type="date"
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl"
-                      value={contractForm.receiptDate}
-                      onChange={(e) =>
-                        setContractForm({
-                          ...contractForm,
-                          receiptDate: e.target.value,
-                        })
-                      }
-                    />
+                    >
+                      <option value="">-- เลือกประเภทอาหาร --</option>
+                      <option value="ของคาว">ของคาว</option>
+                      <option value="เครื่องดื่ม">เครื่องดื่ม</option>
+                      <option value="ของหวาน">ของหวาน</option>
+                    </select>
                   </div>
                 </div>
               </div>
@@ -680,24 +753,6 @@ const Tenants = () => {
                         })
                       }
                     />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      ค่าดักไขมัน (บาท)
-                    </label>
-                    <select
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100"
-                      value={contractForm.greaseTrapFee}
-                      onChange={(e) =>
-                        setContractForm({
-                          ...contractForm,
-                          greaseTrapFee: e.target.value,
-                        })
-                      }
-                    >
-                      <option value="0">ไม่มี</option>
-                      <option value="500">500</option>
-                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -758,7 +813,7 @@ const Tenants = () => {
             <form onSubmit={handleAddSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  เลือกห้อง/ล็อก (ไม่บังคับ)
+                  เลือกแผงค้า (ไม่บังคับ)
                 </label>
                 <select
                   className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100"
@@ -772,7 +827,8 @@ const Tenants = () => {
                     .filter((s) => s.status === "VACANT")
                     .map((s) => (
                       <option key={s.slot_id} value={s.slot_id}>
-                        {s.slot_number} ({s.size} ตร.ม. - {s.rent} บาท)
+                        {s.slot_number} (ศูนย์ {s.food_court_id}) ({s.size}{" "}
+                        ตร.ม. - {s.rent} บาท)
                       </option>
                     ))}
                 </select>

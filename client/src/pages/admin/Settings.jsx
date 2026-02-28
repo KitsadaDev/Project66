@@ -12,6 +12,7 @@ import { settingsAPI } from "../../api";
 const Settings = () => {
   const [waterRate, setWaterRate] = useState("");
   const [electricRate, setElectricRate] = useState("");
+  const [greaseTrapFee, setGreaseTrapFee] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -23,33 +24,39 @@ const Settings = () => {
   const fetchRates = async () => {
     try {
       const response = await settingsAPI.getUtilityRates();
-      const { waterRatePerUnit, electricRatePerUnit } = response.data.data;
+      const { waterRatePerUnit, electricRatePerUnit, greaseTrapFee } =
+        response.data.data;
       setWaterRate(waterRatePerUnit.toString());
       setElectricRate(electricRatePerUnit.toString());
+      setGreaseTrapFee((greaseTrapFee || 500).toString());
     } catch (error) {
       console.error("Error fetching rates:", error);
       // Use defaults
       setWaterRate("18");
       setElectricRate("7");
+      setGreaseTrapFee("500");
     } finally {
       setLoading(false);
     }
   };
 
   const handleSave = async () => {
-    if (!waterRate || !electricRate) {
+    if (!waterRate || !electricRate || !greaseTrapFee) {
       toast.error("กรุณากรอกราคาให้ครบถ้วน");
       return;
     }
 
     const waterNum = parseFloat(waterRate);
     const electricNum = parseFloat(electricRate);
+    const greaseTrapNum = parseFloat(greaseTrapFee);
 
     if (
       isNaN(waterNum) ||
       isNaN(electricNum) ||
+      isNaN(greaseTrapNum) ||
       waterNum < 0 ||
-      electricNum < 0
+      electricNum < 0 ||
+      greaseTrapNum < 0
     ) {
       toast.error("กรุณากรอกราคาที่ถูกต้อง");
       return;
@@ -60,8 +67,9 @@ const Settings = () => {
       await settingsAPI.updateUtilityRates({
         waterRatePerUnit: waterNum,
         electricRatePerUnit: electricNum,
+        greaseTrapFee: greaseTrapNum,
       });
-      toast.success("บันทึกราคาค่าสาธารณูปโภคเรียบร้อยแล้ว");
+      toast.success("บันทึกการตั้งค่าเรียบร้อยแล้ว");
       setLastUpdated(new Date());
     } catch (error) {
       toast.error("ไม่สามารถบันทึกได้ กรุณาลองใหม่");
@@ -151,6 +159,29 @@ const Settings = () => {
               </span>
             </div>
             <p className="text-xs text-gray-400">ค่าเริ่มต้น: 7 บาท/หน่วย</p>
+          </div>
+
+          {/* Grease Trap Fee */}
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <Droplets size={18} className="text-orange-500" />
+              ค่าดักไขมันรายเดือน (บาท)
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                className="w-full pl-4 pr-12 py-3 text-xl font-bold border border-gray-200 rounded-xl focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-50 transition-all placeholder-gray-300"
+                value={greaseTrapFee}
+                onChange={(e) => setGreaseTrapFee(e.target.value)}
+                min="0"
+                step="0.01"
+                placeholder="500.00"
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">
+                ฿
+              </span>
+            </div>
+            <p className="text-xs text-gray-400">ค่าเริ่มต้น: 500 บาท/เดือน</p>
           </div>
         </div>
 

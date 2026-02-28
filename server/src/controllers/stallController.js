@@ -25,6 +25,10 @@ const getAllSlots = async (req, res, next) => {
             }
           },
           take: 1
+        },
+        utility_meters: {
+          orderBy: { created_at: 'desc' },
+          take: 2 // Assuming we might get one water and one electric recently
         }
       },
       orderBy: { slot_number: 'asc' }

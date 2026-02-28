@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
-import { Search, Droplets, Zap, Save, CheckCircle } from "lucide-react";
+import {
+  Search,
+  Droplets,
+  Zap,
+  Save,
+  CheckCircle,
+  Edit,
+  X,
+} from "lucide-react";
 import { toast } from "react-toastify";
 import { stallsAPI } from "../../api";
 
@@ -9,6 +17,7 @@ const MeterRecording = () => {
   const [search, setSearch] = useState("");
   const [foodCourtFilter, setFoodCourtFilter] = useState("ALL");
   const [meterReadings, setMeterReadings] = useState({});
+  const [editingStalls, setEditingStalls] = useState({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -58,6 +67,7 @@ const MeterRecording = () => {
         recordedAt: new Date().toISOString(),
       });
       toast.success("บันทึกมิเตอร์สำเร็จ");
+      setEditingStalls((prev) => ({ ...prev, [stallId]: false }));
     } catch (error) {
       toast.error("ไม่สามารถบันทึกมิเตอร์ได้");
     } finally {
@@ -111,7 +121,7 @@ const MeterRecording = () => {
             บันทึกมิเตอร์น้ำ / ไฟ
           </h1>
           <p className="text-gray-500 text-sm">
-            กรอกค่ามิเตอร์ประจำเดือนของแต่ละล็อก
+            กรอกค่ามิเตอร์ประจำเดือนของแต่ละแผงค้า
           </p>
         </div>
         <button
@@ -133,7 +143,7 @@ const MeterRecording = () => {
             <input
               type="text"
               className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
-              placeholder="ค้นหาหมายเลขล็อค..."
+              placeholder="ค้นหาหมายเลขแผงค้า..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -154,7 +164,7 @@ const MeterRecording = () => {
             <thead>
               <tr className="border-b border-gray-100">
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">
-                  ล็อค
+                  แผงค้า
                 </th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">
                   ศูนย์อาหาร
@@ -194,12 +204,13 @@ const MeterRecording = () => {
                     ศูนย์อาหาร {stall.food_court_id}
                   </td>
                   <td className="py-3 px-4 text-sm">
-                    {stall.tenant?.name || "-"}
+                    {stall.rental_contracts?.[0]?.tenant?.first_name || "-"}
                   </td>
                   <td className="py-3 px-4">
                     <input
                       type="number"
-                      className="w-28 px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 text-right"
+                      disabled={!editingStalls[stall.slot_id]}
+                      className={`w-28 px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 text-right ${!editingStalls[stall.slot_id] ? "bg-gray-100 cursor-not-allowed text-gray-500" : "bg-white"}`}
                       placeholder="0"
                       value={meterReadings[stall.slot_id]?.waterMeter || ""}
                       onChange={(e) =>
@@ -210,11 +221,30 @@ const MeterRecording = () => {
                         )
                       }
                     />
+                    {(() => {
+                      const lastWater = stall.utility_meters?.find(
+                        (m) => m.meter_type === "WATER",
+                      );
+                      if (lastWater) {
+                        return (
+                          <div className="text-xs text-gray-400 mt-1">
+                            ล่าสุด: {lastWater.current_reading} (
+                            {new Date(lastWater.created_at).toLocaleDateString(
+                              "th-TH",
+                              { month: "short", year: "2-digit" },
+                            )}
+                            )
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </td>
                   <td className="py-3 px-4">
                     <input
                       type="number"
-                      className="w-28 px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:border-yellow-400 text-right"
+                      disabled={!editingStalls[stall.slot_id]}
+                      className={`w-28 px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:border-yellow-400 text-right ${!editingStalls[stall.slot_id] ? "bg-gray-100 cursor-not-allowed text-gray-500" : "bg-white"}`}
                       placeholder="0"
                       value={meterReadings[stall.slot_id]?.electricMeter || ""}
                       onChange={(e) =>
@@ -225,16 +255,64 @@ const MeterRecording = () => {
                         )
                       }
                     />
+                    {(() => {
+                      const lastElec = stall.utility_meters?.find(
+                        (m) => m.meter_type === "ELECTRICITY",
+                      );
+                      if (lastElec) {
+                        return (
+                          <div className="text-xs text-gray-400 mt-1">
+                            ล่าสุด: {lastElec.current_reading} (
+                            {new Date(lastElec.created_at).toLocaleDateString(
+                              "th-TH",
+                              { month: "short", year: "2-digit" },
+                            )}
+                            )
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </td>
                   <td className="py-3 px-4">
-                    <button
-                      className="p-2 rounded-lg border border-green-300 text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50"
-                      onClick={() => handleSave(stall.slot_id)}
-                      disabled={saving}
-                      title="บันทึก"
-                    >
-                      <CheckCircle size={16} />
-                    </button>
+                    {editingStalls[stall.slot_id] ? (
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="px-3 py-1.5 rounded-lg border border-green-300 text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50 flex items-center gap-1 text-xs font-semibold"
+                          onClick={() => handleSave(stall.slot_id)}
+                          disabled={saving}
+                          title="บันทึก"
+                        >
+                          <Save size={16} /> บันทึก
+                        </button>
+                        <button
+                          className="px-3 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 flex items-center gap-1 text-xs font-semibold"
+                          onClick={() =>
+                            setEditingStalls((prev) => ({
+                              ...prev,
+                              [stall.slot_id]: false,
+                            }))
+                          }
+                          disabled={saving}
+                          title="ยกเลิก"
+                        >
+                          <X size={16} /> ยกเลิก
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        className="p-2 rounded-lg border border-blue-300 text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-50"
+                        onClick={() =>
+                          setEditingStalls((prev) => ({
+                            ...prev,
+                            [stall.slot_id]: true,
+                          }))
+                        }
+                        title="แก้ไข"
+                      >
+                        <Edit size={16} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -243,7 +321,7 @@ const MeterRecording = () => {
 
           {filteredStalls.length === 0 && (
             <div className="text-center py-12 text-gray-400">
-              ไม่พบล็อคที่มีผู้เช่า
+              ไม่พบแผงค้าที่มีผู้เช่า
             </div>
           )}
         </div>

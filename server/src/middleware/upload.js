@@ -1,54 +1,52 @@
 const multer = require('multer');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const cloudinary = require('cloudinary').v2;
 const path = require('path');
-const fs = require('fs');
 
-// Ensure upload directories exist
-const createUploadDir = (dir) => {
-  const fullPath = path.join(__dirname, '../../uploads', dir);
-  if (!fs.existsSync(fullPath)) {
-    fs.mkdirSync(fullPath, { recursive: true });
-  }
-  return fullPath;
-};
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-// Configure storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    let uploadDir = 'general';
+// Configure Cloudinary Storage
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: async (req, file) => {
+    let folderName = 'general';
     
     if (req.baseUrl.includes('bills')) {
-      uploadDir = 'payments';
+      folderName = 'payments';
     } else if (req.baseUrl.includes('maintenance')) {
-      uploadDir = 'maintenance';
+      folderName = 'maintenance';
     } else if (req.baseUrl.includes('contracts')) {
-      uploadDir = 'contracts';
+      folderName = 'contracts';
     }
-    
-    const fullPath = createUploadDir(uploadDir);
-    cb(null, fullPath);
+
+    return {
+      folder: `Project/${folderName}`,
+      format: path.extname(file.originalname).substring(1).toLowerCase(), // e.g., 'jpeg', 'png'
+      public_id: `${file.fieldname}-${Date.now()}-${Math.round(Math.random() * 1e9)}`,
+    };
   },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
-  }
 });
 
 // File filter
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|pdf/;
+  const allowedTypes = /jpeg|jpg|png|gif|webp|pdf/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
   const mimetype = allowedTypes.test(file.mimetype);
 
   if (extname && mimetype) {
     return cb(null, true);
   }
-  cb(new Error('Only images (jpeg, jpg, png, gif) and PDF files are allowed!'));
+  cb(new Error('Only images (jpeg, jpg, png, gif, webp) and PDF files are allowed!'));
 };
 
 const upload = multer({
-  storage,
-  fileFilter,
+  storage: storage,
+  fileFilter: fileFilter,
   limits: {
     fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024 // 5MB default
   }

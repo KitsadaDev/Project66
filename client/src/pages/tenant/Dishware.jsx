@@ -41,12 +41,9 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-// emoji ตาม category
-const categoryEmoji = { PLATE: "🍽️", BOWL: "🍜", CUP: "🥤", OTHER: "🫙" };
 const categoryColor = {
   PLATE: "border-orange-200 bg-orange-50 text-orange-600",
   BOWL: "border-green-200 bg-green-50 text-green-600",
-  CUP: "border-blue-200 bg-blue-50 text-blue-600",
   OTHER: "border-purple-200 bg-purple-50 text-purple-600",
 };
 
@@ -213,9 +210,6 @@ const TenantDishware = () => {
                   className={`flex items-center justify-between rounded-xl border p-4 ${border} ${bg}`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">
-                      {categoryEmoji[t.category] || "🫙"}
-                    </span>
                     <div>
                       <p className="font-semibold text-gray-800">{t.name}</p>
                       <p className="text-sm text-gray-500">
@@ -360,7 +354,7 @@ const TenantDishware = () => {
                         {(u.items || [])
                           .map(
                             (i) =>
-                              `${categoryEmoji[i.dishware_type?.category] || "🫙"} ${i.dishware_type?.name || ""} ×${i.quantity}`,
+                              `${i.dishware_type?.name || ""} ×${i.quantity}`,
                           )
                           .join("  ")}
                       </p>

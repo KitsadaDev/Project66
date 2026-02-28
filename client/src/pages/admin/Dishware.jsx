@@ -16,13 +16,12 @@ import {
   EyeOff,
 } from "lucide-react";
 import { dishwareAPI, dishwareTypeAPI, contractsAPI } from "../../api";
+import { useUIStore } from "../../store";
 
-const categoryEmoji = { PLATE: "🍽️", BOWL: "🍜", CUP: "🥤", OTHER: "🫙" };
 const CATEGORIES = [
-  { value: "PLATE", label: "🍽️ จาน" },
-  { value: "BOWL", label: "🍜 ชาม" },
-  { value: "CUP", label: "🥤 ถ้วย/แก้ว" },
-  { value: "OTHER", label: "🫙 อื่นๆ" },
+  { value: "PLATE", label: "จาน" },
+  { value: "BOWL", label: "ชาม" },
+  { value: "OTHER", label: "อื่นๆ" },
 ];
 
 // ─── Status Badge ─────────────────────────────────────────────────
@@ -65,6 +64,10 @@ const AdminDishware = () => {
   const [showTypeManager, setShowTypeManager] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("PENDING");
+
+  const decrementPendingDishware = useUIStore(
+    (state) => state.decrementPendingDishware,
+  );
 
   // Reject modal
   const [rejectTarget, setRejectTarget] = useState(null);
@@ -185,6 +188,7 @@ const AdminDishware = () => {
       await dishwareAPI.approve(id);
       toast.success("อนุมัติรายการเรียบร้อย ✓");
       fetchData();
+      decrementPendingDishware();
     } catch (err) {
       toast.error(err?.response?.data?.message || "อนุมัติไม่สำเร็จ");
     }
@@ -211,6 +215,7 @@ const AdminDishware = () => {
       toast.success("ปฏิเสธรายการเรียบร้อย");
       setRejectTarget(null);
       fetchData();
+      decrementPendingDishware();
     } catch (err) {
       toast.error(err?.response?.data?.message || "ปฏิเสธไม่สำเร็จ");
     } finally {
@@ -319,9 +324,9 @@ const AdminDishware = () => {
             <ShoppingBag size={22} />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-800">ถ้วยชามรายวัน</h1>
+            <h1 className="text-xl font-bold text-gray-800">จัดการภาชนะ</h1>
             <p className="text-sm text-gray-500">
-              บันทึกและอนุมัติการซื้อภาชนะ
+              จัดการข้อมูลภาชนะ
             </p>
           </div>
         </div>
@@ -482,7 +487,6 @@ const AdminDishware = () => {
                             key={i.item_id}
                             className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-gray-100 rounded-lg text-xs whitespace-nowrap"
                           >
-                            {categoryEmoji[i.dishware_type?.category] || "🫙"}{" "}
                             {i.dishware_type?.name} ×{i.quantity}
                           </span>
                         ))}
@@ -606,7 +610,7 @@ const AdminDishware = () => {
                       className="flex items-center gap-3"
                     >
                       <span className="text-sm font-medium w-28 text-gray-700 truncate">
-                        {categoryEmoji[t.category]} {t.name}
+                        {t.name}
                       </span>
                       <div className="flex items-center gap-2 flex-1">
                         <button
@@ -793,9 +797,6 @@ const AdminDishware = () => {
                       className={`flex items-center justify-between p-3 rounded-xl border ${t.is_active ? "border-gray-100 bg-white" : "border-dashed border-gray-200 bg-gray-50 opacity-60"}`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-xl">
-                          {categoryEmoji[t.category] || "🫙"}
-                        </span>
                         <div>
                           <p className="font-medium text-gray-800 text-sm">
                             {t.name}

@@ -26,7 +26,9 @@ const ExecutiveStalls = () => {
   const filteredStalls = stalls.filter((stall) => {
     const matchSearch =
       stall.slot_number?.toLowerCase().includes(search.toLowerCase()) ||
-      stall.tenant?.first_name?.toLowerCase().includes(search.toLowerCase());
+      stall.rental_contracts?.[0]?.tenant?.first_name
+        ?.toLowerCase()
+        .includes(search.toLowerCase());
     const matchFoodCourt =
       filterFoodCourt === "ALL" ||
       stall.food_court_id?.toString() === filterFoodCourt;
@@ -136,11 +138,12 @@ const ExecutiveStalls = () => {
                   </td>
                   <td className="py-4 px-6">{getStatusBadge(stall.status)}</td>
                   <td className="py-4 px-6">
-                    {stall.tenant ? (
+                    {stall.rental_contracts?.[0]?.tenant ? (
                       <div className="flex items-center gap-2">
                         <User size={16} className="text-gray-400" />
                         <span className="text-gray-800">
-                          {stall.tenant?.first_name} {stall.tenant?.last_name}
+                          {stall.rental_contracts[0].tenant.first_name}{" "}
+                          {stall.rental_contracts[0].tenant.last_name || ""}
                         </span>
                       </div>
                     ) : (

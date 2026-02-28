@@ -48,6 +48,7 @@ const AdminDashboard = () => {
       if (stall.hasPendingPayment) return "pending";
       return "occupied";
     }
+    if (stall.status === "MAINTENANCE") return "maintenance";
     return "vacant";
   };
 
@@ -60,11 +61,12 @@ const AdminDashboard = () => {
 
     switch (status) {
       case "occupied":
-        return `${baseClasses} ${selectedClasses} bg-green-100 border-green-300 text-green-700 hover:bg-green-200`;
       case "pending":
         return `${baseClasses} ${selectedClasses} bg-red-100 border-red-300 text-red-700 hover:bg-red-200`;
+      case "maintenance":
+        return `${baseClasses} ${selectedClasses} bg-yellow-100 border-yellow-300 text-yellow-700 hover:bg-yellow-200`;
       default: // vacant
-        return `${baseClasses} ${selectedClasses} bg-white border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-600`;
+        return `${baseClasses} ${selectedClasses} bg-green-100 border-green-300 text-green-700 hover:bg-green-200`;
     }
   };
 
@@ -187,15 +189,15 @@ const AdminDashboard = () => {
           <div className="space-y-3 px-2">
             <div className="flex items-center gap-3 text-sm text-gray-600">
               <div className="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"></div>
-              <span>มีผู้เช่า (ปกติ)</span>
+              <span>ว่าง (พร้อมเช่า)</span>
             </div>
             <div className="flex items-center gap-3 text-sm text-gray-600">
               <div className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
-              <span>มียอดค้างชำระ</span>
+              <span>มีผู้เช่าแล้ว</span>
             </div>
             <div className="flex items-center gap-3 text-sm text-gray-600">
-              <div className="w-3 h-3 rounded-full bg-gray-300"></div>
-              <span>ว่าง / ปิดปรับปรุง</span>
+              <div className="w-3 h-3 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]"></div>
+              <span>ปิดปรับปรุง</span>
             </div>
           </div>
         </div>
@@ -223,52 +225,41 @@ const AdminDashboard = () => {
             </h2>
 
             <div className="mt-8 lg:mt-12">
-              {foodCourt === "1" ? (
-                <div className="flex flex-col gap-6">
-                  {/* Row B + D1 */}
-                  <div className="flex gap-4">
-                    {["B1", "B2", "B3", "B4", "B5", "B6"].map((id) => (
-                      <StallCell key={id} id={id} />
-                    ))}
-                    <div className="w-10"></div>
-                    <StallCell id="D1" />
-                  </div>
-
-                  {/* Spacer + D2 */}
-                  <div className="flex gap-4">
-                    <div className="flex-1"></div>{" "}
-                    {/* Spacer to push D2 right */}
-                    <div className="w-10"></div>
-                    <StallCell id="D2" />
-                  </div>
-
-                  {/* Row A + D3 */}
-                  <div className="flex gap-4">
-                    {["A1", "A2", "A3", "A4", "A5", "A6"].map((id) => (
-                      <StallCell key={id} id={id} />
-                    ))}
-                    <div className="w-10"></div>
-                    <StallCell id="D3" />
-                  </div>
-
-                  <div className="h-4"></div>
-
-                  {/* Row C */}
-                  <div className="flex gap-4">
-                    {["C1", "C2", "C3", "C4", "C5", "C6"].map((id) => (
-                      <StallCell key={id} id={id} />
-                    ))}
-                  </div>
+              <div className="flex flex-col gap-6">
+                {/* Row B + D1 */}
+                <div className="flex gap-4">
+                  {["B1", "B2", "B3", "B4", "B5", "B6"].map((id) => (
+                    <StallCell key={id} id={id} />
+                  ))}
+                  <div className="w-10"></div>
+                  <StallCell id="D1" />
                 </div>
-              ) : (
-                <div className="flex flex-col gap-6 items-center">
-                  {["D1", "D2", "D3", "D4", "D5"].map((id) => (
-                    <div key={id} className="flex gap-4">
-                      <StallCell id={id} />
-                    </div>
+
+                {/* Spacer + D2 */}
+                <div className="flex gap-4">
+                  <div className="flex-1"></div> {/* Spacer to push D2 right */}
+                  <div className="w-10"></div>
+                  <StallCell id="D2" />
+                </div>
+
+                {/* Row A + D3 */}
+                <div className="flex gap-4">
+                  {["A1", "A2", "A3", "A4", "A5", "A6"].map((id) => (
+                    <StallCell key={id} id={id} />
+                  ))}
+                  <div className="w-10"></div>
+                  <StallCell id="D3" />
+                </div>
+
+                <div className="h-4"></div>
+
+                {/* Row C */}
+                <div className="flex gap-4">
+                  {["C1", "C2", "C3", "C4", "C5", "C6"].map((id) => (
+                    <StallCell key={id} id={id} />
                   ))}
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>

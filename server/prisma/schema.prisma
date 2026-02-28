@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─────────────────────────────────────────────
@@ -136,17 +137,29 @@ model RentalSlot {
 // D4 – rental_contracts (ตารางสัญญาเช่า)
 // ─────────────────────────────────────────────
 model RentalContract {
-  contract_id     Int            @id @default(autoincrement())
+  contract_id     Int      @id @default(autoincrement())
   slot_id         Int
   tenant_id       Int
-  contract_number String         @unique
+  contract_number String   @unique
   start_date      DateTime
   end_date        DateTime
   monthly_rent    Float
   deposit_amount  Float
-  status          ContractStatus @default(ACTIVE)
-  created_at      DateTime       @default(now())
-  updated_at      DateTime       @updatedAt
+
+  // New fields from the Contract Management Form
+  idCard          String?
+  phone           String?
+  address         String?
+  receiptNumber   String?
+  receiptDate     DateTime?
+  greaseTrapFee   Float     @default(500)
+  lateRentFine    Float?
+  lateUtilityFine Float?
+  menuType        String?
+
+  status     ContractStatus @default(ACTIVE)
+  created_at DateTime       @default(now())
+  updated_at DateTime       @updatedAt
 
   // Relations
   slot   RentalSlot @relation(fields: [slot_id], references: [slot_id])
