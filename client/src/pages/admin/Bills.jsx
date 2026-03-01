@@ -10,6 +10,9 @@ import {
   Calculator,
   Save,
   Trash2,
+  Eye,
+  X,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { billsAPI, stallsAPI } from "../../api";
@@ -38,6 +41,11 @@ const Bills = () => {
   });
 
   const [calculationResult, setCalculationResult] = useState(null);
+
+  // Slip & Status State
+  const [selectedBill, setSelectedBill] = useState(null);
+  const [isSlipModalOpen, setIsSlipModalOpen] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     fetchBills();
@@ -113,6 +121,11 @@ const Bills = () => {
         water_cost: formData.water_cost,
         electricity_cost: formData.electricity_cost,
         dueDate: formData.dueDate,
+        water_units: calculationResult?.units?.water,
+        electricity_units: calculationResult?.units?.electric,
+        water_rate: calculationResult?.rates?.water,
+        electricity_rate: calculationResult?.rates?.electric,
+        grease_trap_fee: calculationResult?.amounts?.greaseTrapFee,
       });
       toast.success("สร้างบิลสำเร็จ");
       setIsModalOpen(false);
@@ -131,6 +144,36 @@ const Bills = () => {
       toast.error(error.response?.data?.message || "สร้างบิลไม่สำเร็จ");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleStatusUpdate = async (billId, newStatus) => {
+    try {
+      await billsAPI.update(billId, { status: newStatus });
+      toast.success("อัปเดตสถานะสำเร็จ");
+      fetchBills();
+    } catch (error) {
+      toast.error("ไม่สามารถอัปเดตสถานะได้");
+    }
+  };
+
+  const handleVerifyPayment = async (bill) => {
+    const paymentId = bill.payments?.[0]?.payment_id;
+    if (!paymentId) {
+      toast.error("ไม่พบข้อมูลการชำระเงิน");
+      return;
+    }
+
+    setVerifying(true);
+    try {
+      await billsAPI.verifyPayment(paymentId, { approved: true });
+      toast.success("ยืนยันการชำระเงินเรียบร้อย");
+      setIsSlipModalOpen(false);
+      fetchBills();
+    } catch (error) {
+      toast.error("ยืนยันการชำระเงินไม่สำเร็จ");
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -173,10 +216,13 @@ const Bills = () => {
 
   const filteredBills = bills.filter((bill) => {
     const matchesSearch =
-      bill.rental_slot?.slot_number
+      (bill.contract?.slot?.slot_number || bill.rental_slot?.slot_number)
         ?.toLowerCase()
         .includes(search.toLowerCase()) ||
-      bill.rental_contract?.tenant?.first_name
+      (
+        bill.contract?.tenant?.first_name ||
+        bill.rental_contract?.tenant?.first_name
+      )
         ?.toLowerCase()
         .includes(search.toLowerCase());
     const matchesStatus =
@@ -274,31 +320,70 @@ const Bills = () => {
                     </span>
                   </td>
                   <td className="py-4 px-6">
-                    <span className="px-2.5 py-1 bg-purple-100 text-purple-700 rounded-lg text-sm font-bold">
-                      {bill.rental_slot?.slot_number ||
-                        bill.rental_contract?.rental_slot?.slot_number}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className="px-2.5 py-1 bg-purple-100 text-purple-700 rounded-lg text-sm font-bold w-fit">
+                        {bill.contract?.slot?.slot_number ||
+                          bill.rental_slot?.slot_number ||
+                          bill.rental_contract?.rental_slot?.slot_number}
+                      </span>
+                      <span className="text-xs text-gray-500 mt-1">
+                        {bill.contract?.slot?.food_court_id
+                          ? `ศูนย์อาหาร ${bill.contract.slot.food_court_id}`
+                          : bill.rental_contract?.rental_slot?.food_court_id
+                            ? `ศูนย์อาหาร ${bill.rental_contract.rental_slot.food_court_id}`
+                            : ""}
+                      </span>
+                    </div>
                   </td>
                   <td className="py-4 px-6 text-sm text-gray-600">
-                    {bill.rental_contract?.tenant?.first_name || "-"}
+                    {bill.contract?.tenant?.first_name ||
+                      bill.rental_contract?.tenant?.first_name ||
+                      "-"}
                   </td>
                   <td className="py-4 px-6 text-right font-bold text-gray-800">
                     ฿{(bill.total_amount || 0).toLocaleString()}
                   </td>
-                  <td className="py-4 px-6 flex justify-center">
-                    {getStatusBadge(bill.status)}
-                  </td>
                   <td className="py-4 px-6">
-                    <button className="p-2 text-gray-400 hover:text-purple-600 transition-colors">
-                      <ExternalLink size={18} />
-                    </button>
-                    <button
-                      onClick={() => generateBillPDF(bill)}
-                      className="p-2 text-gray-400 hover:text-purple-600 transition-colors"
-                      title="ดาวน์โหลด PDF"
+                    <select
+                      value={bill.status}
+                      onChange={(e) =>
+                        handleStatusUpdate(bill.expense_id, e.target.value)
+                      }
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold focus:outline-none border-0 cursor-pointer ${
+                        bill.status === "PAID"
+                          ? "bg-green-100 text-green-700"
+                          : bill.status === "PENDING"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : "bg-red-100 text-red-700"
+                      }`}
                     >
-                      <FileText size={18} />
-                    </button>
+                      <option value="PENDING">รอชำระ</option>
+                      <option value="PAID">ชำระแล้ว</option>
+                      <option value="OVERDUE">เกินกำหนด</option>
+                    </select>
+                  </td>
+                  <td className="py-4 px-6 text-right whitespace-nowrap">
+                    <div className="flex items-center justify-end gap-1">
+                      {bill.payments && bill.payments.length > 0 && (
+                        <button
+                          onClick={() => {
+                            setSelectedBill(bill);
+                            setIsSlipModalOpen(true);
+                          }}
+                          className="p-2 text-purple-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                          title="ดูหลักฐานการชำระเงิน"
+                        >
+                          <Eye size={18} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => generateBillPDF(bill)}
+                        className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                        title="ดาวน์โหลด PDF"
+                      >
+                        <FileText size={18} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -509,6 +594,114 @@ const Bills = () => {
                 {creating ? "กำลังสร้างบิล..." : "บันทึกและสร้างบิล"}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Payment Slip Modal */}
+      {isSlipModalOpen && selectedBill && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-white/80 backdrop-blur-md sticky top-0 z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600">
+                  <Eye size={24} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-800">
+                    หลักฐานการชำระเงิน
+                  </h2>
+                  <p className="text-sm text-gray-500">
+                    ล็อค{" "}
+                    {selectedBill.contract?.slot?.slot_number ||
+                      selectedBill.rental_slot?.slot_number ||
+                      "-"}{" "}
+                    |{" "}
+                    {selectedBill.contract?.tenant?.first_name ||
+                      selectedBill.rental_contract?.tenant?.first_name}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setIsSlipModalOpen(false);
+                  setSelectedBill(null);
+                }}
+                className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
+                title="ปิด"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[70vh]">
+              {selectedBill.payments?.[0]?.payment_slip_url ? (
+                <div className="flex flex-col gap-4">
+                  <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-inner bg-gray-50 flex justify-center">
+                    <img
+                      src={selectedBill.payments[0].payment_slip_url}
+                      alt="Payment Slip"
+                      className="max-w-full max-h-[450px] object-contain"
+                      onClick={() =>
+                        window.open(
+                          selectedBill.payments[0].payment_slip_url,
+                          "_blank",
+                        )
+                      }
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 text-sm mt-2">
+                    <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                      <p className="text-gray-500 mb-1">วันที่อัปโหลด</p>
+                      <p className="font-semibold text-gray-800">
+                        {new Date(
+                          selectedBill.payments[0].payment_date ||
+                            selectedBill.payments[0].created_at,
+                        ).toLocaleString("th-TH")}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                      <p className="text-gray-500 mb-1">จำนวนเงินที่แจ้ง</p>
+                      <p className="font-semibold text-green-600 text-lg">
+                        ฿
+                        {parseFloat(
+                          selectedBill.payments[0].payment_amount ||
+                            selectedBill.total_amount,
+                        ).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  {selectedBill.status !== "PAID" && (
+                    <div className="mt-6 flex flex-col gap-3">
+                      <div className="flex items-center gap-2 p-3 bg-yellow-50 text-yellow-700 rounded-xl border border-yellow-100 text-sm">
+                        <AlertCircle size={18} />
+                        <span>
+                          กรุณาตรวจสอบยอดเงินในบัญชีของท่านให้ตรงกับสลิปก่อนกดยืนยัน
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleVerifyPayment(selectedBill)}
+                        disabled={verifying}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-green-100 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {verifying ? (
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <CheckCircle size={20} />
+                        )}
+                        ยืนยันการชำระเงิน (ปรับสถานะเป็นชำระแล้ว)
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-400 italic bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+                  <Eye size={48} className="mb-4 opacity-20" />
+                  <p>ไม่พบรูปภาพหลักฐานการชำระเงิน</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

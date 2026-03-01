@@ -22,20 +22,20 @@ const Contracts = () => {
   const fetchData = async () => {
     try {
       // Fetch active contracts for this tenant
-      const response = await contractsAPI.getAll({ active: true });
+      const response = await contractsAPI.getAll({ status: "ACTIVE" });
       const myContract = response.data.data?.[0]; // Assuming one active contract per tenant
 
       if (myContract) {
-        // Calculate duration if not provided
-        const start = new Date(myContract.startDate);
-        const end = new Date(myContract.endDate);
+        // Calculate duration
+        const start = new Date(myContract.start_date);
+        const end = new Date(myContract.end_date);
         const diffMonths =
           (end.getFullYear() - start.getFullYear()) * 12 +
           (end.getMonth() - start.getMonth());
 
         setContract({
           ...myContract,
-          contractNumber: `CTR-${myContract.stall?.slot_number || "XXX"}-${new Date().getFullYear() + 543}`,
+          contractDisplayNumber: myContract.contract_number,
           duration: diffMonths || 12,
         });
       }
@@ -89,7 +89,7 @@ const Contracts = () => {
             </div>
             <div>
               <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-1">
-                {contract.contractNumber}
+                {contract.contractDisplayNumber}
               </h2>
               <p className="text-gray-500 text-sm">เลขที่สัญญา</p>
             </div>
@@ -104,10 +104,10 @@ const Contracts = () => {
               <div>
                 <p className="text-xs text-gray-400 mb-1">ล็อคที่เช่า</p>
                 <p className="text-lg font-bold text-gray-800">
-                  {contract.stall?.slot_number}
+                  {contract.slot?.slot_number}
                 </p>
                 <p className="text-xs text-gray-500">
-                  ศูนย์อาหาร {contract.stall?.foodCourt}
+                  ศูนย์อาหาร {contract.slot?.food_court?.name}
                 </p>
               </div>
             </div>
@@ -119,7 +119,7 @@ const Contracts = () => {
               <div>
                 <p className="text-xs text-gray-400 mb-1">วันเริ่มสัญญา</p>
                 <p className="font-semibold text-gray-800">
-                  {formatDate(contract.startDate)}
+                  {formatDate(contract.start_date)}
                 </p>
               </div>
             </div>
@@ -131,7 +131,7 @@ const Contracts = () => {
               <div>
                 <p className="text-xs text-gray-400 mb-1">วันสิ้นสุดสัญญา</p>
                 <p className="font-semibold text-gray-800">
-                  {formatDate(contract.endDate)}
+                  {formatDate(contract.end_date)}
                 </p>
               </div>
             </div>
@@ -162,7 +162,7 @@ const Contracts = () => {
                   <div className="flex justify-between">
                     <span className="text-gray-500">ชื่อ-นามสกุล</span>
                     <span className="font-medium text-gray-800">
-                      {contract.tenant?.name || "-"}
+                      {contract.tenant?.first_name} {contract.tenant?.last_name}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -226,19 +226,19 @@ const Contracts = () => {
                 <div className="flex justify-between items-center py-2 border-b border-gray-200 border-dashed">
                   <span className="text-gray-600">ค่าเช่ารายเดือน</span>
                   <span className="font-bold text-gray-800">
-                    ฿{contract.stall?.rent?.toLocaleString()}
+                    ฿{contract.slot?.rent?.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-gray-200 border-dashed">
                   <span className="text-gray-600">เงินประกันสัญญา</span>
                   <span className="font-bold text-gray-800">
-                    ฿{contract.securityDeposit?.toLocaleString() || "-"}
+                    ฿{contract.deposit_amount?.toLocaleString() || "-"}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-gray-200 border-dashed">
                   <span className="text-gray-600">ค่าดักไขมัน</span>
                   <span className="font-bold text-gray-800">
-                    ฿{contract.greaseTrapFee?.toLocaleString() || "500"}
+                    ฿{contract.menuType === "ของคาว" ? "500" : "0"}
                   </span>
                 </div>
 

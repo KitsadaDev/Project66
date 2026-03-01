@@ -275,7 +275,7 @@ const Reports = () => {
             <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
               <Building2 size={20} />
             </div>
-            <span className="text-gray-500 text-sm">ล็อคทั้งหมด</span>
+            <span className="text-gray-500 text-sm">แผงค้าทั้งหมด</span>
           </div>
           <p className="text-2xl font-bold text-gray-800">
             {stats.totalStalls}
@@ -287,7 +287,7 @@ const Reports = () => {
             <div className="p-2 bg-green-50 text-green-600 rounded-lg">
               <TrendingUp size={20} />
             </div>
-            <span className="text-gray-500 text-sm">เช่าอยู่</span>
+            <span className="text-gray-500 text-sm">กำลังเช่าอยู่</span>
           </div>
           <p className="text-2xl font-bold text-gray-800">
             {stats.occupiedStalls}

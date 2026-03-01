@@ -105,7 +105,6 @@ const Sidebar = () => {
       { to: "/tenant", icon: LayoutDashboard, label: "หน้าหลัก", end: true },
       { to: "/tenant/expenses", icon: Receipt, label: "ค่าใช้จ่าย" },
       { to: "/tenant/contracts", icon: FileText, label: "สัญญาเช่า" },
-      { to: "/tenant/upload-bill", icon: Upload, label: "อัปโหลดบิล" },
       { to: "/tenant/payment-history", icon: History, label: "ประวัติชำระ" },
       { to: "/tenant/stall-status", icon: Store, label: "สถานะล็อค" },
       { to: "/tenant/dishware", icon: ShoppingBag, label: "ถ้วยชาม" },
@@ -121,6 +120,7 @@ const Sidebar = () => {
     ADMIN: [
       { to: "/admin", icon: LayoutDashboard, label: "หน้าแรก", end: true },
       { to: "/admin/tenants", icon: Users, label: "ข้อมูลผู้เช่า" },
+      { to: "/admin/contracts", icon: FileText, label: "ข้อมูลสัญญาเช่า" },
       { to: "/admin/stalls", icon: Building2, label: "ข้อมูลสถานะแผงค้า" },
       { to: "/admin/meter-recording", icon: Gauge, label: "บันทึกมิเตอร์" },
       { to: "/admin/bills", icon: Receipt, label: "ข้อมูลการชำระเงิน" },
@@ -155,8 +155,9 @@ const Sidebar = () => {
     ],
     EXECUTIVE: [
       { to: "/executive", icon: LayoutDashboard, label: "ภาพรวม", end: true },
-      { to: "/executive/stalls", icon: Building2, label: "ข้อมูลล็อค" },
+      { to: "/executive/stalls", icon: Building2, label: "ข้อมูลแผงค้า" },
       { to: "/executive/tenants", icon: Users, label: "ข้อมูลผู้เช่า" },
+      { to: "/executive/contracts", icon: FileText, label: "ข้อมูลสัญญาเช่า" },
       { to: "/executive/bills", icon: Receipt, label: "ข้อมูลบิล" },
       {
         to: "/executive/repairs",

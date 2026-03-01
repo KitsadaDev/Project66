@@ -187,7 +187,7 @@ const Tenants = () => {
 
     setSelectedTenantName(tenant.first_name);
     const existingContract = contracts.find(
-      (c) => c.slot_id === tenant.stall?.slot_id && c.status === "ACTIVE",
+      (c) => c.tenant_id === tenant.user_id && c.status === "ACTIVE",
     );
 
     if (existingContract) {
@@ -209,8 +209,6 @@ const Tenants = () => {
           ? existingContract.receiptDate.split("T")[0]
           : "",
         securityDeposit: existingContract.deposit_amount || "",
-        lateRentFine: existingContract.lateRentFine || "",
-        lateUtilityFine: existingContract.lateUtilityFine || "",
         menuType: existingContract.menuType || "",
       });
 
@@ -253,8 +251,6 @@ const Tenants = () => {
         receiptNumber: "",
         receiptDate: "",
         securityDeposit: tenant.stall.rent ? tenant.stall.rent * 2 : "",
-        lateRentFine: "",
-        lateUtilityFine: "",
         menuType: "",
       });
       setAddressObj({
@@ -271,6 +267,16 @@ const Tenants = () => {
   const handleContractSubmit = async (e) => {
     e.preventDefault();
     try {
+      // Validate Max 3 Years
+      const start = new Date(contractForm.startDate);
+      const end = new Date(contractForm.endDate);
+      const maxEnd = new Date(start);
+      maxEnd.setFullYear(maxEnd.getFullYear() + 3);
+      if (end > maxEnd) {
+        toast.warning("ระยะเวลาสัญญาเช่าสูงสุดคือ 3 ปี");
+        return;
+      }
+
       // Combine address before submit
       const combinedAddress = `บ้านเลขที่ ${addressObj.houseNoMoo}, ตำบล${addressObj.subDistrict}, อำเภอ${addressObj.district}, จังหวัด${addressObj.province} ${addressObj.zipCode}`;
       const finalForm = { ...contractForm, address: combinedAddress };
@@ -316,6 +322,13 @@ const Tenants = () => {
       </div>
     );
   }
+
+  const getMaxEndDate = () => {
+    if (!contractForm.startDate) return "";
+    const start = new Date(contractForm.startDate);
+    start.setFullYear(start.getFullYear() + 3);
+    return start.toISOString().split("T")[0];
+  };
 
   return (
     <div>
@@ -407,14 +420,15 @@ const Tenants = () => {
                         <option value="">-- ไม่ระบุ --</option>
                         {tenant.stall && (
                           <option value={tenant.stall.slot_id}>
-                            {tenant.stall.slot_number} (ปัจจุบัน)
+                            {tenant.stall.slot_number} (ศูนย์อาหาร{" "}
+                            {tenant.stall.food_court_id})
                           </option>
                         )}
                         {allStalls
                           .filter((s) => s.status === "VACANT")
                           .map((s) => (
                             <option key={s.slot_id} value={s.slot_id}>
-                              {s.slot_number} (ศูนย์ {s.food_court_id})
+                              {s.slot_number} (ศูนย์อาหาร {s.food_court_id})
                             </option>
                           ))}
                       </select>
@@ -426,7 +440,9 @@ const Tenants = () => {
                             : "bg-gray-100 text-gray-500"
                         }`}
                       >
-                        {tenant.stall ? tenant.stall.slot_number : "ไม่มี"}
+                        {tenant.stall
+                          ? `${tenant.stall.slot_number} (ศูนย์อาหาร ${tenant.stall.food_court_id})`
+                          : "ไม่มี"}
                       </span>
                     )}
                   </td>
@@ -698,6 +714,7 @@ const Tenants = () => {
                     <input
                       type="date"
                       required
+                      max={getMaxEndDate()}
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl"
                       value={contractForm.endDate}
                       onChange={(e) =>
@@ -732,10 +749,10 @@ const Tenants = () => {
                 </div>
               </div>
 
-              {/* Section 3: Fees & Fines */}
+              {/* Section 3: Security Deposit */}
               <div className="md:col-span-2 bg-orange-50 p-4 rounded-xl border border-orange-100">
                 <h3 className="font-semibold text-orange-800 mb-3 flex items-center gap-2">
-                  <Upload size={18} /> ค่าธรรมเนียมและค่าปรับ
+                  <FileText size={18} /> ค่าประกันสัญญา
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -750,23 +767,6 @@ const Tenants = () => {
                         setContractForm({
                           ...contractForm,
                           securityDeposit: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      ค่าปรับเช่าล่าช้า (บาท/วัน)
-                    </label>
-                    <input
-                      type="number"
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl"
-                      placeholder="ระบุยอดเงิน หรือปล่อยว่าง"
-                      value={contractForm.lateRentFine}
-                      onChange={(e) =>
-                        setContractForm({
-                          ...contractForm,
-                          lateRentFine: e.target.value,
                         })
                       }
                     />

@@ -184,19 +184,32 @@ const ExecutiveRepairs = () => {
                     {repair.title}
                   </td>
                   <td className="py-4 px-6">
-                    {repair.stall?.slot_number || "-"}
+                    <div className="flex flex-col">
+                      <span className="font-medium">
+                        {repair.slot?.slot_number || repair.slot_number || "-"}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        {repair.slot?.food_court_id
+                          ? `ศูนย์อาหาร ${repair.slot.food_court_id}`
+                          : ""}
+                      </span>
+                    </div>
                   </td>
                   <td className="py-4 px-6 text-gray-600">
-                    {repair.tenant?.name || "-"}
+                    {repair.tenant?.first_name || repair.reporter?.name || "-"}
                   </td>
                   <td className="py-4 px-6 text-gray-600">
                     <div className="flex items-center gap-2 text-sm">
                       <Calendar size={14} className="text-gray-400" />
-                      {new Date(repair.createdAt).toLocaleDateString("th-TH")}
+                      {new Date(
+                        repair.requested_at || repair.createdAt,
+                      ).toLocaleDateString("th-TH")}
                     </div>
                   </td>
                   <td className="py-4 px-6 text-gray-600">
-                    {repair.assignedTo?.name || (
+                    {repair.assignments && repair.assignments.length > 0 ? (
+                      `${repair.assignments[0].assignee?.first_name} ${repair.assignments[0].assignee?.last_name || ""}`
+                    ) : (
                       <span className="text-gray-400 italic">ยังไม่ระบุ</span>
                     )}
                   </td>

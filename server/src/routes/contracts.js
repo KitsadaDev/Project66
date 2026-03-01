@@ -14,7 +14,7 @@ const {
 router.use(authenticate);
 
 // Contract routes
-router.get('/', authorize('ADMIN', 'EXECUTIVE'), getAllContracts);
+router.get('/', authorize('ADMIN', 'EXECUTIVE', 'TENANT'), getAllContracts);
 router.get('/:id', getContractById);
 router.post('/', authorize('ADMIN'), upload.single('contractFile'), createContract);
 router.put('/:id', authorize('ADMIN'), upload.single('contractFile'), updateContract);

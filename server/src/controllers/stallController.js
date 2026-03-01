@@ -11,6 +11,15 @@ const getAllSlots = async (req, res, next) => {
     if (food_court_id) where.food_court_id = parseInt(food_court_id);
     if (status) where.status = status;
 
+    if (req.user.role === 'TENANT') {
+      where.rental_contracts = {
+        some: {
+          tenant_id: req.user.user_id,
+          status: 'ACTIVE'
+        }
+      };
+    }
+
     const slots = await prisma.rentalSlot.findMany({
       where,
       include: {

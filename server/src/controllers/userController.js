@@ -47,7 +47,8 @@ const getAllUsers = async (req, res, next) => {
                 slot_id: true,
                 slot_number: true,
                 rent: true,
-                status: true
+                status: true,
+                food_court_id: true
               }
             }
           }

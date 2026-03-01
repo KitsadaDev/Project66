@@ -194,16 +194,21 @@ model UtilityMeter {
 // D6 – monthly_expenses (ตารางค่าใช้จ่ายรายเดือน)
 // ─────────────────────────────────────────────
 model MonthlyExpense {
-  expense_id       Int           @id @default(autoincrement())
-  contract_id      Int
-  billing_month    DateTime
-  rent_amount      Float
-  water_cost       Float
-  electricity_cost Float
-  total_amount     Float
-  due_date         DateTime
-  status           ExpenseStatus @default(PENDING)
-  created_at       DateTime      @default(now())
+  expense_id        Int           @id @default(autoincrement())
+  contract_id       Int
+  billing_month     DateTime
+  rent_amount       Float
+  water_cost        Float
+  electricity_cost  Float
+  total_amount      Float
+  due_date          DateTime
+  status            ExpenseStatus @default(PENDING)
+  water_units       Float?
+  electricity_units Float?
+  water_rate        Float?
+  electricity_rate  Float?
+  grease_trap_fee   Float?
+  created_at        DateTime      @default(now())
 
   // Relations
   contract RentalContract @relation(fields: [contract_id], references: [contract_id])

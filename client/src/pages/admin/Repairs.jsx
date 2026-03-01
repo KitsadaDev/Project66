@@ -247,7 +247,9 @@ const AdminRepairs = () => {
                   </td>
                   <td className="py-3 px-4">{getStatusBadge(repair.status)}</td>
                   <td className="py-3 px-4 text-sm text-gray-600">
-                    {repair.assignedTo?.name || repair.staff?.name || (
+                    {repair.assignments && repair.assignments.length > 0 ? (
+                      `${repair.assignments[0].assignee?.first_name} ${repair.assignments[0].assignee?.last_name || ""}`
+                    ) : (
                       <span className="text-gray-400 italic">
                         ยังไม่มอบหมาย
                       </span>

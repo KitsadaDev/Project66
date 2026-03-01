@@ -17,7 +17,6 @@ import Home from "./pages/Home";
 import TenantDashboard from "./pages/tenant/Dashboard";
 import Expenses from "./pages/tenant/Expenses";
 import Contracts from "./pages/tenant/Contracts";
-import UploadBill from "./pages/tenant/UploadBill";
 import PaymentHistory from "./pages/tenant/PaymentHistory";
 import StallStatus from "./pages/tenant/StallStatus";
 import ReportRepair from "./pages/tenant/ReportRepair";
@@ -35,6 +34,7 @@ import AdminSettings from "./pages/admin/Settings";
 import AdminBills from "./pages/admin/Bills";
 import AdminReports from "./pages/admin/Reports";
 import AdminDishware from "./pages/admin/Dishware";
+import AdminContracts from "./pages/admin/Contracts";
 
 // Maintenance Pages
 import MaintenanceDashboard from "./pages/maintenance/Dashboard";
@@ -117,7 +117,6 @@ function App() {
           <Route index element={<TenantDashboard />} />
           <Route path="expenses" element={<Expenses />} />
           <Route path="contracts" element={<Contracts />} />
-          <Route path="upload-bill" element={<UploadBill />} />
           <Route path="payment-history" element={<PaymentHistory />} />
           <Route path="stall-status" element={<StallStatus />} />
           <Route path="dishware" element={<TenantDishware />} />
@@ -145,6 +144,7 @@ function App() {
           <Route path="reports" element={<AdminReports />} />
           <Route path="repairs" element={<AdminRepairs />} />
           <Route path="settings" element={<AdminSettings />} />
+          <Route path="contracts" element={<AdminContracts />} />
         </Route>
 
         {/* Maintenance Routes */}
@@ -175,6 +175,7 @@ function App() {
           <Route path="tenants" element={<ExecutiveTenants />} />
           <Route path="bills" element={<ExecutiveBills />} />
           <Route path="repairs" element={<ExecutiveRepairs />} />
+          <Route path="contracts" element={<AdminContracts />} />
         </Route>
 
         {/* Default redirect */}

@@ -18,8 +18,34 @@ const dishwareTypeRoutes = require('./routes/dishwareTypes');
 const notificationRoutes = require('./routes/notifications'); // Import notification routes
 
 const notificationService = require('./services/notificationService');
+const { autoTerminateContracts } = require('./services/contractService');
+const cron = require('node-cron');
 
 const app = express();
+
+// --- Database Migration on Startup ---
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
+async function runMigrations() {
+  console.log('[Database] Checking schema...');
+  try {
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "MonthlyExpense" 
+      ADD COLUMN IF NOT EXISTS "water_units" DOUBLE PRECISION,
+      ADD COLUMN IF NOT EXISTS "electricity_units" DOUBLE PRECISION,
+      ADD COLUMN IF NOT EXISTS "water_rate" DOUBLE PRECISION,
+      ADD COLUMN IF NOT EXISTS "electricity_rate" DOUBLE PRECISION,
+      ADD COLUMN IF NOT EXISTS "grease_trap_fee" DOUBLE PRECISION;
+    `);
+    console.log('[Database] Schema is up to date.');
+  } catch (err) {
+    console.error('[Database] Migration error:', err.message);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+runMigrations();
+// ------------------------------------
 
 // Middleware
 app.use(cors());
@@ -66,6 +92,22 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT || 5001;
 
+// Schedule Daily Background Jobs (runs at midnight 00:00 every day)
+cron.schedule('0 0 * * *', async () => {
+  console.log('[System] Running scheduled daily jobs...');
+  try {
+    // 1. Check upcoming bills and send notifications
+    await notificationService.checkUpcomingBills();
+    
+    // 2. Auto terminate contracts pending >= 3 months
+    await autoTerminateContracts();
+  } catch (err) {
+    console.error('[System] Error running scheduled jobs:', err);
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+// Trigger restart 2

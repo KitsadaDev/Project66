@@ -2,10 +2,53 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
+// Helper to compute late fees dynamically
+const computeLateFees = async (expenses) => {
+  if (!expenses || expenses.length === 0) return expenses;
+
+  const lateRent = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_RENT_FINE' } });
+  const lateUtility = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_UTILITY_FINE' } });
+  
+  const rentFine = parseFloat(lateRent?.setting_value || '100');
+  const utilityFine = parseFloat(lateUtility?.setting_value || '50');
+  const totalDailyFine = rentFine + utilityFine;
+
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  const processExpense = (expense) => {
+    if (expense.status === 'PENDING' || expense.status === 'OVERDUE') {
+      const due = new Date(expense.due_date);
+      due.setHours(0, 0, 0, 0);
+
+      if (now > due) {
+        const diffTime = Math.abs(now - due);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const lateFee = diffDays * totalDailyFine;
+        
+        return {
+          ...expense,
+          status: 'OVERDUE', // dynamically reflect overdue
+          late_fee: lateFee,
+          total_amount: expense.total_amount + lateFee,
+          original_total_amount: expense.total_amount
+        };
+      }
+    }
+    return expense;
+  };
+
+  if (Array.isArray(expenses)) {
+    return expenses.map(processExpense);
+  }
+  return processExpense(expenses);
+};
+
+
 // Get all monthly expenses (filtered by role)
 const getAllBills = async (req, res, next) => {
   try {
-    const { status, billing_month } = req.query;
+    const { status, billing_month, slot_id } = req.query;
     const where = {};
 
     if (req.user.role === 'TENANT') {
@@ -15,6 +58,16 @@ const getAllBills = async (req, res, next) => {
         select: { contract_id: true }
       });
       where.contract_id = { in: contracts.map(c => c.contract_id) };
+
+      // If slot_id is provided, refine the filter
+      if (slot_id) {
+        where.contract = { slot_id: parseInt(slot_id) };
+      }
+    } else if (req.user.role === 'EXECUTIVE' || req.user.role === 'ADMIN') {
+      // Admins and Executives see all bills by default, but can filter by slot
+      if (slot_id) {
+        where.contract = { slot_id: parseInt(slot_id) };
+      }
     }
 
     if (status) where.status = status;
@@ -41,7 +94,8 @@ const getAllBills = async (req, res, next) => {
       orderBy: { created_at: 'desc' }
     });
 
-    res.json({ success: true, data: expenses });
+    const expensesWithFines = await computeLateFees(expenses);
+    res.json({ success: true, data: expensesWithFines });
   } catch (error) {
     next(error);
   }
@@ -69,7 +123,8 @@ const getBillById = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Expense not found.' });
     }
 
-    res.json({ success: true, data: expense });
+    const expenseWithFine = await computeLateFees(expense);
+    res.json({ success: true, data: expenseWithFine });
   } catch (error) {
     next(error);
   }
@@ -78,7 +133,18 @@ const getBillById = async (req, res, next) => {
 // Create monthly expense (Admin only)
 const createBill = async (req, res, next) => {
   try {
-    const { slot_id, billing_month, water_cost, electricity_cost, dueDate } = req.body;
+    const { 
+      slot_id, 
+      billing_month, 
+      water_cost, 
+      electricity_cost, 
+      dueDate,
+      water_units,
+      electricity_units,
+      water_rate,
+      electricity_rate,
+      grease_trap_fee: custom_grease_trap_fee
+    } = req.body;
 
     // Find active contract for this slot
     const contract = await prisma.rentalContract.findFirst({
@@ -94,10 +160,13 @@ const createBill = async (req, res, next) => {
 
     const rent_amount = contract.monthly_rent;
     
-    // Fetch global grease trap fee, but only apply if menuType is 'ของคาว'
-    const greaseTrapSetting = await prisma.systemSetting.findUnique({ where: { setting_key: 'GREASE_TRAP_FEE' } });
-    const baseGreaseTrapFee = parseFloat(greaseTrapSetting?.setting_value || '500');
-    const greaseTrapFee = contract.menuType === 'ของคาว' ? baseGreaseTrapFee : 0;
+    // Fetch global grease trap fee if not provided
+    let greaseTrapFee = custom_grease_trap_fee !== undefined ? parseFloat(custom_grease_trap_fee) : null;
+    if (greaseTrapFee === null) {
+      const greaseTrapSetting = await prisma.systemSetting.findUnique({ where: { setting_key: 'GREASE_TRAP_FEE' } });
+      const baseGreaseTrapFee = parseFloat(greaseTrapSetting?.setting_value || '500');
+      greaseTrapFee = contract.menuType === 'ของคาว' ? baseGreaseTrapFee : 0;
+    }
 
     const total_amount = parseFloat(rent_amount) + parseFloat(water_cost) + parseFloat(electricity_cost) + greaseTrapFee;
 
@@ -108,11 +177,31 @@ const createBill = async (req, res, next) => {
         rent_amount: parseFloat(rent_amount),
         water_cost: parseFloat(water_cost),
         electricity_cost: parseFloat(electricity_cost),
+        water_units: water_units ? parseFloat(water_units) : null,
+        electricity_units: electricity_units ? parseFloat(electricity_units) : null,
+        water_rate: water_rate ? parseFloat(water_rate) : null,
+        electricity_rate: electricity_rate ? parseFloat(electricity_rate) : null,
+        grease_trap_fee: greaseTrapFee,
         total_amount,
         due_date: new Date(dueDate),
         status: 'PENDING'
       }
     });
+
+    // Send notification to tenant
+    try {
+      await prisma.notification.create({
+        data: {
+          user_id: contract.tenant_id,
+          title: 'บิลค่าเช่าใหม่',
+          message: `บิลสำหรับเดือน ${new Date(billing_month).toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })} ยอดรวม ฿${total_amount.toLocaleString()} ได้รับการสร้างแล้ว`,
+          reference_id: expense.expense_id
+        }
+      });
+    } catch (notifError) {
+      console.error('Failed to send notification:', notifError);
+      // Don't fail the whole request if notification fails
+    }
 
     res.status(201).json({ success: true, message: 'Expense created successfully.', data: expense });
   } catch (error) {
@@ -276,7 +365,8 @@ const getDueBills = async (req, res, next) => {
       orderBy: { due_date: 'asc' }
     });
 
-    res.json({ success: true, data: expenses });
+    const expensesWithFines = await computeLateFees(expenses);
+    res.json({ success: true, data: expensesWithFines });
   } catch (error) {
     next(error);
   }
@@ -302,23 +392,26 @@ const calculateAmount = async (req, res, next) => {
     const date = new Date(month);
     // End of the billing month
     const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+    // Grace period: allow readings recorded up to 15 days after the month ends
+    const gracePeriod = new Date(endOfMonth);
+    gracePeriod.setDate(gracePeriod.getDate() + 15);
 
-    // Get the latest water meter recorded on or before the end of the billing month
+    // Get the latest water meter recorded on or before the grace period
     const waterMeter = await prisma.utilityMeter.findFirst({
       where: { 
         slot_id: parseInt(slot_id), 
         meter_type: 'WATER',
-        created_at: { lte: endOfMonth }
+        created_at: { lte: gracePeriod }
       },
       orderBy: { created_at: 'desc' }
     });
 
-    // Get the latest electric meter recorded on or before the end of the billing month
+    // Get the latest electric meter recorded on or before the grace period
     const electricMeter = await prisma.utilityMeter.findFirst({
       where: { 
         slot_id: parseInt(slot_id), 
         meter_type: 'ELECTRICITY',
-        created_at: { lte: endOfMonth }
+        created_at: { lte: gracePeriod }
       },
       orderBy: { created_at: 'desc' }
     });
@@ -374,4 +467,5 @@ module.exports = {
   getPaymentHistory,
   getDueBills,
   calculateAmount
-};
+}; // Restart
+

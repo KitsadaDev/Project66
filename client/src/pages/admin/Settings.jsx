@@ -5,6 +5,8 @@ import {
   Zap,
   Save,
   History,
+  AlertTriangle,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { settingsAPI } from "../../api";
@@ -13,6 +15,8 @@ const Settings = () => {
   const [waterRate, setWaterRate] = useState("");
   const [electricRate, setElectricRate] = useState("");
   const [greaseTrapFee, setGreaseTrapFee] = useState("");
+  const [lateRentFine, setLateRentFine] = useState("");
+  const [lateUtilityFine, setLateUtilityFine] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -24,39 +28,60 @@ const Settings = () => {
   const fetchRates = async () => {
     try {
       const response = await settingsAPI.getUtilityRates();
-      const { waterRatePerUnit, electricRatePerUnit, greaseTrapFee } =
-        response.data.data;
+      const {
+        waterRatePerUnit,
+        electricRatePerUnit,
+        greaseTrapFee,
+        lateRentFine,
+        lateUtilityFine,
+      } = response.data.data;
       setWaterRate(waterRatePerUnit.toString());
       setElectricRate(electricRatePerUnit.toString());
       setGreaseTrapFee((greaseTrapFee || 500).toString());
+      setLateRentFine((lateRentFine || 100).toString());
+      setLateUtilityFine((lateUtilityFine || 50).toString());
     } catch (error) {
       console.error("Error fetching rates:", error);
       // Use defaults
       setWaterRate("18");
       setElectricRate("7");
       setGreaseTrapFee("500");
+      setLateRentFine("100");
+      setLateUtilityFine("50");
     } finally {
       setLoading(false);
     }
   };
 
   const handleSave = async () => {
-    if (!waterRate || !electricRate || !greaseTrapFee) {
-      toast.error("กรุณากรอกราคาให้ครบถ้วน");
+    if (
+      !waterRate ||
+      !electricRate ||
+      !greaseTrapFee ||
+      !lateRentFine ||
+      !lateUtilityFine
+    ) {
+      toast.error("กรุณากรอกข้อมูลให้ครบถ้วน");
       return;
     }
 
     const waterNum = parseFloat(waterRate);
     const electricNum = parseFloat(electricRate);
     const greaseTrapNum = parseFloat(greaseTrapFee);
+    const lateRentNum = parseFloat(lateRentFine);
+    const lateUtilityNum = parseFloat(lateUtilityFine);
 
     if (
       isNaN(waterNum) ||
       isNaN(electricNum) ||
       isNaN(greaseTrapNum) ||
+      isNaN(lateRentNum) ||
+      isNaN(lateUtilityNum) ||
       waterNum < 0 ||
       electricNum < 0 ||
-      greaseTrapNum < 0
+      greaseTrapNum < 0 ||
+      lateRentNum < 0 ||
+      lateUtilityNum < 0
     ) {
       toast.error("กรุณากรอกราคาที่ถูกต้อง");
       return;
@@ -68,6 +93,8 @@ const Settings = () => {
         waterRatePerUnit: waterNum,
         electricRatePerUnit: electricNum,
         greaseTrapFee: greaseTrapNum,
+        lateRentFine: lateRentNum,
+        lateUtilityFine: lateUtilityNum,
       });
       toast.success("บันทึกการตั้งค่าเรียบร้อยแล้ว");
       setLastUpdated(new Date());
@@ -182,6 +209,56 @@ const Settings = () => {
               </span>
             </div>
             <p className="text-xs text-gray-400">ค่าเริ่มต้น: 500 บาท/เดือน</p>
+          </div>
+
+          {/* Late Rent Fine */}
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <AlertTriangle size={18} className="text-red-500" />
+              ค่าปรับจ่ายค่าเช่าล่าช้า (บาท/วัน/บิล)
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                className="w-full pl-4 pr-12 py-3 text-xl font-bold border border-gray-200 rounded-xl focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-50 transition-all placeholder-gray-300"
+                value={lateRentFine}
+                onChange={(e) => setLateRentFine(e.target.value)}
+                min="0"
+                step="1"
+                placeholder="100"
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">
+                ฿/วัน
+              </span>
+            </div>
+            <p className="text-xs text-gray-400">
+              ค่าเริ่มต้น: 100 บาท/วัน (นับต่อ 1 บิลที่ค้าง)
+            </p>
+          </div>
+
+          {/* Late Utility Fine */}
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <AlertCircle size={18} className="text-pink-500" />
+              ค่าปรับจ่ายค่าน้ำ-ไฟล่าช้า (บาท/วัน/บิล)
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                className="w-full pl-4 pr-12 py-3 text-xl font-bold border border-gray-200 rounded-xl focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-50 transition-all placeholder-gray-300"
+                value={lateUtilityFine}
+                onChange={(e) => setLateUtilityFine(e.target.value)}
+                min="0"
+                step="1"
+                placeholder="50"
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">
+                ฿/วัน
+              </span>
+            </div>
+            <p className="text-xs text-gray-400">
+              ค่าเริ่มต้น: 50 บาท/วัน (นับต่อ 1 บิลที่ค้าง)
+            </p>
           </div>
         </div>
 

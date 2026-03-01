@@ -160,7 +160,7 @@ const ExecutiveBills = () => {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 <th className="text-left py-4 px-6 font-semibold text-gray-700 rounded-tl-xl text-sm">
-                  ล็อค
+                  แผงค้า
                 </th>
                 <th className="text-left py-4 px-6 font-semibold text-gray-700 text-sm">
                   ผู้เช่า
@@ -183,12 +183,17 @@ const ExecutiveBills = () => {
                   className="border-b border-gray-50 hover:bg-purple-50/30 transition-colors"
                 >
                   <td className="py-4 px-6 font-medium text-gray-800">
-                    {bill.rental_slot?.slot_number ||
-                      bill.rental_contract?.rental_slot?.slot_number ||
-                      "-"}
+                    <div className="flex flex-col">
+                      <span>{bill.contract?.slot?.slot_number || "-"}</span>
+                      <span className="text-xs text-gray-500 font-normal">
+                        {bill.contract?.slot?.food_court_id
+                          ? `ศูนย์อาหาร ${bill.contract.slot.food_court_id}`
+                          : ""}
+                      </span>
+                    </div>
                   </td>
                   <td className="py-4 px-6 text-gray-600">
-                    {bill.rental_contract?.tenant?.first_name || "-"}
+                    {bill.contract?.tenant?.first_name || "-"}
                   </td>
                   <td className="py-4 px-6 text-gray-600">
                     <div className="flex items-center gap-2">

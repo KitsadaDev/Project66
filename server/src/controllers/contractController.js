@@ -17,7 +17,9 @@ const getAllContracts = async (req, res, next) => {
       where,
       include: {
         slot: {
-          select: { slot_id: true, slot_number: true, food_court_id: true, rent: true }
+          include: {
+            food_court: { select: { name: true } }
+          }
         },
         tenant: {
           select: { user_id: true, first_name: true, last_name: true, email: true, phone: true }
@@ -41,7 +43,9 @@ const getContractById = async (req, res, next) => {
       where: { contract_id: parseInt(id) },
       include: {
         slot: {
-          select: { slot_id: true, slot_number: true, food_court_id: true, rent: true, status: true }
+          include: {
+            food_court: { select: { name: true } }
+          }
         },
         tenant: {
           select: { user_id: true, first_name: true, last_name: true, email: true, phone: true }
@@ -79,6 +83,22 @@ const createContract = async (req, res, next) => {
     const tenant = await prisma.user.findUnique({ where: { user_id: parseInt(tenant_id) } });
     if (!tenant || tenant.role !== 'TENANT') {
       return res.status(400).json({ success: false, message: 'Invalid tenant.' });
+    }
+
+    const existingActiveTenantContract = await prisma.rentalContract.findFirst({
+      where: { tenant_id: parseInt(tenant_id), status: 'ACTIVE' }
+    });
+    if (existingActiveTenantContract) {
+      return res.status(400).json({ success: false, message: 'ผู้เช่ารายนี้มีสัญญาที่กำลังดำเนินการอยู่แล้ว ไม่สามารถเพิ่มสัญญาซ้อนได้' });
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const maxEnd = new Date(start);
+    maxEnd.setFullYear(maxEnd.getFullYear() + 3);
+    
+    if (end > maxEnd) {
+      return res.status(400).json({ success: false, message: 'ระยะเวลาสัญญาเช่าสูงสุดคือ 3 ปี' });
     }
 
     // Terminate existing active contracts for this slot
@@ -139,6 +159,15 @@ const updateContract = async (req, res, next) => {
     const existing = await prisma.rentalContract.findUnique({ where: { contract_id: parseInt(id) } });
     if (!existing) {
       return res.status(404).json({ success: false, message: 'Contract not found.' });
+    }
+
+    const newStart = startDate && startDate !== '' ? new Date(startDate) : existing.start_date;
+    const newEnd = endDate && endDate !== '' ? new Date(endDate) : existing.end_date;
+    const maxEnd = new Date(newStart);
+    maxEnd.setFullYear(maxEnd.getFullYear() + 3);
+
+    if (newEnd > maxEnd) {
+      return res.status(400).json({ success: false, message: 'ระยะเวลาสัญญาเช่าสูงสุดคือ 3 ปี' });
     }
 
     const updateData = {};

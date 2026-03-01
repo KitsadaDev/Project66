@@ -31,13 +31,17 @@ router.get('/utility-rates', authenticate, async (req, res) => {
     const waterRate = await prisma.systemSetting.findUnique({ where: { setting_key: 'WATER_RATE_PER_UNIT' } });
     const electricRate = await prisma.systemSetting.findUnique({ where: { setting_key: 'ELECTRIC_RATE_PER_UNIT' } });
     const greaseTrap = await prisma.systemSetting.findUnique({ where: { setting_key: 'GREASE_TRAP_FEE' } });
+    const lateRent = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_RENT_FINE' } });
+    const lateUtility = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_UTILITY_FINE' } });
 
     res.json({
       success: true,
       data: {
         waterRatePerUnit: parseFloat(waterRate?.setting_value || '18'),
         electricRatePerUnit: parseFloat(electricRate?.setting_value || '7'),
-        greaseTrapFee: parseFloat(greaseTrap?.setting_value || '500')
+        greaseTrapFee: parseFloat(greaseTrap?.setting_value || '500'),
+        lateRentFine: parseFloat(lateRent?.setting_value || '100'),
+        lateUtilityFine: parseFloat(lateUtility?.setting_value || '50')
       }
     });
   } catch (error) {
@@ -82,7 +86,7 @@ router.put('/', authenticate, authorize('ADMIN'), async (req, res) => {
 // Update utility rates (Admin only)
 router.put('/utility-rates', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
-    const { waterRatePerUnit, electricRatePerUnit, greaseTrapFee } = req.body;
+    const { waterRatePerUnit, electricRatePerUnit, greaseTrapFee, lateRentFine, lateUtilityFine } = req.body;
 
     const updates = [];
 
@@ -134,8 +138,40 @@ router.put('/utility-rates', authenticate, authorize('ADMIN'), async (req, res) 
       );
     }
 
+    if (lateRentFine !== undefined) {
+      updates.push(
+        prisma.systemSetting.upsert({
+          where: { setting_key: 'LATE_RENT_FINE' },
+          update: { setting_value: String(lateRentFine), updated_by: req.user.user_id },
+          create: {
+            setting_key: 'LATE_RENT_FINE',
+            setting_value: String(lateRentFine),
+            description: 'ค่าปรับจ่ายค่าเช่าล่าช้า (บาท/วัน)',
+            data_type: 'number',
+            updated_by: req.user.user_id
+          }
+        })
+      );
+    }
+
+    if (lateUtilityFine !== undefined) {
+      updates.push(
+        prisma.systemSetting.upsert({
+          where: { setting_key: 'LATE_UTILITY_FINE' },
+          update: { setting_value: String(lateUtilityFine), updated_by: req.user.user_id },
+          create: {
+            setting_key: 'LATE_UTILITY_FINE',
+            setting_value: String(lateUtilityFine),
+            description: 'ค่าปรับจ่ายค่าน้ำไฟล่าช้า (บาท/วัน)',
+            data_type: 'number',
+            updated_by: req.user.user_id
+          }
+        })
+      );
+    }
+
     await prisma.$transaction(updates);
-    res.json({ success: true, message: 'Utility rates updated successfully', data: { waterRatePerUnit, electricRatePerUnit, greaseTrapFee } });
+    res.json({ success: true, message: 'Utility rates updated successfully', data: { waterRatePerUnit, electricRatePerUnit, greaseTrapFee, lateRentFine, lateUtilityFine } });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to update utility rates' });
   }

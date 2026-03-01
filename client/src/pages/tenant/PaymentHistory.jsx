@@ -23,18 +23,20 @@ const PaymentHistory = () => {
 
   const fetchData = async () => {
     try {
-      const stallsRes = await stallsAPI.getAll();
-      const myStall = stallsRes.data.data?.[0];
+      const billsRes = await billsAPI.getAll();
+      const bills = billsRes.data.data || [];
 
-      if (myStall) {
-        const billsRes = await billsAPI.getByStall(myStall.id);
-        const bills = billsRes.data.data || [];
-        // Filter by year if needed, currently getting all
-        setPayments(bills);
-      }
+      // Filter by year based on billing_month
+      const filteredBills = bills.filter((bill) => {
+        if (!bill.billing_month) return false;
+        const billYear = new Date(bill.billing_month).getFullYear();
+        return billYear === selectedYear;
+      });
+
+      setPayments(filteredBills);
     } catch (error) {
       console.error("Error fetching data:", error);
-      setPayments([]); // Clear payments on error instead of showing mock data
+      setPayments([]);
     } finally {
       setLoading(false);
     }
@@ -147,7 +149,7 @@ const PaymentHistory = () => {
               ฿
               {payments
                 .filter((p) => p.status === "PAID")
-                .reduce((sum, p) => sum + (p.amount || p.totalAmount || 0), 0)
+                .reduce((sum, p) => sum + (p.total_amount || 0), 0)
                 .toLocaleString()}
             </h3>
             <p className="text-sm text-gray-500">ยอดชำระรวมปีนี้</p>
@@ -187,30 +189,41 @@ const PaymentHistory = () => {
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-2 font-medium text-gray-800">
                         <Calendar size={18} className="text-purple-400" />
-                        {payment.month || payment.billingMonth}
+                        {payment.billing_month
+                          ? new Date(payment.billing_month).toLocaleDateString(
+                              "th-TH",
+                              { month: "long" },
+                            )
+                          : "-"}
                       </div>
                     </td>
                     <td className="py-4 px-6">
                       <span className="font-bold text-purple-600">
-                        ฿
-                        {(
-                          payment.amount ||
-                          payment.totalAmount ||
-                          0
-                        ).toLocaleString()}
+                        ฿{payment.total_amount?.toLocaleString()}
                       </span>
                     </td>
                     <td className="py-4 px-6 text-gray-600">
-                      {formatDate(payment.paidAt || payment.paidDate)}
+                      {payment.payments?.[0]?.payment_date
+                        ? formatDate(payment.payments[0].payment_date)
+                        : "-"}
                     </td>
                     <td className="py-4 px-6">
                       {getStatusBadge(payment.status)}
                     </td>
                     <td className="py-4 px-6">
-                      {payment.receiptUrl && (
+                      {payment.payments?.[0]?.payment_slip_url && (
                         <button
                           className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-100 rounded-lg transition-colors"
-                          onClick={() => setViewModal({ open: true, payment })}
+                          onClick={() =>
+                            setViewModal({
+                              open: true,
+                              payment: {
+                                ...payment,
+                                receiptUrl:
+                                  payment.payments[0].payment_slip_url,
+                              },
+                            })
+                          }
                           title="ดูใบเสร็จ"
                         >
                           <Eye size={20} />
@@ -274,17 +287,10 @@ const PaymentHistory = () => {
               <div className="flex justify-between items-center text-sm">
                 <span className="text-gray-500">
                   วันที่ชำระ:{" "}
-                  {formatDate(
-                    viewModal.payment?.paidAt || viewModal.payment?.paidDate,
-                  )}
+                  {formatDate(viewModal.payment?.payments?.[0]?.payment_date)}
                 </span>
                 <span className="font-bold text-gray-800">
-                  ฿
-                  {(
-                    viewModal.payment?.amount ||
-                    viewModal.payment?.totalAmount ||
-                    0
-                  ).toLocaleString()}
+                  ฿{viewModal.payment?.total_amount?.toLocaleString()}
                 </span>
               </div>
             </div>
