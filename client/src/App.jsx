@@ -23,6 +23,7 @@ import ReportRepair from "./pages/tenant/ReportRepair";
 import TrackRepairs from "./pages/tenant/TrackRepairs";
 import TenantDishware from "./pages/tenant/Dishware";
 import Notifications from "./pages/tenant/Notifications";
+import UploadBill from "./pages/tenant/UploadBill";
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/Dashboard";
@@ -65,7 +66,6 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   }
 
   if (allowedRoles && !allowedRoles.includes(user?.role)) {
-    // Redirect to appropriate dashboard based on role
     const dashboardRoutes = {
       ADMIN: "/admin",
       TENANT: "/tenant",
@@ -121,9 +121,9 @@ function App() {
           <Route path="stall-status" element={<StallStatus />} />
           <Route path="dishware" element={<TenantDishware />} />
           <Route path="report-repair" element={<ReportRepair />} />
-          <Route path="report-repair" element={<ReportRepair />} />
           <Route path="track-repairs" element={<TrackRepairs />} />
           <Route path="notifications" element={<Notifications />} />
+          <Route path="upload-bill" element={<UploadBill />} />
         </Route>
 
         {/* Admin Routes */}

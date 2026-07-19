@@ -96,9 +96,14 @@ const MeterRecording = () => {
   };
 
   const filteredStalls = stalls.filter((stall) => {
-    const matchesSearch = stall.slot_number
-      ?.toLowerCase()
-      .includes(search.toLowerCase());
+    const tenant = stall.rental_contracts?.[0]?.tenant;
+    const tenantName = tenant
+      ? `${tenant.first_name} ${tenant.last_name}`.toLowerCase()
+      : "";
+
+    const matchesSearch =
+      stall.slot_number?.toLowerCase().includes(search.toLowerCase()) ||
+      tenantName.includes(search.toLowerCase());
     const matchesFoodCourt =
       foodCourtFilter === "ALL" ||
       stall.food_court_id?.toString() === foodCourtFilter;
@@ -143,7 +148,7 @@ const MeterRecording = () => {
             <input
               type="text"
               className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
-              placeholder="ค้นหาหมายเลขแผงค้า..."
+              placeholder="ค้นหาหมายเลขแผงค้า หรือชื่อผู้เช่า..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />

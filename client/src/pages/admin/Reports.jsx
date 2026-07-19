@@ -41,7 +41,6 @@ const Reports = () => {
     fetchData();
   }, []);
 
-  // Re-calculate revenue when filter changes
   useEffect(() => {
     if (allBills.length > 0) {
       calculateStats(allBills);
@@ -67,7 +66,6 @@ const Reports = () => {
 
       const occupied = stalls.filter((s) => s.status === "OCCUPIED").length;
 
-      // Initial stats (won't change with filter except revenue/bills)
       setStats((prev) => ({
         ...prev,
         totalStalls: stalls.length,
@@ -75,7 +73,6 @@ const Reports = () => {
         vacantStalls: stalls.length - occupied,
         totalTenants: tenants.length,
         pendingRepairs: repairs.filter((r) => r.status === "PENDING").length,
-        // pendingBills and totalRevenue will be updated by calculateStats
       }));
     } catch (error) {
       console.error("Error fetching data:", error);

@@ -8,7 +8,7 @@ import {
   FileText,
 } from "lucide-react";
 import { toast } from "react-toastify";
-import { billsAPI } from "../../api";
+import { billsAPI, stallsAPI } from "../../api";
 
 const UploadBill = () => {
   const [file, setFile] = useState(null);
@@ -60,14 +60,50 @@ const UploadBill = () => {
 
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("receipt", file);
-      formData.append("amount", amount);
-      formData.append("month", selectedMonth);
-      formData.append("year", selectedYear);
-      formData.append("note", note);
+      // 1. Fetch stalls to get the tenant's slot
+      const stallsRes = await stallsAPI.getAll();
+      const myStall = stallsRes.data.data?.[0];
+      if (!myStall) {
+        toast.error("ไม่พบข้อมูลแผงค้าของคุณ");
+        setUploading(false);
+        return;
+      }
 
-      await billsAPI.uploadReceipt(formData);
+      // 2. Fetch bills for this stall
+      const billsRes = await billsAPI.getAll({ slot_id: myStall.slot_id });
+      const bills = billsRes.data.data || [];
+
+      // 3. Find the bill matching selectedMonth and selectedYear
+      const bill = bills.find((b) => {
+        const billDate = new Date(b.billing_month);
+        return (
+          billDate.getMonth() + 1 === selectedMonth &&
+          billDate.getFullYear() === selectedYear
+        );
+      });
+
+      if (!bill) {
+        toast.error(`ไม่พบข้อมูลบิลสำหรับเดือน ${thaiMonths[selectedMonth - 1]} ${selectedYear + 543}`);
+        setUploading(false);
+        return;
+      }
+
+      if (bill.status === "PAID") {
+        toast.warning("บิลสำหรับเดือนนี้ได้รับการชำระเรียบร้อยแล้ว");
+        setUploading(false);
+        return;
+      }
+
+      // 4. Upload payment slip
+      const formData = new FormData();
+      formData.append("paymentProof", file);
+      formData.append("payment_date", new Date().toISOString());
+      formData.append("payment_amount", amount);
+      if (note) {
+        formData.append("note", note);
+      }
+
+      await billsAPI.uploadPayment(bill.expense_id, formData);
       toast.success("อัปโหลดหลักฐานสำเร็จ รอการตรวจสอบ");
 
       // Reset form
@@ -76,7 +112,8 @@ const UploadBill = () => {
       setAmount("");
       setNote("");
     } catch (error) {
-      toast.error("ไม่สามารถอัปโหลดได้ กรุณาลองใหม่");
+      console.error(error);
+      toast.error(error.response?.data?.message || "ไม่สามารถอัปโหลดได้ กรุณาลองใหม่");
     } finally {
       setUploading(false);
     }
