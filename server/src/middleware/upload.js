@@ -32,13 +32,18 @@ const storage = new CloudinaryStorage({
   },
 });
 
-// File filter
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|webp|pdf/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype);
+// File filter - explicit MIME type allow-list (prevents extension spoofing)
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/pdf'
+]);
 
-  if (extname && mimetype) {
+const fileFilter = (req, file, cb) => {
+  if (ALLOWED_MIME_TYPES.has(file.mimetype)) {
     return cb(null, true);
   }
   cb(new Error('Only images (jpeg, jpg, png, gif, webp) and PDF files are allowed!'));

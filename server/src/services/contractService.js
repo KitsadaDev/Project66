@@ -1,6 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const { createNotification } = require('./notificationService'); // if we want to send a notification
+// Note: createNotification is not exported from notificationService; notifications are created inline
 
 /**
  * Checks all active contracts for users with 3 or more unpaid bills.
@@ -37,7 +37,7 @@ const autoTerminateContracts = async () => {
           }),
           prisma.rentalSlot.update({
             where: { slot_id: contract.slot_id },
-            data: { status: 'VACANT', tenant_id: null }
+            data: { status: 'VACANT' }
           }),
           prisma.notification.create({
             data: {

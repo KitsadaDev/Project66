@@ -10,7 +10,7 @@ import {
   CheckCircle,
   X,
 } from "lucide-react";
-import { billsAPI, stallsAPI } from "../../api";
+import { billsAPI, contractsAPI } from "../../api";
 import { generateBillPDF } from "../../utils/pdfGenerator";
 import { useAuthStore } from "../../store";
 import { toast } from "react-toastify";
@@ -35,11 +35,15 @@ const Expenses = () => {
 
   const fetchData = async () => {
     try {
-      const stallsRes = await stallsAPI.getAll();
-      const myStall = stallsRes.data.data?.[0];
-      setStall(myStall);
+      // Fetch tenant's active contract to get their stall
+      const contractsRes = await contractsAPI.getAll({ status: 'ACTIVE' });
+      const activeContract = contractsRes.data.data?.[0];
 
-      if (myStall) {
+      if (activeContract?.slot) {
+        // Build a stall-like object from the contract's slot data
+        const myStall = activeContract.slot;
+        setStall(myStall);
+
         // Use getAll with slot_id filter
         const billsRes = await billsAPI.getAll({ slot_id: myStall.slot_id });
         const bills = billsRes.data.data || [];

@@ -22,7 +22,7 @@ const computeLateFees = async (expenses) => {
       due.setHours(0, 0, 0, 0);
 
       if (now > due) {
-        const diffTime = Math.abs(now - due);
+        const diffTime = now - due;
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         const lateFee = diffDays * totalDailyFine;
         
@@ -121,6 +121,14 @@ const getBillById = async (req, res, next) => {
 
     if (!expense) {
       return res.status(404).json({ success: false, message: 'Expense not found.' });
+    }
+
+    // IDOR prevention: TENANT can only view their own bills
+    if (req.user.role === 'TENANT') {
+      const tenantId = expense.contract?.tenant_id;
+      if (tenantId !== req.user.user_id) {
+        return res.status(403).json({ success: false, message: 'Access denied.' });
+      }
     }
 
     const expenseWithFine = await computeLateFees(expense);
@@ -229,7 +237,8 @@ const updateBill = async (req, res, next) => {
     if (water_cost !== undefined || electricity_cost !== undefined) {
       const newWater = water_cost !== undefined ? parseFloat(water_cost) : existing.water_cost;
       const newElec = electricity_cost !== undefined ? parseFloat(electricity_cost) : existing.electricity_cost;
-      updateData.total_amount = existing.rent_amount + newWater + newElec;
+      const existingGreaseTrap = existing.grease_trap_fee || 0;
+      updateData.total_amount = existing.rent_amount + newWater + newElec + existingGreaseTrap;
     }
 
     const updated = await prisma.monthlyExpense.update({

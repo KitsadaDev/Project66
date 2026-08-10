@@ -70,7 +70,6 @@ const AdminDashboard = () => {
   const getStallStatus = (slot_number) => {
     const stall = getStallData(slot_number);
     if (!stall) return "empty";
-    if (stall.status === "OCCUPIED" && stall.hasPendingPayment) return "pending";
     return stall.status.toLowerCase();
   };
 

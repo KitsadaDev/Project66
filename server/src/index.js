@@ -1,9 +1,11 @@
-require("dotenv").config(); // Restarting server to apply Prisma client manual patch
+require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
 const path = require("path");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 
 // Import routes
 const authRoutes = require("./routes/auth");
@@ -47,11 +49,50 @@ async function runMigrations() {
 runMigrations();
 // ------------------------------------
 
-// Middleware
-app.use(cors());
+// Security Headers (Helmet)
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow Cloudinary images to load
+  contentSecurityPolicy: false // Disable CSP for API server (frontend handles it)
+}));
+
+// CORS — restrict to known frontend origins only
+const allowedOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(',')
+  : ['http://localhost:5173', 'http://localhost:3000'];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g., Postman, mobile apps) in development
+    if (!origin && process.env.NODE_ENV !== 'production') return callback(null, true);
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true
+}));
+
+// Rate Limiting
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // max 20 login attempts per 15 min per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many requests, please try again after 15 minutes.' }
+});
+
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api', generalLimiter);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(morgan("dev"));
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 // Static files for uploads
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
@@ -66,6 +107,7 @@ app.use("/api/maintenance", maintenanceRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/dishware", dishwareRoutes);
 app.use("/api/dishware-types", dishwareTypeRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {

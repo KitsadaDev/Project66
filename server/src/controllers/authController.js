@@ -20,6 +20,8 @@ const register = async (req, res, next) => {
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
 
+    // Security: always register as TENANT regardless of what role is sent in body
+    // Role can only be elevated by an Admin after account creation
     const user = await prisma.user.create({
       data: {
         username: trimmedUsername,
@@ -28,7 +30,7 @@ const register = async (req, res, next) => {
         last_name: last_name || undefined,
         email: email || null,
         phone: phone || null,
-        role: role || 'TENANT',
+        role: 'TENANT',
         title: title || null,
         address_line: address_line || null,
         subdistrict: subdistrict || null,
@@ -64,19 +66,13 @@ const register = async (req, res, next) => {
 };
 
 // Login user (ด้วย email หรือ username)
-const fs = require('fs');
-const path = require('path');
-
 const login = async (req, res, next) => {
   try {
     let { login: loginField, password } = req.body;
-    const logPath = path.join(__dirname, '../../debug.log');
-    fs.appendFileSync(logPath, `\n--- Login Attempt ${new Date().toISOString()} ---\n`);
-    fs.appendFileSync(logPath, `Raw loginField: ${JSON.stringify(loginField)}\n`);
-    fs.appendFileSync(logPath, `Raw password: ${JSON.stringify(password)}\n`);
-    console.log('--- Login Attempt ---');
-    console.log('Raw loginField:', JSON.stringify(loginField));
-    console.log('Raw password:', JSON.stringify(password));
+
+    if (!loginField || !password) {
+      return res.status(400).json({ success: false, message: 'Login and password are required.' });
+    }
 
     loginField = typeof loginField === 'string' ? loginField.trim() : loginField;
 
@@ -90,22 +86,13 @@ const login = async (req, res, next) => {
       }
     });
 
-    fs.appendFileSync(logPath, `Found user in DB? ${!!user}\n`);
-    console.log('Found user in DB?', !!user);
-
     if (!user) {
-      fs.appendFileSync(logPath, `User not found in DB!\n`);
-      console.log('User not found in DB!');
       return res.status(401).json({ success: false, message: 'Invalid credentials.' });
     }
 
     const isMatch = await bcrypt.compare(password, user.password_hash);
-    fs.appendFileSync(logPath, `Password match? ${isMatch}\n`);
-    console.log('Password match?', isMatch);
     
     if (!isMatch) {
-      fs.appendFileSync(logPath, `Password hash mismatch!\n`);
-      console.log('Password hash mismatch!');
       return res.status(401).json({ success: false, message: 'Invalid credentials.' });
     }
 

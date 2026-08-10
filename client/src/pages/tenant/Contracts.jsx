@@ -267,7 +267,7 @@ const Contracts = () => {
                 <div className="flex justify-between items-center py-2 border-b border-gray-200 border-dashed">
                   <span className="text-gray-600">ค่าดักไขมัน</span>
                   <span className="font-bold text-gray-800">
-                    ฿{contract.menuType === "ของคาว" ? "500" : "0"}
+                    {contract.menuType === "ของคาว" ? "ตามที่กำหนด" : "ฟรี"}
                   </span>
                 </div>
 
