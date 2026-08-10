@@ -259,41 +259,29 @@ const Stalls = () => {
           </div>
         </div>
       ) : (
-        /* ===== ผังศูนย์อาหาร 2 (เดิม) ===== */
-        <div className="bg-white rounded-2xl shadow-lg border border-purple-100 p-8 flex justify-center overflow-x-auto">
-          <div className="flex flex-col gap-6 min-w-[600px]">
-            {/* Row B + D1 */}
-            <div className="flex gap-4">
-              {["B1", "B2", "B3", "B4", "B5", "B6"].map((id) => (
-                <StallCell key={id} id={id} />
-              ))}
-              <div className="w-10"></div>
-              <StallCell id="D1" />
-            </div>
+        /* ===== ผังศูนย์อาหาร 2 ===== */
+        <div className="bg-white rounded-2xl shadow-lg border border-purple-100 p-3 sm:p-6 w-full overflow-x-auto">
+          {/* Mobile scroll hint */}
+          <div className="lg:hidden text-center text-xs text-purple-600 font-semibold mb-3 flex items-center justify-center gap-1.5 bg-purple-50/80 py-2 px-3 rounded-xl border border-purple-100 shadow-sm">
+            <span>👈</span> เลื่อน ซ้าย-ขวา เพื่อดูผังทั้งหมด <span>👉</span>
+          </div>
 
-            {/* Spacer + D2 */}
-            <div className="flex gap-4">
-              <div className="flex-1"></div>
-              <div className="w-10"></div>
-              <StallCell id="D2" />
-            </div>
+          <div className="min-w-[650px] w-[650px] mx-auto">
+            <div style={{ position: "relative", width: 650, height: 540, border: "3px solid #4B5563" }}>
+              {/* ── Stall Column A (A10 down to A1) ── */}
+              <div style={{ position: "absolute", top: 24, left: 24, display: "flex", flexDirection: "column", gap: 5 }}>
+                {["A10", "A9", "A8", "A7", "A6", "A5", "A4", "A3", "A2", "A1"].map((id) => (
+                  <StallCell key={id} id={id} fixedSize w={44} h={44} />
+                ))}
+              </div>
 
-            {/* Row A + D3 */}
-            <div className="flex gap-4">
-              {["A1", "A2", "A3", "A4", "A5", "A6"].map((id) => (
-                <StallCell key={id} id={id} />
-              ))}
-              <div className="w-10"></div>
-              <StallCell id="D3" />
-            </div>
-
-            <div className="h-4"></div>
-
-            {/* Row C */}
-            <div className="flex gap-4">
-              {["C1", "C2", "C3", "C4", "C5", "C6"].map((id) => (
-                <StallCell key={id} id={id} />
-              ))}
+              {/* ── Dining zone ── */}
+              <div
+                className="absolute flex items-center justify-center rounded-xl bg-gray-200/80 border border-gray-300 text-gray-700 text-base font-semibold shadow-inner"
+                style={{ top: 24, left: 120, width: 495, height: 485 }}
+              >
+                โซนโต๊ะนั่งทานอาหาร
+              </div>
             </div>
           </div>
         </div>

@@ -116,3 +116,15 @@ Raw loginField: "Admin"
 Raw password: "123456"
 Found user in DB? true
 Password match? true
+
+--- Login Attempt 2026-08-10T11:51:52.064Z ---
+Raw loginField: "User01"
+Raw password: "123456"
+Found user in DB? true
+Password match? true
+
+--- Login Attempt 2026-08-10T11:52:02.599Z ---
+Raw loginField: "Admin"
+Raw password: "123456"
+Found user in DB? true
+Password match? true
