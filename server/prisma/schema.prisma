@@ -8,9 +8,251 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ─────────────────────────────────────────────
-// Enums
-// ─────────────────────────────────────────────
+model FoodCourt {
+  food_court_id Int          @id @default(autoincrement())
+  name          String
+  total_slots   Int
+  rental_slots  RentalSlot[]
+}
+
+model User {
+  user_id                          Int                     @id @default(autoincrement())
+  username                         String                  @unique
+  password_hash                    String
+  role                             Role
+  title                            String?
+  first_name                       String
+  last_name                        String?
+  address_line                     String?
+  subdistrict                      String?
+  district                         String?
+  province                         String?
+  postal_code                      String?
+  phone                            String?
+  email                            String?
+  is_active                        Boolean                 @default(true)
+  must_change_password             Boolean                 @default(false)
+  push_token                       String?
+  daily_dishware_usages            DailyDishwareUsage[]    @relation("RecordedByUser")
+  daily_dishware_reviewed          DailyDishwareUsage[]    @relation("ReviewedByUser")
+  maintenance_assignments_by       MaintenanceAssignment[] @relation("AssignedByUser")
+  maintenance_assignments_assigned MaintenanceAssignment[] @relation("AssignedToUser")
+  maintenance_requests             MaintenanceRequest[]    @relation("TenantRequests")
+  maintenance_updates              MaintenanceUpdate[]     @relation("UpdatedByUser")
+  notifications                    Notification[]          @relation("UserNotifications")
+  monthly_expenses_verified        Payment[]               @relation("VerifiedByUser")
+  rental_contracts                 RentalContract[]        @relation("TenantContracts")
+  system_settings                  SystemSetting[]         @relation("UpdatedByUser")
+  utility_meters                   UtilityMeter[]          @relation("RecordedByUser")
+}
+
+model RentalSlot {
+  slot_id              Int                  @id @default(autoincrement())
+  food_court_id        Int
+  slot_number          String
+  slot_size            String?
+  rent                 Float
+  status               SlotStatus           @default(VACANT)
+  maintenance_requests MaintenanceRequest[]
+  rental_contracts     RentalContract[]
+  food_court           FoodCourt            @relation(fields: [food_court_id], references: [food_court_id])
+  utility_meters       UtilityMeter[]
+}
+
+model RentalContract {
+  contract_id           Int                  @id @default(autoincrement())
+  slot_id               Int
+  tenant_id             Int
+  contract_number       String               @unique
+  start_date            DateTime
+  end_date              DateTime
+  monthly_rent          Float
+  deposit_amount        Float
+  status                ContractStatus       @default(ACTIVE)
+  created_at            DateTime             @default(now())
+  updated_at            DateTime             @updatedAt
+  address               String?
+  greaseTrapFee         Float                @default(500)
+  idCard                String?
+  lateRentFine          Float?
+  lateUtilityFine       Float?
+  menuType              String?
+  phone                 String?
+  receiptDate           DateTime?
+  receiptNumber         String?
+  contractImage         String?
+  daily_dishware_usages DailyDishwareUsage[]
+  monthly_expenses      MonthlyExpense[]
+  slot                  RentalSlot           @relation(fields: [slot_id], references: [slot_id])
+  tenant                User                 @relation("TenantContracts", fields: [tenant_id], references: [user_id])
+}
+
+model UtilityMeter {
+  meter_id         Int        @id @default(autoincrement())
+  slot_id          Int
+  meter_type       MeterType
+  meter_number     String?
+  previous_reading Float
+  current_reading  Float
+  unit_used        Float
+  unit_price       Float
+  total_cost       Float
+  recorded_by      Int
+  created_at       DateTime   @default(now())
+  recorder         User       @relation("RecordedByUser", fields: [recorded_by], references: [user_id])
+  slot             RentalSlot @relation(fields: [slot_id], references: [slot_id])
+}
+
+model MonthlyExpense {
+  expense_id        Int            @id @default(autoincrement())
+  contract_id       Int
+  billing_month     DateTime
+  rent_amount       Float
+  water_cost        Float
+  electricity_cost  Float
+  total_amount      Float
+  due_date          DateTime
+  status            ExpenseStatus  @default(PENDING)
+  created_at        DateTime       @default(now())
+  water_units       Float?
+  electricity_units Float?
+  water_rate        Float?
+  electricity_rate  Float?
+  grease_trap_fee   Float?
+  contract          RentalContract @relation(fields: [contract_id], references: [contract_id])
+  payments          Payment[]
+}
+
+model Payment {
+  payment_id       Int            @id @default(autoincrement())
+  expense_id       Int
+  payment_date     DateTime
+  payment_amount   Float
+  payment_slip_url String?
+  verified_by      Int?
+  verified_at      DateTime?
+  notes            String?
+  created_at       DateTime       @default(now())
+  expense          MonthlyExpense @relation(fields: [expense_id], references: [expense_id])
+  verifier         User?          @relation("VerifiedByUser", fields: [verified_by], references: [user_id])
+}
+
+model MaintenanceRequest {
+  request_id   Int                     @id @default(autoincrement())
+  slot_id      Int
+  tenant_id    Int
+  title        String
+  description  String?
+  category     String?
+  requested_at DateTime                @default(now())
+  status       MaintenanceStatus       @default(PENDING)
+  assignments  MaintenanceAssignment[]
+  images       MaintenanceImage[]
+  slot         RentalSlot              @relation(fields: [slot_id], references: [slot_id])
+  tenant       User                    @relation("TenantRequests", fields: [tenant_id], references: [user_id])
+  updates      MaintenanceUpdate[]
+}
+
+model MaintenanceImage {
+  image_id    Int                @id @default(autoincrement())
+  request_id  Int
+  image_url   String
+  image_type  String?
+  uploaded_at DateTime           @default(now())
+  request     MaintenanceRequest @relation(fields: [request_id], references: [request_id])
+}
+
+model MaintenanceAssignment {
+  assignment_id        Int                @id @default(autoincrement())
+  request_id           Int
+  assigned_to          Int
+  assigned_by          Int
+  estimated_completion DateTime?
+  scheduled_date       DateTime?
+  notes                String?
+  assigner             User               @relation("AssignedByUser", fields: [assigned_by], references: [user_id])
+  assignee             User               @relation("AssignedToUser", fields: [assigned_to], references: [user_id])
+  request              MaintenanceRequest @relation(fields: [request_id], references: [request_id])
+}
+
+model MaintenanceUpdate {
+  update_id  Int                @id @default(autoincrement())
+  request_id Int
+  updated_by Int
+  status     MaintenanceStatus
+  comment    String?
+  updated_at DateTime           @default(now())
+  request    MaintenanceRequest @relation(fields: [request_id], references: [request_id])
+  updater    User               @relation("UpdatedByUser", fields: [updated_by], references: [user_id])
+}
+
+model Notification {
+  notification_id Int                @id @default(autoincrement())
+  user_id         Int
+  title           String
+  message         String?
+  reference_id    Int?
+  status          NotificationStatus @default(UNREAD)
+  created_at      DateTime           @default(now())
+  user            User               @relation("UserNotifications", fields: [user_id], references: [user_id])
+}
+
+model SystemSetting {
+  setting_id    Int      @id @default(autoincrement())
+  setting_key   String   @unique
+  setting_value String
+  description   String?
+  data_type     String?
+  updated_by    Int?
+  updated_at    DateTime @updatedAt
+  updater       User?    @relation("UpdatedByUser", fields: [updated_by], references: [user_id])
+}
+
+model DishwareType {
+  dishware_type_id Int                 @id @default(autoincrement())
+  name             String
+  category         DishwareCategory
+  size_label       String
+  unit_price       Float
+  is_active        Boolean             @default(true)
+  created_at       DateTime            @default(now())
+  order_items      DishwareOrderItem[]
+}
+
+model DailyDishwareUsage {
+  usage_id      Int                 @id @default(autoincrement())
+  contract_id   Int
+  usage_date    DateTime
+  total_cost    Float
+  recorded_by   Int
+  status        DishwareStatus      @default(PENDING)
+  reviewed_by   Int?
+  reviewed_at   DateTime?
+  reject_reason String?
+  created_at    DateTime            @default(now())
+  contract      RentalContract      @relation(fields: [contract_id], references: [contract_id])
+  recorder      User                @relation("RecordedByUser", fields: [recorded_by], references: [user_id])
+  reviewer      User?               @relation("ReviewedByUser", fields: [reviewed_by], references: [user_id])
+  items         DishwareOrderItem[]
+}
+
+model DishwareOrderItem {
+  item_id          Int                @id @default(autoincrement())
+  usage_id         Int
+  dishware_type_id Int
+  quantity         Int
+  unit_price       Float
+  subtotal         Float
+  dishware_type    DishwareType       @relation(fields: [dishware_type_id], references: [dishware_type_id])
+  usage            DailyDishwareUsage @relation(fields: [usage_id], references: [usage_id])
+}
+
+model ShopType {
+  shop_type_id        Int      @id @default(autoincrement())
+  type_name           String   @unique
+  require_grease_trap Boolean  @default(false)
+  created_at          DateTime @default(now())
+}
 
 enum Role {
   ADMIN
@@ -65,338 +307,4 @@ enum DishwareCategory {
 enum NotificationStatus {
   UNREAD
   READ
-}
-
-// ─────────────────────────────────────────────
-// D1 – food_courts (ตารางศูนย์อาหาร)
-// ─────────────────────────────────────────────
-model FoodCourt {
-  food_court_id Int    @id @default(autoincrement())
-  name          String
-  total_slots   Int
-
-  // Relations
-  rental_slots RentalSlot[]
-}
-
-// ─────────────────────────────────────────────
-// D2 – users (ตารางผู้ใช้งาน)
-// ─────────────────────────────────────────────
-model User {
-  user_id       Int     @id @default(autoincrement())
-  username      String  @unique
-  password_hash String
-  role          Role
-  title         String?
-  first_name    String
-  last_name     String?
-  address_line  String?
-  subdistrict   String?
-  district      String?
-  province      String?
-  postal_code   String?
-  phone         String?
-  email         String?
-
-  // Relations – tenant side
-  rental_contracts        RentalContract[]     @relation("TenantContracts")
-  maintenance_requests    MaintenanceRequest[] @relation("TenantRequests")
-  daily_dishware_usages   DailyDishwareUsage[] @relation("RecordedByUser")
-  daily_dishware_reviewed DailyDishwareUsage[] @relation("ReviewedByUser")
-  utility_meters          UtilityMeter[]       @relation("RecordedByUser")
-
-  // Relations – staff side
-  maintenance_assignments_assigned MaintenanceAssignment[] @relation("AssignedToUser")
-  maintenance_assignments_by       MaintenanceAssignment[] @relation("AssignedByUser")
-  maintenance_updates              MaintenanceUpdate[]     @relation("UpdatedByUser")
-  notifications                    Notification[]          @relation("UserNotifications")
-  system_settings                  SystemSetting[]         @relation("UpdatedByUser")
-  monthly_expenses_verified        Payment[]               @relation("VerifiedByUser")
-}
-
-// ─────────────────────────────────────────────
-// D3 – rental_slots (ตารางล็อกพื้นที่เช่า)
-// ─────────────────────────────────────────────
-model RentalSlot {
-  slot_id       Int        @id @default(autoincrement())
-  food_court_id Int
-  slot_number   String
-  slot_size     String?
-  rent          Float
-  status        SlotStatus @default(VACANT)
-
-  // Relations
-  food_court FoodCourt @relation(fields: [food_court_id], references: [food_court_id])
-
-  rental_contracts     RentalContract[]
-  utility_meters       UtilityMeter[]
-  maintenance_requests MaintenanceRequest[]
-}
-
-// ─────────────────────────────────────────────
-// D4 – rental_contracts (ตารางสัญญาเช่า)
-// ─────────────────────────────────────────────
-model RentalContract {
-  contract_id     Int      @id @default(autoincrement())
-  slot_id         Int
-  tenant_id       Int
-  contract_number String   @unique
-  start_date      DateTime
-  end_date        DateTime
-  monthly_rent    Float
-  deposit_amount  Float
-
-  // New fields from the Contract Management Form
-  idCard          String?
-  phone           String?
-  address         String?
-  receiptNumber   String?
-  receiptDate     DateTime?
-  greaseTrapFee   Float     @default(500)
-  lateRentFine    Float?
-  lateUtilityFine Float?
-  menuType        String?
-  contractImage   String?
-
-  status     ContractStatus @default(ACTIVE)
-  created_at DateTime       @default(now())
-  updated_at DateTime       @updatedAt
-
-  // Relations
-  slot   RentalSlot @relation(fields: [slot_id], references: [slot_id])
-  tenant User       @relation("TenantContracts", fields: [tenant_id], references: [user_id])
-
-  monthly_expenses      MonthlyExpense[]
-  daily_dishware_usages DailyDishwareUsage[]
-}
-
-// ─────────────────────────────────────────────
-// D5 – utility_meters (ตารางมิเตอร์น้ำ-ไฟ)
-// ─────────────────────────────────────────────
-model UtilityMeter {
-  meter_id         Int       @id @default(autoincrement())
-  slot_id          Int
-  meter_type       MeterType
-  meter_number     String?
-  previous_reading Float
-  current_reading  Float
-  unit_used        Float
-  unit_price       Float
-  total_cost       Float
-  recorded_by      Int
-  created_at       DateTime  @default(now())
-
-  // Relations
-  slot     RentalSlot @relation(fields: [slot_id], references: [slot_id])
-  recorder User       @relation("RecordedByUser", fields: [recorded_by], references: [user_id])
-}
-
-// ─────────────────────────────────────────────
-// D6 – monthly_expenses (ตารางค่าใช้จ่ายรายเดือน)
-// ─────────────────────────────────────────────
-model MonthlyExpense {
-  expense_id        Int           @id @default(autoincrement())
-  contract_id       Int
-  billing_month     DateTime
-  rent_amount       Float
-  water_cost        Float
-  electricity_cost  Float
-  total_amount      Float
-  due_date          DateTime
-  status            ExpenseStatus @default(PENDING)
-  water_units       Float?
-  electricity_units Float?
-  water_rate        Float?
-  electricity_rate  Float?
-  grease_trap_fee   Float?
-  created_at        DateTime      @default(now())
-
-  // Relations
-  contract RentalContract @relation(fields: [contract_id], references: [contract_id])
-  payments Payment[]
-}
-
-// ─────────────────────────────────────────────
-// D7 – payments (ตารางการชำระเงิน)
-// ─────────────────────────────────────────────
-model Payment {
-  payment_id       Int       @id @default(autoincrement())
-  expense_id       Int
-  payment_date     DateTime
-  payment_amount   Float
-  payment_slip_url String?
-  verified_by      Int?
-  verified_at      DateTime?
-  notes            String?
-  created_at       DateTime  @default(now())
-
-  // Relations
-  expense  MonthlyExpense @relation(fields: [expense_id], references: [expense_id])
-  verifier User?          @relation("VerifiedByUser", fields: [verified_by], references: [user_id])
-}
-
-// ─────────────────────────────────────────────
-// D8 – maintenance_requests (ตารางแจ้งซ่อม)
-// ─────────────────────────────────────────────
-model MaintenanceRequest {
-  request_id   Int               @id @default(autoincrement())
-  slot_id      Int
-  tenant_id    Int
-  title        String
-  description  String?
-  category     String?
-  requested_at DateTime          @default(now())
-  status       MaintenanceStatus @default(PENDING)
-
-  // Relations
-  slot   RentalSlot @relation(fields: [slot_id], references: [slot_id])
-  tenant User       @relation("TenantRequests", fields: [tenant_id], references: [user_id])
-
-  images      MaintenanceImage[]
-  assignments MaintenanceAssignment[]
-  updates     MaintenanceUpdate[]
-}
-
-// ─────────────────────────────────────────────
-// D9 – maintenance_images (ตารางรูปภาพประกอบ)
-// ─────────────────────────────────────────────
-model MaintenanceImage {
-  image_id    Int      @id @default(autoincrement())
-  request_id  Int
-  image_url   String
-  image_type  String?
-  uploaded_at DateTime @default(now())
-
-  // Relations
-  request MaintenanceRequest @relation(fields: [request_id], references: [request_id])
-}
-
-// ─────────────────────────────────────────────
-// D10 – maintenance_assignments (ตารางมอบหมายงานซ่อม)
-// ─────────────────────────────────────────────
-model MaintenanceAssignment {
-  assignment_id        Int       @id @default(autoincrement())
-  request_id           Int
-  assigned_to          Int
-  assigned_by          Int
-  estimated_completion DateTime?
-  scheduled_date       DateTime?
-  notes                String?
-
-  // Relations
-  request  MaintenanceRequest @relation(fields: [request_id], references: [request_id])
-  assignee User               @relation("AssignedToUser", fields: [assigned_to], references: [user_id])
-  assigner User               @relation("AssignedByUser", fields: [assigned_by], references: [user_id])
-}
-
-// ─────────────────────────────────────────────
-// D11 – maintenance_updates (ตารางอัปเดตสถานะ)
-// ─────────────────────────────────────────────
-model MaintenanceUpdate {
-  update_id  Int               @id @default(autoincrement())
-  request_id Int
-  updated_by Int
-  status     MaintenanceStatus
-  comment    String?
-  updated_at DateTime          @default(now())
-
-  // Relations
-  request MaintenanceRequest @relation(fields: [request_id], references: [request_id])
-  updater User               @relation("UpdatedByUser", fields: [updated_by], references: [user_id])
-}
-
-// ─────────────────────────────────────────────
-// D12 – notifications (ตารางการแจ้งเตือน)
-// ─────────────────────────────────────────────
-model Notification {
-  notification_id Int                @id @default(autoincrement())
-  user_id         Int
-  title           String
-  message         String?
-  reference_id    Int?
-  status          NotificationStatus @default(UNREAD)
-  created_at      DateTime           @default(now())
-
-  // Relations
-  user User @relation("UserNotifications", fields: [user_id], references: [user_id])
-}
-
-// ─────────────────────────────────────────────
-// D13 – system_settings (การตั้งค่าระบบ)
-// ─────────────────────────────────────────────
-model SystemSetting {
-  setting_id    Int      @id @default(autoincrement())
-  setting_key   String   @unique
-  setting_value String
-  description   String?
-  data_type     String?
-  updated_by    Int?
-  updated_at    DateTime @updatedAt
-
-  // Relations
-  updater User? @relation("UpdatedByUser", fields: [updated_by], references: [user_id])
-}
-
-// ─────────────────────────────────────────────
-// D14 – dishware_types (ประเภท+ขนาดภาชนะ)
-// ─────────────────────────────────────────────
-model DishwareType {
-  dishware_type_id Int              @id @default(autoincrement())
-  name             String // เช่น "จาน (S)", "ชาม (M)"
-  category         DishwareCategory // PLATE | BOWL | CUP | OTHER
-  size_label       String // "S" | "M" | "L" | "-"
-  unit_price       Float
-  is_active        Boolean          @default(true)
-  created_at       DateTime         @default(now())
-
-  // Relations
-  order_items DishwareOrderItem[]
-}
-
-// ─────────────────────────────────────────────
-// D15 – daily_dishware_usage (ตารางคำสั่งซื้อภาชนะรายวัน)
-// ─────────────────────────────────────────────
-model DailyDishwareUsage {
-  usage_id      Int            @id @default(autoincrement())
-  contract_id   Int
-  usage_date    DateTime
-  total_cost    Float
-  recorded_by   Int
-  status        DishwareStatus @default(PENDING)
-  reviewed_by   Int?
-  reviewed_at   DateTime?
-  reject_reason String?
-  created_at    DateTime       @default(now())
-
-  // Relations
-  contract RentalContract      @relation(fields: [contract_id], references: [contract_id])
-  recorder User                @relation("RecordedByUser", fields: [recorded_by], references: [user_id])
-  reviewer User?               @relation("ReviewedByUser", fields: [reviewed_by], references: [user_id])
-  items    DishwareOrderItem[]
-}
-
-// ─────────────────────────────────────────────
-// D16 – dishware_order_items (รายการย่อยของคำสั่งซื้อ)
-// ─────────────────────────────────────────────
-model DishwareOrderItem {
-  item_id          Int   @id @default(autoincrement())
-  usage_id         Int
-  dishware_type_id Int
-  quantity         Int
-  unit_price       Float // snapshot ราคา ณ เวลาสั่ง
-  subtotal         Float
-
-  // Relations
-  usage         DailyDishwareUsage @relation(fields: [usage_id], references: [usage_id])
-  dishware_type DishwareType       @relation(fields: [dishware_type_id], references: [dishware_type_id])
-}
-
-// ─────────────────────────────────────────────
-// D17 – shop_types (ประเภทร้านค้า)
-// ─────────────────────────────────────────────
-model ShopType {
-  shop_type_id        Int      @id @default(autoincrement())
-  type_name           String   @unique
-  require_grease_trap Boolean  @default(false)
-  created_at          DateTime @default(now())
 }

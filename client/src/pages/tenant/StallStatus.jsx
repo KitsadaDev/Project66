@@ -72,7 +72,7 @@ const StallStatus = () => {
   const WALL = "3px solid #4B5563";
 
   const FC1Map = () => (
-    <div style={{ flexShrink: 0 }}>
+    <div className="min-w-[920px] w-[920px] mx-auto">
 
       {/* ═══ ROOM (bordered) ═══ */}
       <div style={{ position: "relative", width: W, height: H_ROOM }}>
@@ -198,18 +198,23 @@ const StallStatus = () => {
       </div>
 
       {/* Map card */}
-      <div className="p-4 lg:p-8">
-        <div className="bg-white p-6 md:p-10 rounded-[2.5rem] shadow-xl w-full">
+      <div className="p-2 sm:p-4 lg:p-8">
+        <div className="bg-white p-3 sm:p-6 md:p-10 rounded-2xl md:rounded-[2.5rem] shadow-xl w-full">
           <h2 className="text-2xl font-bold text-gray-800 mb-8 hidden lg:block text-center">
             ผังศูนย์อาหาร {foodCourt}
           </h2>
 
-          <div className="overflow-x-auto flex justify-center py-2">
+          {/* Mobile scroll hint */}
+          <div className="lg:hidden text-center text-xs text-purple-600 font-semibold mb-3 flex items-center justify-center gap-1.5 bg-purple-50/80 py-2 px-3 rounded-xl border border-purple-100 shadow-sm">
+            <span>👈</span> เลื่อน ซ้าย-ขวา เพื่อดูผังทั้งหมด <span>👉</span>
+          </div>
+
+          <div className="w-full overflow-x-auto pb-4 pt-1">
             {foodCourt === "1" ? (
               <FC1Map />
             ) : (
               /* FC2 */
-              <div className="flex flex-col gap-6 max-w-xl mx-auto">
+              <div className="flex flex-col gap-6 min-w-[500px] mx-auto">
                 <div className="flex gap-3">
                   {["B1","B2","B3","B4","B5","B6"].map((id) => <Cell key={id} id={id} />)}
                   <div className="w-8" /><Cell id="D1" />
@@ -230,11 +235,11 @@ const StallStatus = () => {
           </div>
 
           {/* Legend */}
-          <div className="mt-10 flex flex-wrap gap-6 border-t border-gray-100 pt-6">
+          <div className="mt-6 flex flex-wrap gap-4 sm:gap-6 border-t border-gray-100 pt-4 sm:pt-6">
             {[["border-green-300 bg-green-100","ว่าง (พร้อมเช่า)"],["border-red-300 bg-red-100","มีผู้เช่าแล้ว"],["border-yellow-300 bg-yellow-100","ปิดปรับปรุง"],["border-dashed border-gray-300 bg-gray-50","ยังไม่เปิดบริการ"]].map(([c,l]) => (
               <div key={l} className="flex items-center gap-2">
                 <div className={`w-4 h-4 rounded border ${c}`} />
-                <span className="text-sm text-gray-600">{l}</span>
+                <span className="text-xs sm:text-sm text-gray-600">{l}</span>
               </div>
             ))}
           </div>

@@ -197,58 +197,65 @@ const Stalls = () => {
       {/* Visual Map */}
       {selectedFoodCourt === "1" ? (
         /* ===== ผังศูนย์อาหาร 1 ===== */
-        <div className="bg-white rounded-2xl shadow-lg border border-purple-100 p-6 overflow-x-auto">
-          <div style={{ position: "relative", width: 920, height: 660, flexShrink: 0 }}>
-            {/* ── Room walls ── */}
-            <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, borderLeft: "3px solid #4B5563" }} />
-            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, borderBottom: "3px solid #4B5563" }} />
-            <div style={{ position: "absolute", top: 0, left: 0, width: 810, borderTop: "3px solid #4B5563" }} />
-            <div style={{ position: "absolute", left: 810, top: 0, height: 100, borderLeft: "3px solid #4B5563" }} />
-            <div style={{ position: "absolute", top: 100, left: 810, right: 0, borderTop: "3px solid #4B5563" }} />
-            <div style={{ position: "absolute", right: 0, top: 100, bottom: 0, borderRight: "3px solid #4B5563" }} />
-
-            {/* ── B row ── */}
-            <div style={{ position: "absolute", top: 10, left: 330, display: "flex", gap: 5 }}>
-              {["B1","B2","B3","B4","B5","B6","B7","B8"].map((id) => (
-                <StallCell key={id} id={id} fixedSize w={44} h={44} />
-              ))}
-            </div>
-
-            {/* ── C row ── */}
-            <div style={{ position: "absolute", top: 115, left: 134, display: "flex", gap: 5 }}>
-              {["C1","C2","C3","C4","C5","C6"].map((id) => (
-                <StallCell key={id} id={id} fixedSize w={44} h={44} />
-              ))}
-            </div>
-
-            {/* ── Dining zone ── */}
-            <div
-              className="absolute flex items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 text-gray-500 text-sm font-medium"
-              style={{ top: 175, left: 100, width: 640, height: 315 }}
-            >
-              โซนโต๊ะนั่งทานอาหาร
-            </div>
-
-            {/* ── A column ── */}
-            <div style={{ position: "absolute", top: 110, right: 10, display: "flex", flexDirection: "column", gap: 5 }}>
-              {["A1","A2","A3","A4","A5","A6","A7","A8","A9","A10","A11"].map((id) => (
-                <StallCell key={id} id={id} fixedSize w={44} h={44} />
-              ))}
-            </div>
-
-            {/* ── D row ── */}
-            <div style={{ position: "absolute", top: 606, left: 294, display: "flex", gap: 5 }}>
-              {["D1","D2","D3","D4","D5","D6"].map((id) => (
-                <StallCell key={id} id={id} fixedSize w={44} h={44} />
-              ))}
-            </div>
+        <div className="bg-white rounded-2xl shadow-lg border border-purple-100 p-3 sm:p-6 w-full overflow-x-auto">
+          {/* Mobile scroll hint */}
+          <div className="lg:hidden text-center text-xs text-purple-600 font-semibold mb-3 flex items-center justify-center gap-1.5 bg-purple-50/80 py-2 px-3 rounded-xl border border-purple-100 shadow-sm">
+            <span>👈</span> เลื่อน ซ้าย-ขวา เพื่อดูผังทั้งหมด <span>👉</span>
           </div>
 
-          {/* ═══ E row — OUTSIDE room ═══ */}
-          <div style={{ marginTop: 10, display: "flex", gap: 5 }}>
-            {["E1","E2","E3","E4","E5","E6","E7","E8","E9","E10","E11","E12"].map((id) => (
-              <StallCell key={id} id={id} fixedSize w={44} h={44} />
-            ))}
+          <div className="min-w-[920px] w-[920px] mx-auto">
+            <div style={{ position: "relative", width: 920, height: 660 }}>
+              {/* ── Room walls ── */}
+              <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, borderLeft: "3px solid #4B5563" }} />
+              <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, borderBottom: "3px solid #4B5563" }} />
+              <div style={{ position: "absolute", top: 0, left: 0, width: 810, borderTop: "3px solid #4B5563" }} />
+              <div style={{ position: "absolute", left: 810, top: 0, height: 100, borderLeft: "3px solid #4B5563" }} />
+              <div style={{ position: "absolute", top: 100, left: 810, right: 0, borderTop: "3px solid #4B5563" }} />
+              <div style={{ position: "absolute", right: 0, top: 100, bottom: 0, borderRight: "3px solid #4B5563" }} />
+
+              {/* ── B row ── */}
+              <div style={{ position: "absolute", top: 10, left: 330, display: "flex", gap: 5 }}>
+                {["B1","B2","B3","B4","B5","B6","B7","B8"].map((id) => (
+                  <StallCell key={id} id={id} fixedSize w={44} h={44} />
+                ))}
+              </div>
+
+              {/* ── C row ── */}
+              <div style={{ position: "absolute", top: 115, left: 134, display: "flex", gap: 5 }}>
+                {["C1","C2","C3","C4","C5","C6"].map((id) => (
+                  <StallCell key={id} id={id} fixedSize w={44} h={44} />
+                ))}
+              </div>
+
+              {/* ── Dining zone ── */}
+              <div
+                className="absolute flex items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 text-gray-500 text-sm font-medium"
+                style={{ top: 175, left: 100, width: 640, height: 315 }}
+              >
+                โซนโต๊ะนั่งทานอาหาร
+              </div>
+
+              {/* ── A column ── */}
+              <div style={{ position: "absolute", top: 110, right: 10, display: "flex", flexDirection: "column", gap: 5 }}>
+                {["A1","A2","A3","A4","A5","A6","A7","A8","A9","A10","A11"].map((id) => (
+                  <StallCell key={id} id={id} fixedSize w={44} h={44} />
+                ))}
+              </div>
+
+              {/* ── D row ── */}
+              <div style={{ position: "absolute", top: 606, left: 294, display: "flex", gap: 5 }}>
+                {["D1","D2","D3","D4","D5","D6"].map((id) => (
+                  <StallCell key={id} id={id} fixedSize w={44} h={44} />
+                ))}
+              </div>
+            </div>
+
+            {/* ═══ E row — OUTSIDE room ═══ */}
+            <div style={{ marginTop: 10, display: "flex", gap: 5 }}>
+              {["E1","E2","E3","E4","E5","E6","E7","E8","E9","E10","E11","E12"].map((id) => (
+                <StallCell key={id} id={id} fixedSize w={44} h={44} />
+              ))}
+            </div>
           </div>
         </div>
       ) : (

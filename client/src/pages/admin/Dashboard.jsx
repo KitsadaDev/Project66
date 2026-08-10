@@ -219,15 +219,20 @@ const AdminDashboard = () => {
         </div>
 
         {/* Scrollable Grid Area */}
-        <div className="flex-1 overflow-auto p-4 md:p-8 flex items-center justify-center min-h-0">
-          <div className="bg-white p-8 md:p-12 rounded-[2.5rem] shadow-xl shadow-purple-100/50 border border-white relative">
+        <div className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-8 flex items-start justify-center">
+          <div className="bg-white p-3 sm:p-6 md:p-12 rounded-2xl md:rounded-[2.5rem] shadow-xl shadow-purple-100/50 border border-white relative w-full">
             <h2 className="absolute top-6 left-8 text-2xl font-bold text-gray-800 hidden lg:block">
               ผังศูนย์อาหาร {foodCourt}
             </h2>
 
-            <div className="mt-8 lg:mt-12 overflow-x-auto flex justify-center py-2">
+            {/* Mobile scroll hint */}
+            <div className="lg:hidden text-center text-xs text-purple-600 font-semibold mb-2 flex items-center justify-center gap-1.5 bg-purple-50/80 py-2 px-3 rounded-xl border border-purple-100 shadow-sm">
+              <span>👈</span> เลื่อน ซ้าย-ขวา เพื่อดูผังทั้งหมด <span>👉</span>
+            </div>
+
+            <div className="mt-2 lg:mt-12 w-full overflow-x-auto pb-4 pt-1">
               {foodCourt === "1" ? (
-                <div style={{ flexShrink: 0 }}>
+                <div className="min-w-[920px] w-[920px] mx-auto">
                   <div style={{ position: "relative", width: 920, height: 660 }}>
                     {/* ── Room walls ── */}
                     <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, borderLeft: "3px solid #4B5563" }} />
@@ -282,7 +287,7 @@ const AdminDashboard = () => {
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-6 min-w-[500px] mx-auto">
                   {/* Row B + D1 */}
                   <div className="flex gap-4">
                     {["B1", "B2", "B3", "B4", "B5", "B6"].map((id) => (
@@ -321,7 +326,7 @@ const AdminDashboard = () => {
             </div>
 
             {/* Legend */}
-            <div className="mt-10 flex flex-wrap gap-6 border-t border-gray-100 pt-6">
+            <div className="mt-6 flex flex-wrap gap-4 sm:gap-6 border-t border-gray-100 pt-4 sm:pt-6">
               {[
                 ["border-green-300 bg-green-100", "ว่าง (พร้อมเช่า)"],
                 ["border-red-300 bg-red-100", "มีผู้เช่าแล้ว"],
@@ -330,7 +335,7 @@ const AdminDashboard = () => {
               ].map(([c, l]) => (
                 <div key={l} className="flex items-center gap-2">
                   <div className={`w-4 h-4 rounded border ${c}`} />
-                  <span className="text-sm text-gray-600">{l}</span>
+                  <span className="text-xs sm:text-sm text-gray-600">{l}</span>
                 </div>
               ))}
             </div>
