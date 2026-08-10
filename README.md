@@ -141,11 +141,3 @@ Project66/
 │   │   └── index.js     # จุดเริ่มต้นของระบบ Backend
 ```
 
----
-
-## 📝 ข้อมูลการเข้าสู่ระบบเบื้องต้น (Default Accounts)
-สามารถใช้บัญชีเริ่มต้นในการเข้าทดสอบระบบหลังทำ Seeding:
-- **Admin**: `Admin` / `123456`
-- **Tenant**: `User01` / `123456`
-- **Executive**: `Executive` / `123456`
-- **Maintenance**: `Staff01` / `123456`
