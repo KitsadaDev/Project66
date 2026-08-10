@@ -156,6 +156,7 @@ model RentalContract {
   lateRentFine    Float?
   lateUtilityFine Float?
   menuType        String?
+  contractImage   String?
 
   status     ContractStatus @default(ACTIVE)
   created_at DateTime       @default(now())

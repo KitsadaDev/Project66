@@ -52,7 +52,10 @@ const Tenants = () => {
     lateRentFine: "",
     lateUtilityFine: "",
     menuType: "",
+    contractImage: "",
   });
+  const [contractFile, setContractFile] = useState(null);
+  const [contractFilePreview, setContractFilePreview] = useState(null);
   const [selectedTenantName, setSelectedTenantName] = useState("");
 
   // Thai Address Cascading Dropdown States
@@ -212,7 +215,10 @@ const Tenants = () => {
           : "",
         securityDeposit: existingContract.deposit_amount || "",
         menuType: existingContract.menuType || "",
+        contractImage: existingContract.contractImage || "",
       });
+      setContractFile(null);
+      setContractFilePreview(existingContract.contractImage || null);
 
       // Simple parse attempt for existing address, or fallback to houseNoMoo
       const addrGroups = (existingContract.address || "").match(
@@ -255,7 +261,10 @@ const Tenants = () => {
         receiptDate: "",
         securityDeposit: tenant.stall.rent ? tenant.stall.rent * 2 : "",
         menuType: "",
+        contractImage: "",
       });
+      setContractFile(null);
+      setContractFilePreview(null);
       setAddressObj({
         houseNoMoo: "",
         province: "",
@@ -290,6 +299,9 @@ const Tenants = () => {
           formData.append(key, finalForm[key]);
         }
       });
+      if (contractFile) {
+        formData.append("contractFile", contractFile);
+      }
 
       if (contractForm.id) {
         await contractsAPI.update(contractForm.id, formData);
@@ -791,6 +803,77 @@ const Tenants = () => {
                       }
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Section 4: Contract Document Upload & Preview */}
+              <div className="md:col-span-2 bg-purple-50 p-4 rounded-xl border border-purple-100">
+                <h3 className="font-semibold text-purple-800 mb-3 flex items-center gap-2">
+                  <Upload size={18} /> รูปภาพ/เอกสารสัญญาฉบับจริง (สำหรับตรวจสอบ)
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-purple-200 text-purple-700 hover:bg-purple-100 rounded-xl cursor-pointer font-medium text-sm transition-colors shadow-sm">
+                      <Upload size={16} />
+                      {contractFilePreview ? "เปลี่ยนรูป/ไฟล์สัญญา" : "แนบรูปภาพ/ไฟล์สัญญา (PDF หรือ รูปภาพ)"}
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            setContractFile(file);
+                            setContractFilePreview(URL.createObjectURL(file));
+                          }
+                        }}
+                      />
+                    </label>
+                    {contractFilePreview && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setContractFile(null);
+                          setContractFilePreview(null);
+                          setContractForm({ ...contractForm, contractImage: "" });
+                        }}
+                        className="text-xs text-red-500 hover:underline font-medium"
+                      >
+                        ลบเอกสารออก
+                      </button>
+                    )}
+                  </div>
+
+                  {contractFilePreview && (
+                    <div className="mt-3 p-3.5 bg-white rounded-xl border border-purple-100 flex items-center justify-between shadow-sm">
+                      <div className="flex items-center gap-3">
+                        {contractFilePreview.endsWith(".pdf") || contractFilePreview.includes("pdf") ? (
+                          <div className="w-12 h-12 bg-red-100 text-red-600 rounded-xl flex items-center justify-center font-bold text-xs shrink-0">
+                            PDF
+                          </div>
+                        ) : (
+                          <img
+                            src={contractFilePreview}
+                            alt="เอกสารสัญญาฉบับจริง"
+                            className="w-14 h-14 object-cover rounded-xl border border-gray-200 shrink-0"
+                          />
+                        )}
+                        <div>
+                          <p className="text-sm font-semibold text-gray-800">
+                            {contractFile ? contractFile.name : "เอกสารสัญญาฉบับจริงที่แนบไว้"}
+                          </p>
+                          <a
+                            href={contractFilePreview}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-purple-600 hover:underline font-medium flex items-center gap-1 mt-0.5"
+                          >
+                            คลิกเพื่อเปิดดูรูปภาพ/เอกสารขนาดเต็ม ↗
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

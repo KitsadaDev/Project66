@@ -468,6 +468,18 @@ const AdminDashboard = () => {
                         <span className="font-medium text-gray-700">{tenantEmail}</span>
                       </div>
                     )}
+                    {activeContract?.contractImage && (
+                      <div className="col-span-2 pt-1">
+                        <a
+                          href={activeContract.contractImage}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-medium text-xs rounded-lg transition-colors border border-purple-200"
+                        >
+                          <FileText size={14} /> ดูรูป/ไฟล์สัญญาฉบับจริง ↗
+                        </a>
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-2">

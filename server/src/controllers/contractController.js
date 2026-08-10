@@ -128,6 +128,7 @@ const createContract = async (req, res, next) => {
           lateRentFine: lateRentFine && lateRentFine !== '' ? parseFloat(lateRentFine) : null,
           lateUtilityFine: lateUtilityFine && lateUtilityFine !== '' ? parseFloat(lateUtilityFine) : null,
           menuType: menuType && menuType !== '' ? menuType : null,
+          contractImage: req.file ? req.file.path : (req.body.contractImage || null),
           status: 'ACTIVE'
         },
         include: {
@@ -192,6 +193,11 @@ const updateContract = async (req, res, next) => {
     if (lateRentFine !== undefined) updateData.lateRentFine = lateRentFine === '' ? null : parseFloat(lateRentFine);
     if (lateUtilityFine !== undefined) updateData.lateUtilityFine = lateUtilityFine === '' ? null : parseFloat(lateUtilityFine);
     if (menuType !== undefined) updateData.menuType = menuType === '' ? null : menuType;
+    if (req.file) {
+      updateData.contractImage = req.file.path;
+    } else if (req.body.contractImage !== undefined) {
+      updateData.contractImage = req.body.contractImage === '' ? null : req.body.contractImage;
+    }
 
     const updatedContract = await prisma.rentalContract.update({
       where: { contract_id: parseInt(id) },

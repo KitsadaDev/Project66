@@ -83,17 +83,46 @@ const Contracts = () => {
       {contract ? (
         <div className="bg-white rounded-2xl shadow-lg border border-purple-100 overflow-hidden">
           {/* Header */}
-          <div className="bg-purple-50 p-6 md:p-8 flex items-center gap-6 border-b border-purple-100">
-            <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm text-purple-600">
-              <FileText size={32} />
+          <div className="bg-purple-50 p-6 md:p-8 flex items-center justify-between border-b border-purple-100">
+            <div className="flex items-center gap-6">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm text-purple-600">
+                <FileText size={32} />
+              </div>
+              <div>
+                <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-1">
+                  {contract.contractDisplayNumber}
+                </h2>
+                <p className="text-gray-500 text-sm">เลขที่สัญญา</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-1">
-                {contract.contractDisplayNumber}
-              </h2>
-              <p className="text-gray-500 text-sm">เลขที่สัญญา</p>
-            </div>
+            {contract.contractImage && (
+              <a
+                href={contract.contractImage}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden sm:flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-medium text-sm rounded-xl transition-colors shadow-sm"
+              >
+                <FileText size={16} /> ดูสัญญาฉบับจริง ↗
+              </a>
+            )}
           </div>
+
+          {contract.contractImage && (
+            <div className="sm:hidden mx-6 mt-6 p-4 bg-purple-50 rounded-2xl border border-purple-100 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <FileText size={20} className="text-purple-600 shrink-0" />
+                <span className="text-xs font-semibold text-gray-800">สัญญาฉบับจริง</span>
+              </div>
+              <a
+                href={contract.contractImage}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 bg-purple-600 text-white font-medium text-xs rounded-lg"
+              >
+                เปิดดู ↗
+              </a>
+            </div>
+          )}
 
           {/* Key Info Grid */}
           <div className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
