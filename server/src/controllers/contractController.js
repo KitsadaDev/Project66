@@ -72,7 +72,7 @@ const createContract = async (req, res, next) => {
     const { 
       slot_id, tenant_id, startDate, endDate, securityDeposit,
       idCard, phone, address, receiptNumber, receiptDate,
-      lateRentFine, lateUtilityFine, menuType
+      lateRentFine, lateUtilityFine, menuType, contract_number, contractNumber
     } = req.body;
 
     const slot = await prisma.rentalSlot.findUnique({ where: { slot_id: parseInt(slot_id) } });
@@ -107,12 +107,14 @@ const createContract = async (req, res, next) => {
       data: { status: 'TERMINATED' }
     });
 
+    const customContractNum = contract_number || contractNumber;
+
     const [contract] = await prisma.$transaction([
       prisma.rentalContract.create({
         data: {
           slot_id: parseInt(slot_id),
           tenant_id: parseInt(tenant_id),
-          contract_number: `CTR-${slot.slot_number}-${Date.now().toString().slice(-6)}`,
+          contract_number: customContractNum && customContractNum.trim() !== '' ? customContractNum.trim() : `CTR-${slot.slot_number}-${Date.now().toString().slice(-6)}`,
           start_date: new Date(startDate),
           end_date: new Date(endDate),
           monthly_rent: parseFloat(slot.rent),
@@ -153,7 +155,7 @@ const updateContract = async (req, res, next) => {
     const { 
       startDate, endDate, securityDeposit, status,
       idCard, phone, address, receiptNumber, receiptDate,
-      lateRentFine, lateUtilityFine, menuType
+      lateRentFine, lateUtilityFine, menuType, contract_number, contractNumber
     } = req.body;
 
     const existing = await prisma.rentalContract.findUnique({ where: { contract_id: parseInt(id) } });
@@ -177,6 +179,8 @@ const updateContract = async (req, res, next) => {
     if (status) updateData.status = status;
     
     // New fields
+    const customContractNum = contract_number !== undefined ? contract_number : contractNumber;
+    if (customContractNum !== undefined && customContractNum !== '') updateData.contract_number = customContractNum.trim();
     if (idCard !== undefined) updateData.idCard = idCard === '' ? null : idCard;
     if (phone !== undefined) updateData.phone = phone === '' ? null : phone;
     if (address !== undefined) updateData.address = address === '' ? null : address;

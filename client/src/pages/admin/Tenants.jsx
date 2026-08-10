@@ -39,6 +39,7 @@ const Tenants = () => {
     id: null,
     stallId: "",
     tenantId: "",
+    contractNumber: "",
     startDate: "",
     endDate: "",
     idCard: "",
@@ -195,6 +196,7 @@ const Tenants = () => {
         id: existingContract.contract_id,
         stallId: existingContract.slot_id,
         tenantId: tenant.user_id,
+        contractNumber: existingContract.contract_number || "",
         startDate: existingContract.start_date
           ? existingContract.start_date.split("T")[0]
           : "",
@@ -243,6 +245,7 @@ const Tenants = () => {
         id: null,
         stallId: tenant.stall.slot_id,
         tenantId: tenant.user_id,
+        contractNumber: "",
         startDate: today.toISOString().split("T")[0],
         endDate: next3Years.toISOString().split("T")[0],
         idCard: "",
@@ -690,6 +693,23 @@ const Tenants = () => {
                   <FileText size={18} /> รายละเอียดสัญญา
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      เลขที่สัญญาเช่า
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="เช่น CTR-A2-654445 (หากเว้นว่างไว้ ระบบจะสร้างให้อัตโนมัติ)"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-100"
+                      value={contractForm.contractNumber || ""}
+                      onChange={(e) =>
+                        setContractForm({
+                          ...contractForm,
+                          contractNumber: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       วันเริ่มสัญญา
@@ -726,12 +746,12 @@ const Tenants = () => {
                     />
                   </div>
 
-                  <div>
+                  <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       ประเภทเมนูอาหาร
                     </label>
                     <select
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100 bg-white"
                       value={contractForm.menuType}
                       onChange={(e) =>
                         setContractForm({
