@@ -7,6 +7,7 @@ import {
   MapPin,
   Calendar,
   FileText,
+  X,
 } from "lucide-react";
 import { stallsAPI } from "../../api";
 
@@ -41,17 +42,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const getStallStatus = (slot_number) => {
-    const stall = stalls.find((s) => s.slot_number === slot_number);
-    if (!stall) return "vacant";
-    if (stall.status === "OCCUPIED") {
-      if (stall.hasPendingPayment) return "pending";
-      return "occupied";
-    }
-    if (stall.status === "MAINTENANCE") return "maintenance";
-    return "vacant";
-  };
-
   const getStallColor = (status, isSelected) => {
     const baseClasses =
       "transition-all duration-300 cursor-pointer border-2 shadow-sm relative";
@@ -63,20 +53,30 @@ const AdminDashboard = () => {
       case "occupied":
       case "pending":
         return `${baseClasses} ${selectedClasses} bg-red-100 border-red-300 text-red-700 hover:bg-red-200`;
+      case "vacant":
+        return `${baseClasses} ${selectedClasses} bg-green-100 border-green-300 text-green-700 hover:bg-green-200`;
       case "maintenance":
         return `${baseClasses} ${selectedClasses} bg-yellow-100 border-yellow-300 text-yellow-700 hover:bg-yellow-200`;
-      default: // vacant
-        return `${baseClasses} ${selectedClasses} bg-green-100 border-green-300 text-green-700 hover:bg-green-200`;
+      default: // empty / non-existent
+        return `${baseClasses} ${selectedClasses} bg-gray-50 border-dashed border-gray-300 text-gray-400 hover:bg-gray-100`;
     }
   };
 
   const getStallData = (slot_number) => {
-    return stalls.find((s) => s.slot_number === slot_number);
+    const fcId = foodCourt ? parseInt(foodCourt) : 1;
+    return stalls.find((s) => s.slot_number === slot_number && s.food_court_id === fcId);
+  };
+
+  const getStallStatus = (slot_number) => {
+    const stall = getStallData(slot_number);
+    if (!stall) return "empty";
+    if (stall.status === "OCCUPIED" && stall.hasPendingPayment) return "pending";
+    return stall.status.toLowerCase();
   };
 
   const handleStallClick = (slot_number) => {
     const stall = getStallData(slot_number);
-    setSelectedStall(stall);
+    setSelectedStall(stall ?? { slot_number, status: "EMPTY" });
   };
 
   // Food Court Selection View
@@ -144,9 +144,10 @@ const AdminDashboard = () => {
   }
 
   // Common Stall Cell Component
-  const StallCell = ({ id }) => (
+  const StallCell = ({ id, fixedSize = false, w = 44, h = 44 }) => (
     <div
-      className={`w-14 h-14 md:w-16 md:h-16 rounded-xl flex items-center justify-center font-bold text-sm md:text-base ${getStallColor(getStallStatus(id), selectedStall?.slot_number === id)}`}
+      style={fixedSize ? { width: w, height: h } : {}}
+      className={`${fixedSize ? "text-xs font-bold" : "w-14 h-14 md:w-16 md:h-16 text-sm md:text-base"} rounded-xl flex items-center justify-center font-bold ${getStallColor(getStallStatus(id), selectedStall?.slot_number === id)}`}
       onClick={() => handleStallClick(id)}
     >
       {id}
@@ -224,186 +225,295 @@ const AdminDashboard = () => {
               ผังศูนย์อาหาร {foodCourt}
             </h2>
 
-            <div className="mt-8 lg:mt-12">
-              <div className="flex flex-col gap-6">
-                {/* Row B + D1 */}
-                <div className="flex gap-4">
-                  {["B1", "B2", "B3", "B4", "B5", "B6"].map((id) => (
-                    <StallCell key={id} id={id} />
-                  ))}
-                  <div className="w-10"></div>
-                  <StallCell id="D1" />
-                </div>
+            <div className="mt-8 lg:mt-12 overflow-x-auto flex justify-center py-2">
+              {foodCourt === "1" ? (
+                <div style={{ flexShrink: 0 }}>
+                  <div style={{ position: "relative", width: 920, height: 660 }}>
+                    {/* ── Room walls ── */}
+                    <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, borderLeft: "3px solid #4B5563" }} />
+                    <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, borderBottom: "3px solid #4B5563" }} />
+                    <div style={{ position: "absolute", top: 0, left: 0, width: 810, borderTop: "3px solid #4B5563" }} />
+                    <div style={{ position: "absolute", left: 810, top: 0, height: 100, borderLeft: "3px solid #4B5563" }} />
+                    <div style={{ position: "absolute", top: 100, left: 810, right: 0, borderTop: "3px solid #4B5563" }} />
+                    <div style={{ position: "absolute", right: 0, top: 100, bottom: 0, borderRight: "3px solid #4B5563" }} />
 
-                {/* Spacer + D2 */}
-                <div className="flex gap-4">
-                  <div className="flex-1"></div> {/* Spacer to push D2 right */}
-                  <div className="w-10"></div>
-                  <StallCell id="D2" />
-                </div>
+                    {/* ── B row ── */}
+                    <div style={{ position: "absolute", top: 10, left: 330, display: "flex", gap: 5 }}>
+                      {["B1","B2","B3","B4","B5","B6","B7","B8"].map((id) => (
+                        <StallCell key={id} id={id} fixedSize w={44} h={44} />
+                      ))}
+                    </div>
 
-                {/* Row A + D3 */}
-                <div className="flex gap-4">
-                  {["A1", "A2", "A3", "A4", "A5", "A6"].map((id) => (
-                    <StallCell key={id} id={id} />
-                  ))}
-                  <div className="w-10"></div>
-                  <StallCell id="D3" />
-                </div>
+                    {/* ── C row ── */}
+                    <div style={{ position: "absolute", top: 115, left: 134, display: "flex", gap: 5 }}>
+                      {["C1","C2","C3","C4","C5","C6"].map((id) => (
+                        <StallCell key={id} id={id} fixedSize w={44} h={44} />
+                      ))}
+                    </div>
 
-                <div className="h-4"></div>
+                    {/* ── Dining zone ── */}
+                    <div
+                      className="absolute flex items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 text-gray-500 text-sm font-medium"
+                      style={{ top: 175, left: 100, width: 640, height: 315 }}
+                    >
+                      โซนโต๊ะนั่งทานอาหาร
+                    </div>
 
-                {/* Row C */}
-                <div className="flex gap-4">
-                  {["C1", "C2", "C3", "C4", "C5", "C6"].map((id) => (
-                    <StallCell key={id} id={id} />
-                  ))}
+                    {/* ── A column ── */}
+                    <div style={{ position: "absolute", top: 110, right: 10, display: "flex", flexDirection: "column", gap: 5 }}>
+                      {["A1","A2","A3","A4","A5","A6","A7","A8","A9","A10","A11"].map((id) => (
+                        <StallCell key={id} id={id} fixedSize w={44} h={44} />
+                      ))}
+                    </div>
+
+                    {/* ── D row ── */}
+                    <div style={{ position: "absolute", top: 606, left: 294, display: "flex", gap: 5 }}>
+                      {["D1","D2","D3","D4","D5","D6"].map((id) => (
+                        <StallCell key={id} id={id} fixedSize w={44} h={44} />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* ═══ E row — OUTSIDE room ═══ */}
+                  <div style={{ marginTop: 10, display: "flex", gap: 5 }}>
+                    {["E1","E2","E3","E4","E5","E6","E7","E8","E9","E10","E11","E12"].map((id) => (
+                      <StallCell key={id} id={id} fixedSize w={44} h={44} />
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex flex-col gap-6">
+                  {/* Row B + D1 */}
+                  <div className="flex gap-4">
+                    {["B1", "B2", "B3", "B4", "B5", "B6"].map((id) => (
+                      <StallCell key={id} id={id} />
+                    ))}
+                    <div className="w-10"></div>
+                    <StallCell id="D1" />
+                  </div>
+
+                  {/* Spacer + D2 */}
+                  <div className="flex gap-4">
+                    <div className="flex-1"></div> {/* Spacer to push D2 right */}
+                    <div className="w-10"></div>
+                    <StallCell id="D2" />
+                  </div>
+
+                  {/* Row A + D3 */}
+                  <div className="flex gap-4">
+                    {["A1", "A2", "A3", "A4", "A5", "A6"].map((id) => (
+                      <StallCell key={id} id={id} />
+                    ))}
+                    <div className="w-10"></div>
+                    <StallCell id="D3" />
+                  </div>
+
+                  <div className="h-4"></div>
+
+                  {/* Row C */}
+                  <div className="flex gap-4">
+                    {["C1", "C2", "C3", "C4", "C5", "C6"].map((id) => (
+                      <StallCell key={id} id={id} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Legend */}
+            <div className="mt-10 flex flex-wrap gap-6 border-t border-gray-100 pt-6">
+              {[
+                ["border-green-300 bg-green-100", "ว่าง (พร้อมเช่า)"],
+                ["border-red-300 bg-red-100", "มีผู้เช่าแล้ว"],
+                ["border-yellow-300 bg-yellow-100", "ปิดปรับปรุง"],
+                ["border-dashed border-gray-300 bg-gray-50", "ยังไม่เปิดบริการ"],
+              ].map(([c, l]) => (
+                <div key={l} className="flex items-center gap-2">
+                  <div className={`w-4 h-4 rounded border ${c}`} />
+                  <span className="text-sm text-gray-600">{l}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Right Details Panel */}
-      <div
-        className={`w-full lg:w-96 bg-white border-l border-gray-100 shadow-2xl lg:shadow-none z-30 transition-transform duration-300 absolute lg:relative bottom-0 lg:bottom-auto h-[60vh] lg:h-full rounded-t-3xl lg:rounded-none overflow-hidden flex flex-col ${selectedStall ? "translate-y-0" : "translate-y-full lg:translate-y-0 lg:block hidden"}`}
-      >
-        {selectedStall ? (
-          <div className="flex flex-col h-full">
-            <div className="p-6 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
-              <span className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-                รายละเอียด
-              </span>
+      {/* Modal Popup */}
+      {selectedStall && (() => {
+        const activeContract = selectedStall.rental_contracts?.[0];
+        const tenant = activeContract?.tenant;
+        const tenantName = tenant
+          ? `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim()
+          : activeContract?.phone
+          ? "ผู้เช่า"
+          : "ไม่มีข้อมูลชื่อผู้เช่า";
+        const tenantPhone = tenant?.phone || activeContract?.phone || "-";
+        const tenantEmail = tenant?.email || "-";
+        const menuType = activeContract?.menuType || "ไม่ระบุประเภท";
+        const contractNum = activeContract?.contract_number || "-";
+        const monthlyRent = activeContract?.monthly_rent || selectedStall.rent;
+        const formatDate = (dStr) => {
+          if (!dStr) return "-";
+          const d = new Date(dStr);
+          return isNaN(d.getTime()) ? "-" : d.toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" });
+        };
+        const startDate = formatDate(activeContract?.start_date);
+        const endDate = formatDate(activeContract?.end_date);
+        const isOccupied = selectedStall.status === "OCCUPIED" || selectedStall.status === "occupied";
+        const isMaintenance = selectedStall.status === "MAINTENANCE" || selectedStall.status === "maintenance";
+        const isVacant = selectedStall.status === "VACANT" || selectedStall.status === "vacant";
+
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+            onClick={() => setSelectedStall(null)}
+          >
+            <div
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 md:p-8 relative"
+              onClick={(e) => e.stopPropagation()}
+            >
               <button
                 onClick={() => setSelectedStall(null)}
-                className="lg:hidden p-2 bg-gray-200 rounded-full hover:bg-gray-300 transition-colors"
+                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 transition-colors"
               >
-                ✕
+                <X size={16} />
               </button>
-            </div>
+              <div className="flex flex-col items-center mb-6">
+                <div
+                  className={`w-20 h-20 rounded-full flex items-center justify-center mb-3 text-2xl font-bold shadow-md ${
+                    isOccupied
+                      ? "bg-red-100 text-red-600"
+                      : isMaintenance
+                      ? "bg-yellow-100 text-yellow-600"
+                      : isVacant
+                      ? "bg-green-100 text-green-600"
+                      : "bg-gray-100 text-gray-400"
+                  }`}
+                >
+                  {selectedStall.slot_number}
+                </div>
+                <h3 className="text-xl font-bold text-gray-800">
+                  {isOccupied
+                    ? "มีผู้เช่าแล้ว"
+                    : isMaintenance
+                    ? "ปิดปรับปรุง"
+                    : isVacant
+                    ? "ว่าง"
+                    : "ยังไม่เปิดบริการ"}
+                </h3>
+                <span
+                  className={`mt-1.5 px-3 py-0.5 rounded-full text-xs font-bold ${
+                    isOccupied
+                      ? "bg-red-100 text-red-700"
+                      : isMaintenance
+                      ? "bg-yellow-100 text-yellow-700"
+                      : isVacant
+                      ? "bg-green-100 text-green-700"
+                      : "bg-gray-100 text-gray-500"
+                  }`}
+                >
+                  {isOccupied
+                    ? "สถานะปกติ"
+                    : isMaintenance
+                    ? "ปิดชั่วคราว"
+                    : isVacant
+                    ? "พร้อมเช่า"
+                    : "ยังไม่เปิด"}
+                </span>
+              </div>
 
-            <div className="p-6 md:p-8 overflow-y-auto flex-1">
-              {selectedStall.tenant ? (
-                <>
-                  <div className="flex flex-col items-center mb-8">
-                    <div className="w-24 h-24 rounded-full bg-purple-100 flex items-center justify-center mb-4 border-4 border-white shadow-lg text-purple-600">
-                      {selectedStall.tenant.avatar ? (
-                        <img
-                          src={selectedStall.tenant.avatar}
-                          alt={selectedStall.tenant?.first_name}
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      ) : (
-                        <User size={48} />
-                      )}
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-800 text-center">
-                      {selectedStall.tenant?.first_name}{" "}
-                      {selectedStall.tenant?.last_name}
-                    </h3>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-bold">
-                        ผู้เช่า
-                      </span>
-                      <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">
-                        ล็อก {selectedStall.slot_number}
-                      </span>
-                    </div>
+              {isOccupied ? (
+                <div className="space-y-3 bg-red-50/60 p-4 rounded-2xl border border-red-100 text-left text-xs">
+                  <div className="flex items-center justify-between pb-2 border-b border-red-100 font-bold text-red-800 text-sm">
+                    <span className="flex items-center gap-1.5">
+                      <User size={16} /> ข้อมูลผู้เช่า
+                    </span>
+                    <span className="text-[10px] font-mono font-normal text-red-600 bg-red-100 px-2 py-0.5 rounded-md">
+                      {contractNum}
+                    </span>
                   </div>
 
-                  <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-2 text-gray-700">
                     <div>
-                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
-                        ข้อมูลสัญญา
-                      </h4>
-                      <div className="space-y-3">
-                        <div className="flex items-start gap-3">
-                          <FileText
-                            size={18}
-                            className="text-gray-400 mt-0.5"
-                          />
-                          <div>
-                            <p className="text-sm text-gray-500">ประเภทอาหาร</p>
-                            <p className="font-medium text-gray-800">
-                              {selectedStall.foodType || "ของคาว"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <Calendar
-                            size={18}
-                            className="text-gray-400 mt-0.5"
-                          />
-                          <div>
-                            <p className="text-sm text-gray-500">
-                              ระยะเวลาสัญญา
-                            </p>
-                            <p className="font-medium text-gray-800">
-                              {selectedStall.contractStartDate || "1 ม.ค. 69"} -{" "}
-                              {selectedStall.contractEndDate || "31 ธ.ค. 71"}
-                            </p>
-                            <p className="text-xs text-gray-400 mt-0.5">
-                              ({selectedStall.contractDuration || "30"} เดือน)
-                            </p>
-                          </div>
-                        </div>
-                      </div>
+                      <span className="text-gray-400 block text-[11px]">ชื่อผู้เช่า</span>
+                      <span className="font-semibold text-gray-800">{tenantName}</span>
                     </div>
+                    <div>
+                      <span className="text-gray-400 block text-[11px]">เบอร์โทรศัพท์</span>
+                      <a href={`tel:${tenantPhone}`} className="font-semibold text-purple-600 hover:underline">
+                        {tenantPhone}
+                      </a>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[11px]">ประเภทร้านอาหาร</span>
+                      <span className="font-semibold text-gray-800">{menuType}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[11px]">ค่าเช่ารายเดือน</span>
+                      <span className="font-semibold text-gray-800">
+                        {monthlyRent ? `${Number(monthlyRent).toLocaleString()} ฿` : "-"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[11px]">วันเริ่มสัญญา</span>
+                      <span className="font-semibold text-gray-800">{startDate}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[11px]">วันสิ้นสุดสัญญาเช่า</span>
+                      <span className="font-semibold text-gray-800">{endDate}</span>
+                    </div>
+                    {tenantEmail !== "-" && (
+                      <div className="col-span-2">
+                        <span className="text-gray-400 block text-[11px]">อีเมล</span>
+                        <span className="font-medium text-gray-700">{tenantEmail}</span>
+                      </div>
+                    )}
+                  </div>
 
-                    <div className="border-t border-gray-100 pt-6">
-                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
-                        ที่อยู่ตามบัตรประชาชน
-                      </h4>
-                      <div className="flex items-start gap-3">
-                        <MapPin size={18} className="text-gray-400 mt-0.5" />
-                        <div className="text-sm text-gray-600 leading-relaxed">
-                          <p>
-                            บ้านเลขที่{" "}
-                            {selectedStall.tenant.houseNumber || "111"} หมู่{" "}
-                            {selectedStall.tenant.moo || "11"}
-                          </p>
-                          <p>
-                            ต.{selectedStall.tenant.subDistrict || "บ้านใหญ่"}{" "}
-                            อ.{selectedStall.tenant.district || "คูเมือง"}
-                          </p>
-                          <p>
-                            จ.{selectedStall.tenant.province || "บุรีรัมย์"}{" "}
-                            {selectedStall.tenant.postalCode || "31000"}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+                  <div className="pt-2">
+                    <button
+                      onClick={() => navigate("/admin/tenants")}
+                      className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-medium text-xs shadow-sm transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <FileText size={14} /> ดูรายละเอียดผู้เช่าทั้งหมด
+                    </button>
                   </div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center text-gray-400">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                    <Store size={32} />
-                  </div>
-                  <p className="text-lg font-medium text-gray-600">
-                    ล็อก {selectedStall.slot_number}
+                </div>
+              ) : isMaintenance ? (
+                <div className="text-center p-5 bg-yellow-50 rounded-2xl border border-yellow-100 space-y-2">
+                  <p className="text-yellow-700 font-medium text-sm">ล็อกนี้ปิดปรับปรุงชั่วคราว</p>
+                  <p className="text-xs text-yellow-600">
+                    ค่าเช่า: {selectedStall.rent ? `${Number(selectedStall.rent).toLocaleString()} ฿/เดือน` : "-"}
                   </p>
-                  <p className="text-sm">ยังไม่มีผู้เช่าในขณะนี้</p>
-                  <Link
-                    to={`/admin/stalls?edit=${selectedStall.slot_number}`}
-                    className="mt-6 px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm font-medium"
+                  <button
+                    onClick={() => navigate("/admin/stalls")}
+                    className="mt-2 w-full py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-xl font-medium text-xs shadow-sm transition-colors"
                   >
-                    เพิ่มข้อมูลผู้เช่า
-                  </Link>
+                    จัดการสถานะแผงค้า
+                  </button>
+                </div>
+              ) : isVacant ? (
+                <div className="text-center p-5 border-2 border-dashed border-green-200 rounded-2xl bg-green-50/50 space-y-2">
+                  <p className="text-green-700 font-medium text-sm">ล็อกนี้ยังว่างอยู่ (พร้อมเช่า)</p>
+                  <p className="text-xs text-green-600">
+                    ค่าเช่า: {selectedStall.rent ? `${Number(selectedStall.rent).toLocaleString()} ฿/เดือน` : "-"}
+                  </p>
+                  <button
+                    onClick={() => navigate("/admin/stalls")}
+                    className="mt-2 w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium text-xs shadow-sm transition-colors"
+                  >
+                    ทำสัญญา / แก้ไขแผงค้า
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center p-5 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                  <p className="text-gray-400 font-medium">ยังไม่เปิดให้บริการ</p>
                 </div>
               )}
             </div>
           </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 p-8">
-            <div className="w-20 h-20 bg-gray-50 rounded-2xl flex items-center justify-center mb-4 animate-pulse">
-              <Store size={40} className="opacity-20" />
-            </div>
-            <p>เลือกล็อกเพื่อดูรายละเอียด</p>
-          </div>
-        )}
-      </div>
+        );
+      })()}
     </div>
   );
 };
