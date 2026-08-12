@@ -11,6 +11,9 @@ export const usersAPI = {
   getAll: (params) => api.get('/users', { params }),
   getById: (id) => api.get(`/users/${id}`),
   update: (id, data) => api.put(`/users/${id}`, data),
+  updateWithPhoto: (id, formData) => api.put(`/users/${id}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
   delete: (id) => api.delete(`/users/${id}`),
   resetPassword: (id, data) => api.post(`/users/${id}/reset-password`, data)
 };

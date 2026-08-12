@@ -39,8 +39,8 @@ const ExecutiveTenants = () => {
 
       // Match tenants with their stalls and contracts
       const tenantsWithStalls = users.map((user) => {
-        const stall = stalls.find((s) => s.tenant_id === user.user_id);
         const contract = contracts.find((c) => c.tenant_id === user.user_id);
+        const stall = user.stall || (contract ? stalls.find((s) => s.slot_id === contract.slot_id) : null);
         return { ...user, stall, contract };
       });
 
@@ -126,11 +126,19 @@ const ExecutiveTenants = () => {
                 >
                   <td className="py-4 px-6">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 text-white flex items-center justify-center font-bold text-sm shadow-sm">
-                        {(tenant.first_name || tenant.username || "?")
-                          .charAt(0)
-                          .toUpperCase()}
-                      </div>
+                      {tenant.profile_image_url ? (
+                        <img
+                          src={tenant.profile_image_url}
+                          alt="Profile"
+                          className="w-8 h-8 rounded-full object-cover border border-purple-100 shadow-sm shrink-0"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                          {(tenant.first_name || tenant.username || "?")
+                            .charAt(0)
+                            .toUpperCase()}
+                        </div>
+                      )}
                       <span className="font-medium text-gray-800">
                         {tenant.first_name} {tenant.last_name}
                       </span>

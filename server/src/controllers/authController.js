@@ -20,6 +20,8 @@ const register = async (req, res, next) => {
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
 
+    const profile_image_url = req.file ? req.file.path : (req.body.profile_image_url || null);
+
     // Security: always register as TENANT regardless of what role is sent in body
     // Role can only be elevated by an Admin after account creation
     const user = await prisma.user.create({
@@ -36,7 +38,9 @@ const register = async (req, res, next) => {
         subdistrict: subdistrict || null,
         district: district || null,
         province: province || null,
-        postal_code: postal_code || null
+        postal_code: postal_code || null,
+        profile_image_url,
+        must_change_password: true
       },
       select: {
         user_id: true,
@@ -45,7 +49,9 @@ const register = async (req, res, next) => {
         first_name: true,
         last_name: true,
         role: true,
-        phone: true
+        phone: true,
+        profile_image_url: true,
+        must_change_password: true
       }
     });
 
@@ -113,7 +119,9 @@ const login = async (req, res, next) => {
           first_name: user.first_name,
           last_name: user.last_name,
           role: user.role,
-          phone: user.phone
+          phone: user.phone,
+          profile_image_url: user.profile_image_url,
+          must_change_password: user.must_change_password
         },
         token
       }
@@ -140,7 +148,9 @@ const getProfile = async (req, res, next) => {
         subdistrict: true,
         district: true,
         province: true,
-        postal_code: true
+        postal_code: true,
+        profile_image_url: true,
+        must_change_password: true
       }
     });
 
@@ -154,7 +164,7 @@ const getProfile = async (req, res, next) => {
 const updateProfile = async (req, res, next) => {
   try {
     const { first_name, last_name, phone, currentPassword, newPassword,
-            address_line, subdistrict, district, province, postal_code } = req.body;
+            address_line, subdistrict, district, province, postal_code, title } = req.body;
 
     const updateData = {};
 
@@ -166,6 +176,13 @@ const updateProfile = async (req, res, next) => {
     if (district !== undefined) updateData.district = district;
     if (province !== undefined) updateData.province = province;
     if (postal_code !== undefined) updateData.postal_code = postal_code;
+    if (title !== undefined) updateData.title = title;
+    
+    if (req.file) {
+      updateData.profile_image_url = req.file.path;
+    } else if (req.body.profile_image_url !== undefined) {
+      updateData.profile_image_url = req.body.profile_image_url === '' ? null : req.body.profile_image_url;
+    }
 
     if (currentPassword && newPassword) {
       const user = await prisma.user.findUnique({ where: { user_id: req.user.user_id } });
@@ -175,6 +192,7 @@ const updateProfile = async (req, res, next) => {
       }
       const salt = await bcrypt.genSalt(10);
       updateData.password_hash = await bcrypt.hash(newPassword, salt);
+      updateData.must_change_password = false;
     }
 
     const updatedUser = await prisma.user.update({
@@ -187,7 +205,9 @@ const updateProfile = async (req, res, next) => {
         first_name: true,
         last_name: true,
         role: true,
-        phone: true
+        phone: true,
+        profile_image_url: true,
+        must_change_password: true
       }
     });
 

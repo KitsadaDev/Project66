@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { billsAPI, stallsAPI } from "../../api";
-import { generateBillPDF } from "../../utils/pdfGenerator";
 
 const Bills = () => {
   const [bills, setBills] = useState([]);
@@ -370,19 +369,11 @@ const Bills = () => {
                             setSelectedBill(bill);
                             setIsSlipModalOpen(true);
                           }}
-                          className="p-2 text-purple-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                          title="ดูหลักฐานการชำระเงิน"
+                          className="bg-purple-50 hover:bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
                         >
-                          <Eye size={18} />
+                          แสดงสลิป
                         </button>
                       )}
-                      <button
-                        onClick={() => generateBillPDF(bill)}
-                        className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                        title="ดาวน์โหลด PDF"
-                      >
-                        <FileText size={18} />
-                      </button>
                     </div>
                   </td>
                 </tr>

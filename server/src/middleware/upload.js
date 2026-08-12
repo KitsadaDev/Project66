@@ -24,9 +24,12 @@ const storage = new CloudinaryStorage({
       folderName = 'contracts';
     }
 
+    const ext = path.extname(file.originalname).substring(1).toLowerCase();
+    const format = (ext === 'heic' || ext === 'heif') ? 'jpg' : ext;
+
     return {
       folder: `Project/${folderName}`,
-      format: path.extname(file.originalname).substring(1).toLowerCase(), // e.g., 'jpeg', 'png'
+      format: format,
       public_id: `${file.fieldname}-${Date.now()}-${Math.round(Math.random() * 1e9)}`,
     };
   },
@@ -39,14 +42,16 @@ const ALLOWED_MIME_TYPES = new Set([
   'image/png',
   'image/gif',
   'image/webp',
+  'image/heic',
+  'image/heif',
   'application/pdf'
 ]);
 
 const fileFilter = (req, file, cb) => {
-  if (ALLOWED_MIME_TYPES.has(file.mimetype)) {
+  if (ALLOWED_MIME_TYPES.has(file.mimetype) || file.originalname.toLowerCase().endsWith('.heic') || file.originalname.toLowerCase().endsWith('.heif')) {
     return cb(null, true);
   }
-  cb(new Error('Only images (jpeg, jpg, png, gif, webp) and PDF files are allowed!'));
+  cb(new Error('Only images (jpeg, jpg, png, gif, webp, heic) and PDF files are allowed!'));
 };
 
 const upload = multer({

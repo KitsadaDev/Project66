@@ -119,7 +119,7 @@ const createSlot = async (req, res, next) => {
 const updateSlot = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { slot_number, slot_size, rent, status, tenant_id } = req.body;
+    const { slot_number, slot_size, rent, status, tenant_id, menuType } = req.body;
 
     const existing = await prisma.rentalSlot.findUnique({ where: { slot_id: parseInt(id) } });
     if (!existing) {
@@ -159,6 +159,7 @@ const updateSlot = async (req, res, next) => {
             end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
             monthly_rent: updatedSlot.rent,
             deposit_amount: updatedSlot.rent * 2,
+            menuType: menuType || null,
             status: 'ACTIVE'
           }
         });

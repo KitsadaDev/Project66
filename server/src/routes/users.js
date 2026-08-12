@@ -9,13 +9,15 @@ const {
   resetPassword
 } = require('../controllers/userController');
 
+const upload = require('../middleware/upload');
+
 // All routes require authentication and admin role
 router.use(authenticate);
 router.use(authorize('ADMIN', 'EXECUTIVE'));
 
 router.get('/', getAllUsers);
 router.get('/:id', getUserById);
-router.put('/:id', updateUser);
+router.put('/:id', upload.single('profileImage'), updateUser);
 router.delete('/:id', deleteUser);
 router.post('/:id/reset-password', resetPassword);
 

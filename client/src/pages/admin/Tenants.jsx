@@ -26,12 +26,30 @@ const Tenants = () => {
   const [editForm, setEditForm] = useState({});
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addForm, setAddForm] = useState({
-    name: "",
-    email: "",
+    title: "",
+    first_name: "",
+    last_name: "",
     phone: "",
+    email: "",
+    address_line: "",
+    province: "",
+    district: "",
+    subdistrict: "",
+    postal_code: "",
+    menuType: "",
+    username: "",
     password: "",
     stallId: "",
   });
+  const [profileFile, setProfileFile] = useState(null);
+  const [profilePreview, setProfilePreview] = useState(null);
+
+  // Edit-mode profile image state
+  const [editProfileFile, setEditProfileFile] = useState(null);
+  const [editProfilePreview, setEditProfilePreview] = useState(null);
+
+  // Quick photo upload state
+  const [uploadingPhotoId, setUploadingPhotoId] = useState(null);
 
   // Contract Modal State
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
@@ -66,6 +84,218 @@ const Tenants = () => {
     subDistrict: "",
     zipCode: "",
   });
+
+  // Address Cascading Dropdown States
+  const [addressData, setAddressData] = useState([]);
+  const [provinces, setProvinces] = useState([]);
+  const [districts, setDistricts] = useState([]);
+  const [subdistricts, setSubdistricts] = useState([]);
+
+  // Contract Address Cascading Dropdown States
+  const [contractDistricts, setContractDistricts] = useState([]);
+  const [contractSubdistricts, setContractSubdistricts] = useState([]);
+
+  // Load address database dynamically when Add Modal or Contract Modal is open
+  useEffect(() => {
+    if ((isAddModalOpen || isContractModalOpen) && addressData.length === 0) {
+      fetch("/thailand-address.json")
+        .then((res) => res.json())
+        .then((data) => {
+          setAddressData(data);
+          const sorted = [...data].sort((a, b) => a.name_th.localeCompare(b.name_th));
+          setProvinces(sorted);
+        })
+        .catch((err) => console.error("Error loading address data:", err));
+    }
+  }, [isAddModalOpen, isContractModalOpen, addressData]);
+
+  // Synchronize Contract Dropdowns when existing contract address is loaded
+  useEffect(() => {
+    if (isContractModalOpen && addressData.length > 0) {
+      if (addressObj.province) {
+        const provinceObj = addressData.find((p) => p.name_th === addressObj.province);
+        if (provinceObj) {
+          const sortedDistricts = [...provinceObj.amphure].sort((a, b) =>
+            a.name_th.localeCompare(b.name_th)
+          );
+          setContractDistricts(sortedDistricts);
+
+          if (addressObj.district) {
+            const districtObj = sortedDistricts.find((d) => d.name_th === addressObj.district);
+            if (districtObj) {
+              const sortedSubdistricts = [...districtObj.tambon].sort((a, b) =>
+                a.name_th.localeCompare(b.name_th)
+              );
+              setContractSubdistricts(sortedSubdistricts);
+            }
+          }
+        }
+      }
+    }
+  }, [isContractModalOpen, addressData, addressObj.province, addressObj.district]);
+
+  const handleContractProvinceChange = (provinceName) => {
+    if (!provinceName) {
+      setAddressObj((prev) => ({
+        ...prev,
+        province: "",
+        district: "",
+        subDistrict: "",
+        zipCode: "",
+      }));
+      setContractDistricts([]);
+      setContractSubdistricts([]);
+      return;
+    }
+
+    const provinceObj = addressData.find((p) => p.name_th === provinceName);
+    const sortedDistricts = provinceObj
+      ? [...provinceObj.amphure].sort((a, b) => a.name_th.localeCompare(b.name_th))
+      : [];
+
+    setAddressObj((prev) => ({
+      ...prev,
+      province: provinceName,
+      district: "",
+      subDistrict: "",
+      zipCode: "",
+    }));
+    setContractDistricts(sortedDistricts);
+    setContractSubdistricts([]);
+  };
+
+  const handleContractDistrictChange = (districtName) => {
+    if (!districtName) {
+      setAddressObj((prev) => ({
+        ...prev,
+        district: "",
+        subDistrict: "",
+        zipCode: "",
+      }));
+      setContractSubdistricts([]);
+      return;
+    }
+
+    const districtObj = contractDistricts.find((d) => d.name_th === districtName);
+    const sortedSubdistricts = districtObj
+      ? [...districtObj.tambon].sort((a, b) => a.name_th.localeCompare(b.name_th))
+      : [];
+
+    setAddressObj((prev) => ({
+      ...prev,
+      district: districtName,
+      subDistrict: "",
+      zipCode: "",
+    }));
+    setContractSubdistricts(sortedSubdistricts);
+  };
+
+  const handleContractSubdistrictChange = (subdistrictName) => {
+    if (!subdistrictName) {
+      setAddressObj((prev) => ({
+        ...prev,
+        subDistrict: "",
+        zipCode: "",
+      }));
+      return;
+    }
+
+    const subdistrictObj = contractSubdistricts.find((s) => s.name_th === subdistrictName);
+    const zipCode = subdistrictObj ? String(subdistrictObj.zip_code) : "";
+
+    setAddressObj((prev) => ({
+      ...prev,
+      subDistrict: subdistrictName,
+      zipCode: zipCode,
+    }));
+  };
+
+  const handleProvinceChange = (provinceName) => {
+    if (!provinceName) {
+      setAddForm((prev) => ({
+        ...prev,
+        province: "",
+        district: "",
+        subdistrict: "",
+        postal_code: "",
+      }));
+      setDistricts([]);
+      setSubdistricts([]);
+      return;
+    }
+
+    const provinceObj = addressData.find((p) => p.name_th === provinceName);
+    const sortedDistricts = provinceObj
+      ? [...provinceObj.amphure].sort((a, b) => a.name_th.localeCompare(b.name_th))
+      : [];
+
+    setAddForm((prev) => ({
+      ...prev,
+      province: provinceName,
+      district: "",
+      subdistrict: "",
+      postal_code: "",
+    }));
+    setDistricts(sortedDistricts);
+    setSubdistricts([]);
+  };
+
+  const handleDistrictChange = (districtName) => {
+    if (!districtName) {
+      setAddForm((prev) => ({
+        ...prev,
+        district: "",
+        subdistrict: "",
+        postal_code: "",
+      }));
+      setSubdistricts([]);
+      return;
+    }
+
+    const districtObj = districts.find((d) => d.name_th === districtName);
+    const sortedSubdistricts = districtObj
+      ? [...districtObj.tambon].sort((a, b) => a.name_th.localeCompare(b.name_th))
+      : [];
+
+    setAddForm((prev) => ({
+      ...prev,
+      district: districtName,
+      subdistrict: "",
+      postal_code: "",
+    }));
+    setSubdistricts(sortedSubdistricts);
+  };
+
+  const handleSubdistrictChange = (subdistrictName) => {
+    if (!subdistrictName) {
+      setAddForm((prev) => ({
+        ...prev,
+        subdistrict: "",
+        postal_code: "",
+      }));
+      return;
+    }
+
+    const subdistrictObj = subdistricts.find((s) => s.name_th === subdistrictName);
+    const zipCode = subdistrictObj ? String(subdistrictObj.zip_code) : "";
+
+    setAddForm((prev) => ({
+      ...prev,
+      subdistrict: subdistrictName,
+      postal_code: zipCode,
+    }));
+  };
+
+  const openAddModal = () => {
+    const randomPassword = Math.random().toString(36).substring(2, 8);
+    setAddForm((prev) => ({
+      ...prev,
+      password: randomPassword,
+    }));
+    setIsAddModalOpen(true);
+  };
+
+
 
   useEffect(() => {
     fetchData();
@@ -110,6 +340,8 @@ const Tenants = () => {
       slot_id: tenant.stall?.slot_id || "",
       originalSlotId: tenant.stall?.slot_id || "",
     });
+    setEditProfileFile(null);
+    setEditProfilePreview(tenant.profile_image_url || null);
   };
 
   const handleSave = async (user_id) => {
@@ -131,10 +363,20 @@ const Tenants = () => {
         }
       }
 
-      await usersAPI.update(user_id, userData);
+      if (editProfileFile) {
+        // Send as multipart/form-data to upload profile image
+        const formData = new FormData();
+        Object.entries(userData).forEach(([k, v]) => formData.append(k, v ?? ""));
+        formData.append("profileImage", editProfileFile);
+        await usersAPI.updateWithPhoto(user_id, formData);
+      } else {
+        await usersAPI.update(user_id, userData);
+      }
 
       toast.success("บันทึกข้อมูลสำเร็จ");
       setEditingId(null);
+      setEditProfileFile(null);
+      setEditProfilePreview(null);
       fetchData();
     } catch (error) {
       console.error(error);
@@ -142,18 +384,47 @@ const Tenants = () => {
     }
   };
 
+  const handleQuickPhotoUpload = async (user_id, file) => {
+    if (!file) return;
+    setUploadingPhotoId(user_id);
+    try {
+      const formData = new FormData();
+      formData.append("profileImage", file);
+      await usersAPI.updateWithPhoto(user_id, formData);
+      toast.success("อัปโหลดรูปโปรไฟล์สำเร็จ");
+      fetchData();
+    } catch (error) {
+      console.error(error);
+      toast.error("ไม่สามารถอัปโหลดรูปได้");
+    } finally {
+      setUploadingPhotoId(null);
+    }
+  };
+
   const handleAddSubmit = async (e) => {
     e.preventDefault();
     try {
-      // 1. Register User
-      const registerResponse = await authAPI.register({
-        first_name: addForm.name,
-        username: addForm.email || addForm.name,
-        phone: addForm.phone,
-        password: addForm.password,
-        role: "TENANT",
-      });
+      const formData = new FormData();
+      formData.append("title", addForm.title || "");
+      formData.append("first_name", addForm.first_name);
+      formData.append("last_name", addForm.last_name || "");
+      formData.append("phone", addForm.phone || "");
+      formData.append("email", addForm.email || "");
+      formData.append("username", addForm.username.trim());
+      formData.append("password", addForm.password);
+      formData.append("address_line", addForm.address_line || "");
+      formData.append("subdistrict", addForm.subdistrict || "");
+      formData.append("district", addForm.district || "");
+      formData.append("province", addForm.province || "");
+      formData.append("postal_code", addForm.postal_code || "");
+      formData.append("role", "TENANT");
 
+      if (profileFile) {
+        formData.append("profileImage", profileFile);
+      }
+
+      // 1. Register User
+      const registerResponse = await authAPI.register(formData);
       const userId = registerResponse.data.data.user.user_id;
 
       // 2. Assign to Stall (if selected)
@@ -161,18 +432,32 @@ const Tenants = () => {
         await stallsAPI.update(addForm.stallId, {
           tenant_id: userId,
           status: "OCCUPIED",
+          menuType: addForm.menuType || null,
         });
       }
 
       toast.success("เพิ่มผู้เช่าสำเร็จ");
       setIsAddModalOpen(false);
       setAddForm({
-        name: "",
-        email: "",
+        title: "",
+        first_name: "",
+        last_name: "",
         phone: "",
+        email: "",
+        address_line: "",
+        province: "",
+        district: "",
+        subdistrict: "",
+        postal_code: "",
+        menuType: "",
+        username: "",
         password: "",
         stallId: "",
       });
+      setProfileFile(null);
+      setProfilePreview(null);
+      setDistricts([]);
+      setSubdistricts([]);
       fetchData(); // Refresh both lists
     } catch (error) {
       console.error(error);
@@ -321,6 +606,8 @@ const Tenants = () => {
   const handleCancel = () => {
     setEditingId(null);
     setEditForm({});
+    setEditProfileFile(null);
+    setEditProfilePreview(null);
   };
 
   const filteredTenants = tenants.filter(
@@ -357,7 +644,7 @@ const Tenants = () => {
           </p>
         </div>
         <button
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={openAddModal}
           className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl transition-colors shadow-sm"
         >
           <Plus size={20} />
@@ -405,22 +692,70 @@ const Tenants = () => {
                 >
                   <td className="py-4 px-6">
                     {editingId === tenant.user_id ? (
-                      <input
-                        type="text"
-                        className="w-full px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500"
-                        value={editForm.first_name || ""}
-                        onChange={(e) =>
-                          setEditForm({
-                            ...editForm,
-                            first_name: e.target.value,
-                          })
-                        }
-                        placeholder="ชื่อผู้เช่า"
-                      />
+                      <div className="flex items-center gap-3">
+                        {/* Profile photo upload in edit mode */}
+                        <label className="relative cursor-pointer group shrink-0">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                setEditProfileFile(file);
+                                setEditProfilePreview(URL.createObjectURL(file));
+                              }
+                            }}
+                          />
+                          {editProfilePreview ? (
+                            <img
+                              src={editProfilePreview}
+                              alt="Profile"
+                              className="w-10 h-10 rounded-full object-cover border-2 border-purple-400 shadow-sm"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                              {(tenant.first_name || tenant.username || "?")
+                                .charAt(0)
+                                .toUpperCase()}
+                            </div>
+                          )}
+                          <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                            <Camera size={14} className="text-white" />
+                          </div>
+                        </label>
+                        <input
+                          type="text"
+                          className="flex-1 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm"
+                          value={editForm.first_name || ""}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              first_name: e.target.value,
+                            })
+                          }
+                          placeholder="ชื่อผู้เช่า"
+                        />
+                      </div>
                     ) : (
-                      <p className="font-semibold text-gray-800">
-                        {tenant.first_name} {tenant.last_name || ""}
-                      </p>
+                      <div className="flex items-center gap-3">
+                        {tenant.profile_image_url ? (
+                          <img
+                            src={tenant.profile_image_url}
+                            alt="Profile"
+                            className="w-8 h-8 rounded-full object-cover border border-purple-100 shadow-sm shrink-0"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                            {(tenant.first_name || tenant.username || "?")
+                              .charAt(0)
+                              .toUpperCase()}
+                          </div>
+                        )}
+                        <p className="font-semibold text-gray-800">
+                          {tenant.first_name} {tenant.last_name || ""}
+                        </p>
+                      </div>
                     )}
                   </td>
                   <td className="py-4 px-6">
@@ -486,6 +821,28 @@ const Tenants = () => {
                   </td>
                   <td className="py-4 px-6 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      {/* Quick Photo Upload Button */}
+                      {editingId !== tenant.user_id && (
+                        <label
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors cursor-pointer select-none"
+                          title="อัปโหลดรูปโปรไฟล์"
+                        >
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={uploadingPhotoId === tenant.user_id}
+                            onChange={(e) =>
+                              handleQuickPhotoUpload(tenant.user_id, e.target.files[0])
+                            }
+                          />
+                          {uploadingPhotoId === tenant.user_id && (
+                            <div className="w-3.5 h-3.5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+                          )}
+                          อัพรูปโปรไฟล์
+                        </label>
+                      )}
+
                       {/* Manage Contract Button */}
                       <button
                         onClick={() => handleManageContract(tenant)}
@@ -627,63 +984,65 @@ const Tenants = () => {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">
                           จังหวัด
                         </label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-2 border border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="ชื่อจังหวัด..."
+                        <select
+                          className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100 bg-white text-sm"
                           value={addressObj.province}
-                          onChange={(e) =>
-                            setAddressObj({
-                              ...addressObj,
-                              province: e.target.value,
-                            })
-                          }
-                        />
+                          onChange={(e) => handleContractProvinceChange(e.target.value)}
+                        >
+                          <option value="">เลือกจังหวัด</option>
+                          {provinces.map((p) => (
+                            <option key={p.id} value={p.name_th}>
+                              {p.name_th}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">
                           อำเภอ/เขต
                         </label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-2 border border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="ชื่ออำเภอ/เขต..."
+                        <select
+                          className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100 bg-white text-sm"
                           value={addressObj.district}
-                          onChange={(e) =>
-                            setAddressObj({
-                              ...addressObj,
-                              district: e.target.value,
-                            })
-                          }
-                        />
+                          onChange={(e) => handleContractDistrictChange(e.target.value)}
+                          disabled={!addressObj.province}
+                        >
+                          <option value="">เลือกอำเภอ/เขต</option>
+                          {contractDistricts.map((d) => (
+                            <option key={d.id} value={d.name_th}>
+                              {d.name_th}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">
                           ตำบล/แขวง
                         </label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-2 border border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="ชื่อตำบล/แขวง..."
+                        <select
+                          className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100 bg-white text-sm"
                           value={addressObj.subDistrict}
-                          onChange={(e) =>
-                            setAddressObj({
-                              ...addressObj,
-                              subDistrict: e.target.value,
-                            })
-                          }
-                        />
+                          onChange={(e) => handleContractSubdistrictChange(e.target.value)}
+                          disabled={!addressObj.district}
+                        >
+                          <option value="">เลือกตำบล/แขวง</option>
+                          {contractSubdistricts.map((s) => (
+                            <option key={s.id} value={s.name_th}>
+                              {s.name_th}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">
                           รหัสไปรษณีย์
                         </label>
                         <input
                           type="text"
-                          className="w-full px-4 py-2 border border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100 text-sm"
                           placeholder="รหัสไปรษณีย์..."
                           value={addressObj.zipCode}
                           onChange={(e) =>
@@ -900,115 +1259,308 @@ const Tenants = () => {
       {/* Add Tenant Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-xl shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6 border-b pb-3">
               <h2 className="text-xl font-bold text-gray-800">
                 เพิ่มผู้เช่าใหม่
               </h2>
               <button
-                onClick={() => setIsAddModalOpen(false)}
+                onClick={() => {
+                  setIsAddModalOpen(false);
+                  setProfileFile(null);
+                  setProfilePreview(null);
+                  setDistricts([]);
+                  setSubdistricts([]);
+                }}
                 className="text-gray-400 hover:text-gray-600"
               >
                 <X size={24} />
               </button>
             </div>
 
-            <form onSubmit={handleAddSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  เลือกแผงค้า (ไม่บังคับ)
-                </label>
-                <select
-                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100"
-                  value={addForm.stallId}
-                  onChange={(e) =>
-                    setAddForm({ ...addForm, stallId: e.target.value })
-                  }
-                >
-                  <option value="">-- ไม่ระบุ --</option>
-                  {allStalls
-                    .filter((s) => s.status === "VACANT")
-                    .map((s) => (
-                      <option key={s.slot_id} value={s.slot_id}>
-                        {s.slot_number} (ศูนย์ {s.food_court_id}) ({s.size}{" "}
-                        ตร.ม. - {s.rent} บาท)
-                      </option>
-                    ))}
-                </select>
+            <form onSubmit={handleAddSubmit} className="space-y-6">
+              {/* Profile Image (Optional) */}
+              <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-xl p-4 bg-gray-50/50">
+                {profilePreview ? (
+                  <div className="relative">
+                    <img
+                      src={profilePreview}
+                      alt="Profile Preview"
+                      className="w-24 h-24 rounded-full object-cover border-2 border-purple-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProfileFile(null);
+                        setProfilePreview(null);
+                      }}
+                      className="absolute -top-1 -right-1 bg-red-100 text-red-600 rounded-full p-1 border hover:bg-red-200"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center cursor-pointer text-gray-400 hover:text-purple-600 py-2">
+                    <Upload size={32} className="mb-2 text-gray-400" />
+                    <span className="text-xs font-semibold">รูปโปรไฟล์ (ไม่บังคับ)</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          setProfileFile(file);
+                          setProfilePreview(URL.createObjectURL(file));
+                        }
+                      }}
+                    />
+                  </label>
+                )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  ชื่อ-นามสกุล
-                </label>
-                <input
-                  type="text"
-                  required
-                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100"
-                  value={addForm.name}
-                  onChange={(e) =>
-                    setAddForm({ ...addForm, name: e.target.value })
-                  }
-                />
+              {/* Section: Personal Info */}
+              <div className="space-y-3">
+                <h3 className="font-bold text-gray-700 text-sm border-l-4 border-purple-500 pl-2">ข้อมูลส่วนตัว</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">คำนำหน้า</label>
+                    <select
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100 bg-white text-sm"
+                      value={addForm.title}
+                      onChange={(e) => setAddForm({ ...addForm, title: e.target.value })}
+                    >
+                      <option value="">เลือกคำนำหน้า</option>
+                      <option value="นาย">นาย</option>
+                      <option value="นาง">นาง</option>
+                      <option value="นางสาว">นางสาว</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">ชื่อ *</label>
+                    <input
+                      type="text"
+                      required
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100 text-sm"
+                      placeholder="ชื่อจริง"
+                      value={addForm.first_name}
+                      onChange={(e) => setAddForm({ ...addForm, first_name: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">นามสกุล</label>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100 text-sm"
+                      placeholder="นามสกุล"
+                      value={addForm.last_name}
+                      onChange={(e) => setAddForm({ ...addForm, last_name: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">เบอร์โทรศัพท์ *</label>
+                    <input
+                      type="tel"
+                      required
+                      maxLength={10}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100 text-sm"
+                      placeholder="08xxxxxxxx"
+                      value={addForm.phone}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "");
+                        setAddForm({ ...addForm, phone: val });
+                      }}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">อีเมล</label>
+                    <input
+                      type="email"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100 text-sm"
+                      placeholder="email@example.com"
+                      value={addForm.email}
+                      onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  เบอร์โทรศัพท์
-                </label>
-                <input
-                  type="tel"
-                  required
-                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100"
-                  value={addForm.phone}
-                  onChange={(e) =>
-                    setAddForm({ ...addForm, phone: e.target.value })
-                  }
-                />
+              {/* Section: Address */}
+              <div className="space-y-3">
+                <h3 className="font-bold text-gray-700 text-sm border-l-4 border-purple-500 pl-2">ที่อยู่</h3>
+                
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">ที่อยู่ (บ้านเลขที่ ถนน)</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100 text-sm"
+                    placeholder="ที่อยู่ บ้านเลขที่ ถนน ซอย"
+                    value={addForm.address_line}
+                    onChange={(e) => setAddForm({ ...addForm, address_line: e.target.value })}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">จังหวัด</label>
+                    <select
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100 bg-white text-sm"
+                      value={addForm.province}
+                      onChange={(e) => handleProvinceChange(e.target.value)}
+                    >
+                      <option value="">เลือกจังหวัด</option>
+                      {provinces.map((p) => (
+                        <option key={p.id} value={p.name_th}>
+                          {p.name_th}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">อำเภอ</label>
+                    <select
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100 bg-white text-sm"
+                      value={addForm.district}
+                      onChange={(e) => handleDistrictChange(e.target.value)}
+                      disabled={!addForm.province}
+                    >
+                      <option value="">เลือกอำเภอ</option>
+                      {districts.map((d) => (
+                        <option key={d.id} value={d.name_th}>
+                          {d.name_th}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">ตำบล</label>
+                    <select
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100 bg-white text-sm"
+                      value={addForm.subdistrict}
+                      onChange={(e) => handleSubdistrictChange(e.target.value)}
+                      disabled={!addForm.district}
+                    >
+                      <option value="">เลือกตำบล</option>
+                      {subdistricts.map((s) => (
+                        <option key={s.id} value={s.name_th}>
+                          {s.name_th}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">รหัสไปรษณีย์</label>
+                  <input
+                    type="text"
+                    className="w-full md:w-1/2 px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100 text-sm"
+                    placeholder="รหัสไปรษณีย์"
+                    value={addForm.postal_code}
+                    onChange={(e) => setAddForm({ ...addForm, postal_code: e.target.value })}
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  อีเมล (สำหรับล็อกอิน)
-                </label>
-                <input
-                  type="text"
-                  required
-                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100"
-                  value={addForm.email}
-                  onChange={(e) =>
-                    setAddForm({ ...addForm, email: e.target.value })
-                  }
-                />
+              {/* Section: Stall & Shop Type */}
+              <div className="space-y-3">
+                <h3 className="font-bold text-gray-700 text-sm border-l-4 border-purple-500 pl-2">ข้อมูลแผงค้าและประเภทร้าน</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">เลือกแผงค้า (ไม่บังคับ)</label>
+                    <select
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100 bg-white text-sm"
+                      value={addForm.stallId}
+                      onChange={(e) => setAddForm({ ...addForm, stallId: e.target.value })}
+                    >
+                      <option value="">-- ไม่ระบุ --</option>
+                      {allStalls
+                        .filter((s) => s.status === "VACANT")
+                        .map((s) => (
+                          <option key={s.slot_id} value={s.slot_id}>
+                            {s.slot_number} (ศูนย์ {s.food_court_id}) ({s.size} ตร.ม. - {Number(s.rent).toLocaleString()} บาท)
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">ประเภทร้าน</label>
+                    <select
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100 bg-white text-sm"
+                      value={addForm.menuType}
+                      onChange={(e) => setAddForm({ ...addForm, menuType: e.target.value })}
+                    >
+                      <option value="">เลือกประเภทร้าน</option>
+                      <option value="ของคาว">ร้านของคาว</option>
+                      <option value="เครื่องดื่ม">ร้านน้ำหวาน</option>
+                      <option value="ของหวาน">ร้านขนม</option>
+                    </select>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  รหัสผ่าน
-                </label>
-                <input
-                  type="password"
-                  required
-                  minLength={6}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100"
-                  value={addForm.password}
-                  onChange={(e) =>
-                    setAddForm({ ...addForm, password: e.target.value })
-                  }
-                />
+              {/* Section: Login Credentials */}
+              <div className="space-y-3">
+                <h3 className="font-bold text-gray-700 text-sm border-l-4 border-purple-500 pl-2">ข้อมูลล็อกอิน</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Username *</label>
+                    <input
+                      type="text"
+                      required
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100 text-sm"
+                      placeholder="Username สำหรับล็อกอิน"
+                      value={addForm.username}
+                      onChange={(e) => setAddForm({ ...addForm, username: e.target.value })}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">รหัสผ่านชั่วคราว (ระบบสร้างให้อัตโนมัติ)</label>
+                    <div className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono font-semibold text-gray-700 flex justify-between items-center h-[38px]">
+                      <span>{addForm.password}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(addForm.password);
+                          toast.success("คัดลอกรหัสผ่านแล้ว!");
+                        }}
+                        className="text-xs text-purple-600 hover:text-purple-700 font-bold bg-transparent border-0 cursor-pointer"
+                      >
+                        คัดลอก
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex justify-end gap-3 mt-6">
+              <div className="flex justify-end gap-3 mt-8 pt-4 border-t">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="px-6 py-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+                  onClick={() => {
+                    setIsAddModalOpen(false);
+                    setProfileFile(null);
+                    setProfilePreview(null);
+                    setDistricts([]);
+                    setSubdistricts([]);
+                  }}
+                  className="px-6 py-2.5 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors text-sm font-medium"
                 >
                   ยกเลิก
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-lg shadow-purple-200 transition-all"
+                  className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-lg shadow-purple-200 transition-all text-sm font-medium"
                 >
                   บันทึก
                 </button>

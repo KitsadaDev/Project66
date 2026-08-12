@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   X,
   MapPin,
@@ -6,8 +7,11 @@ import {
   FileText,
   Image as ImageIcon,
 } from "lucide-react";
+import ImageModal from "./ImageModal";
 
 const RepairDetailsModal = ({ repair, onClose }) => {
+  const [selectedImageUrl, setSelectedImageUrl] = useState(null);
+
   if (!repair) return null;
 
   return (
@@ -136,49 +140,112 @@ const RepairDetailsModal = ({ repair, onClose }) => {
           </div>
 
           {/* Images */}
-          <div className="border-t border-gray-100 pt-6">
-            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2 mb-4">
-              <ImageIcon size={16} /> รูปภาพประกอบ
-            </label>
+          <div className="border-t border-gray-100 pt-6 space-y-6">
+            {/* Request Images */}
+            {(() => {
+              const requestImages = (repair.images || []).filter(
+                (img) => typeof img === "string" || img.image_type !== "completion"
+              );
+              if (requestImages.length === 0) return null;
+              return (
+                <div>
+                  <label className="text-xs font-semibold text-purple-600 uppercase tracking-wider flex items-center gap-2 mb-3">
+                    <ImageIcon size={16} /> รูปภาพแจ้งซ่อม (ก่อนซ่อม)
+                  </label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {requestImages.map((imgObj, index) => {
+                      const imgUrl =
+                        typeof imgObj === "string"
+                          ? imgObj
+                          : imgObj?.image_url || "";
+                      if (!imgUrl) return null;
 
-            {repair.images && repair.images.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {repair.images.map((imgObj, index) => {
-                  const imgUrl =
-                    typeof imgObj === "string"
-                      ? imgObj
-                      : imgObj?.image_url || "";
-                  if (!imgUrl) return null;
+                      const rawImgSrc = imgUrl.startsWith("http")
+                        ? imgUrl
+                        : imgUrl.startsWith("/")
+                          ? `${import.meta.env.VITE_API_URL || "http://localhost:5000"}${imgUrl}`
+                          : `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/${imgUrl}`;
+                      const imgSrc = rawImgSrc.replace(/\.(heic|heif)$/i, ".jpg");
 
-                  const imgSrc = imgUrl.startsWith("http")
-                    ? imgUrl
-                    : imgUrl.startsWith("/")
-                      ? `${import.meta.env.VITE_API_URL || "http://localhost:5000"}${imgUrl}`
-                      : `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/${imgUrl}`;
+                      return (
+                        <div
+                          key={`req-${index}`}
+                          className="group relative aspect-video bg-gray-100 rounded-xl overflow-hidden shadow-sm border border-gray-100"
+                        >
+                          <img
+                            src={imgSrc}
+                            alt={`Problem ${index + 1}`}
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 cursor-pointer"
+                            onError={(e) => {
+                              e.target.src =
+                                "https://via.placeholder.com/400x300?text=Image+Not+Found";
+                            }}
+                            onClick={() => setSelectedImageUrl(imgSrc)}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
-                  return (
-                    <div
-                      key={index}
-                      className="group relative aspect-video bg-gray-100 rounded-xl overflow-hidden shadow-sm border border-gray-100"
-                    >
-                      <img
-                        src={imgSrc}
-                        alt={`Repair ${index + 1}`}
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 cursor-pointer"
-                        onError={(e) => {
-                          e.target.src =
-                            "https://via.placeholder.com/400x300?text=Image+Not+Found";
-                        }}
-                        onClick={() => window.open(imgSrc, "_blank")}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-gray-400">
-                <ImageIcon size={32} className="mb-2 opacity-50" />
-                <p className="text-sm">ไม่มีรูปภาพประกอบ</p>
+            {/* Completion Images */}
+            {(() => {
+              const completionImages = (repair.images || []).filter(
+                (img) => typeof img !== "string" && img.image_type === "completion"
+              );
+              if (completionImages.length === 0) return null;
+              return (
+                <div className="border-t border-gray-100 pt-6">
+                  <label className="text-xs font-semibold text-green-600 uppercase tracking-wider flex items-center gap-2 mb-3">
+                    <ImageIcon size={16} /> รูปภาพการซ่อมเสร็จสิ้น (หลังซ่อม)
+                  </label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {completionImages.map((imgObj, index) => {
+                      const imgUrl = imgObj?.image_url || "";
+                      if (!imgUrl) return null;
+
+                      const rawImgSrc = imgUrl.startsWith("http")
+                        ? imgUrl
+                        : imgUrl.startsWith("/")
+                          ? `${import.meta.env.VITE_API_URL || "http://localhost:5000"}${imgUrl}`
+                          : `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/${imgUrl}`;
+                      const imgSrc = rawImgSrc.replace(/\.(heic|heif)$/i, ".jpg");
+
+                      return (
+                        <div
+                          key={`comp-${index}`}
+                          className="group relative aspect-video bg-gray-100 rounded-xl overflow-hidden shadow-sm border border-gray-100"
+                        >
+                          <img
+                            src={imgSrc}
+                            alt={`Completion ${index + 1}`}
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 cursor-pointer"
+                            onError={(e) => {
+                              e.target.src =
+                                "https://via.placeholder.com/400x300?text=Image+Not+Found";
+                            }}
+                            onClick={() => setSelectedImageUrl(imgSrc)}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Empty State */}
+            {(!repair.images || repair.images.length === 0) && (
+              <div>
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2 mb-4">
+                  <ImageIcon size={16} /> รูปภาพประกอบ
+                </label>
+                <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-gray-400">
+                  <ImageIcon size={32} className="mb-2 opacity-50" />
+                  <p className="text-sm">ไม่มีรูปภาพประกอบ</p>
+                </div>
               </div>
             )}
           </div>
@@ -194,6 +261,13 @@ const RepairDetailsModal = ({ repair, onClose }) => {
           </button>
         </div>
       </div>
+
+      {/* Lightbox Modal */}
+      <ImageModal
+        isOpen={!!selectedImageUrl}
+        src={selectedImageUrl}
+        onClose={() => setSelectedImageUrl(null)}
+      />
     </div>
   );
 };

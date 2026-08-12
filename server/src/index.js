@@ -65,7 +65,8 @@ app.use(cors({
     // Allow requests with no origin (e.g., Postman, mobile apps) in development
     if (!origin && process.env.NODE_ENV !== 'production') return callback(null, true);
     if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error('Not allowed by CORS'));
+    // Return 403 without throwing — prevents server crash
+    return callback(null, false);
   },
   credentials: true
 }));

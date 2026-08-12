@@ -9,7 +9,6 @@ import {
   User,
   Calendar,
   X,
-  Eye,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { maintenanceAPI, usersAPI } from "../../api";
@@ -258,11 +257,10 @@ const AdminRepairs = () => {
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
                       <button
-                        className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                        className="bg-purple-50 hover:bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
                         onClick={() => setViewRepair(repair)}
-                        title="ดูรายละเอียด"
                       >
-                        <Eye size={18} />
+                        รายละเอียดการซ่อม
                       </button>
                       {repair.status === "PENDING" && (
                         <button

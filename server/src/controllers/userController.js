@@ -39,6 +39,7 @@ const getAllUsers = async (req, res, next) => {
         district: true,
         province: true,
         postal_code: true,
+        profile_image_url: true,
         rental_contracts: {
           where: { status: 'ACTIVE' },
           select: {
@@ -90,6 +91,7 @@ const getUserById = async (req, res, next) => {
         district: true,
         province: true,
         postal_code: true,
+        profile_image_url: true,
         rental_contracts: {
           where: { status: 'ACTIVE' },
           select: {
@@ -132,6 +134,13 @@ const updateUser = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'User not found.' });
     }
 
+    let profile_image_url = undefined;
+    if (req.file) {
+      profile_image_url = req.file.path;
+    } else if (req.body.profile_image_url !== undefined) {
+      profile_image_url = req.body.profile_image_url === '' ? null : req.body.profile_image_url;
+    }
+
     const updatedUser = await prisma.user.update({
       where: { user_id: parseInt(id) },
       data: {
@@ -145,7 +154,8 @@ const updateUser = async (req, res, next) => {
         ...(subdistrict !== undefined && { subdistrict }),
         ...(district !== undefined && { district }),
         ...(province !== undefined && { province }),
-        ...(postal_code !== undefined && { postal_code })
+        ...(postal_code !== undefined && { postal_code }),
+        ...(profile_image_url !== undefined && { profile_image_url })
       },
       select: {
         user_id: true,
@@ -154,7 +164,8 @@ const updateUser = async (req, res, next) => {
         first_name: true,
         last_name: true,
         role: true,
-        phone: true
+        phone: true,
+        profile_image_url: true
       }
     });
 
@@ -205,7 +216,10 @@ const resetPassword = async (req, res, next) => {
 
     await prisma.user.update({
       where: { user_id: parseInt(id) },
-      data: { password_hash }
+      data: {
+        password_hash,
+        must_change_password: true
+      }
     });
 
     res.json({ success: true, message: 'Password reset successfully.' });

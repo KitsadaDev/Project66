@@ -33,6 +33,7 @@ model User {
   is_active                        Boolean                 @default(true)
   must_change_password             Boolean                 @default(false)
   push_token                       String?
+  profile_image_url                String?
   daily_dishware_usages            DailyDishwareUsage[]    @relation("RecordedByUser")
   daily_dishware_reviewed          DailyDishwareUsage[]    @relation("ReviewedByUser")
   maintenance_assignments_by       MaintenanceAssignment[] @relation("AssignedByUser")

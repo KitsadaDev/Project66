@@ -4,6 +4,7 @@ import { Wrench, Camera, X, Send, AlertCircle, ArrowRight } from "lucide-react";
 import { toast } from "react-toastify";
 import { maintenanceAPI } from "../../api";
 import { useAuthStore } from "../../store";
+import { convertHeicToJpeg } from "../../utils/heicConverter";
 
 const ReportRepair = () => {
   const navigate = useNavigate();
@@ -24,16 +25,27 @@ const ReportRepair = () => {
     { value: "OTHER", label: "อื่นๆ" },
   ];
 
-  const handlePhotoUpload = (e) => {
+  const handlePhotoUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (photos.length + files.length > 5) {
       toast.warning("สามารถแนบรูปได้สูงสุด 5 รูป");
       return;
     }
 
-    setPhotos((prev) => [...prev, ...files]);
-    const newUrls = files.map((file) => URL.createObjectURL(file));
-    setPhotoUrls((prev) => [...prev, ...newUrls]);
+    const toastId = toast.info("กำลังประมวลผลรูปภาพ...", { autoClose: false });
+    try {
+      const convertedFiles = await Promise.all(
+        files.map((file) => convertHeicToJpeg(file))
+      );
+      setPhotos((prev) => [...prev, ...convertedFiles]);
+      const newUrls = convertedFiles.map((file) => URL.createObjectURL(file));
+      setPhotoUrls((prev) => [...prev, ...newUrls]);
+    } catch (err) {
+      console.error(err);
+      toast.error("เกิดข้อผิดพลาดในการประมวลผลรูปภาพ");
+    } finally {
+      toast.dismiss(toastId);
+    }
   };
 
   const removePhoto = (index) => {

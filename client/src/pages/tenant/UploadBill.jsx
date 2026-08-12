@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { billsAPI, stallsAPI } from "../../api";
+import { convertHeicToJpeg } from "../../utils/heicConverter";
 
 const UploadBill = () => {
   const [file, setFile] = useState(null);
@@ -34,11 +35,20 @@ const UploadBill = () => {
     "ธันวาคม",
   ];
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
-      setFile(selectedFile);
-      setPreview(URL.createObjectURL(selectedFile));
+      const toastId = toast.info("กำลังประมวลผลไฟล์...", { autoClose: false });
+      try {
+        const convertedFile = await convertHeicToJpeg(selectedFile);
+        setFile(convertedFile);
+        setPreview(URL.createObjectURL(convertedFile));
+      } catch (err) {
+        console.error(err);
+        toast.error("เกิดข้อผิดพลาดในการประมวลผลไฟล์");
+      } finally {
+        toast.dismiss(toastId);
+      }
     }
   };
 

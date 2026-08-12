@@ -19,20 +19,14 @@ const Header = () => {
           >
             <Menu size={24} />
           </button>
-
-          <img
-            src="/bru-logo.png"
-            alt="BRU Logo"
-            className="w-10 h-10 md:w-14 md:h-14 object-contain"
-          />
           <div>
-            <h1 className="text-sm md:text-base font-bold text-gray-800">
+            <h1 className="text-lg md:text-xl font-bold text-gray-800 leading-tight">
               มหาวิทยาลัย
             </h1>
-            <h1 className="text-sm md:text-base font-semibold text-gray-800">
+            <h1 className="text-lg md:text-xl font-bold text-gray-800 leading-tight">
               ราชภัฏบุรีรัมย์
             </h1>
-            <p className="text-xs text-gray-600 hidden md:block">
+            <p className="text-xs md:text-sm text-gray-600 hidden md:block mt-0.5">
               Buriram Rajabhat University
             </p>
           </div>

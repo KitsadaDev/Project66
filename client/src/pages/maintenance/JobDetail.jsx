@@ -12,9 +12,12 @@ import {
   Bell,
   Save,
   X,
+  Image as ImageIcon,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { maintenanceAPI } from "../../api";
+import { convertHeicToJpeg } from "../../utils/heicConverter";
+import ImageModal from "../../components/ImageModal";
 
 const JobDetail = () => {
   const { id } = useParams();
@@ -26,6 +29,7 @@ const JobDetail = () => {
   const [scheduledDate, setScheduledDate] = useState("");
   const [completionPhotos, setCompletionPhotos] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
+  const [selectedImageUrl, setSelectedImageUrl] = useState(null);
 
   useEffect(() => {
     fetchJob();
@@ -48,12 +52,22 @@ const JobDetail = () => {
     }
   };
 
-  const handlePhotoUpload = (e) => {
+  const handlePhotoUpload = async (e) => {
     const files = Array.from(e.target.files);
-    setCompletionPhotos((prev) => [...prev, ...files]);
-
-    const newPreviews = files.map((file) => URL.createObjectURL(file));
-    setPreviewUrls((prev) => [...prev, ...newPreviews]);
+    const toastId = toast.info("กำลังประมวลผลรูปภาพ...", { autoClose: false });
+    try {
+      const convertedFiles = await Promise.all(
+        files.map((file) => convertHeicToJpeg(file))
+      );
+      setCompletionPhotos((prev) => [...prev, ...convertedFiles]);
+      const newPreviews = convertedFiles.map((file) => URL.createObjectURL(file));
+      setPreviewUrls((prev) => [...prev, ...newPreviews]);
+    } catch (err) {
+      console.error(err);
+      toast.error("เกิดข้อผิดพลาดในการประมวลผลรูปภาพ");
+    } finally {
+      toast.dismiss(toastId);
+    }
   };
 
   const removePhoto = (index) => {
@@ -64,14 +78,22 @@ const JobDetail = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // In a real app, you would upload photos first to get URLs,
-      // then send the data. This is a simplified example.
+      if (status === "COMPLETED" && completionPhotos.length > 0) {
+        const formData = new FormData();
+        completionPhotos.forEach((file) => {
+          formData.append("completionProof", file);
+        });
+        await maintenanceAPI.uploadCompletion(id, formData);
+      }
+
       await maintenanceAPI.updateStatus(id, {
         status,
         scheduledDate,
       });
 
       toast.success("บันทึกข้อมูลสำเร็จ");
+      setCompletionPhotos([]);
+      setPreviewUrls([]);
       fetchJob();
     } catch (error) {
       toast.error("ไม่สามารถบันทึกข้อมูลได้");
@@ -214,28 +236,80 @@ const JobDetail = () => {
             </div>
 
             {/* Reported Photos */}
-            {job.images && job.images.length > 0 && (
-              <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-3">
-                  รูปภาพที่แจ้ง
-                </h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {job.images.map((img, index) => (
-                    <div
-                      key={index}
-                      className="aspect-square rounded-xl overflow-hidden border border-gray-200"
-                    >
-                      <img
-                        src={img.image_url}
-                        alt={`Problem ${index + 1}`}
-                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer"
-                        onClick={() => window.open(img.image_url, "_blank")}
-                      />
+            {(() => {
+              const requestImages = (job.images || []).filter(
+                (img) => img.image_type !== "completion"
+              );
+              const completionImages = (job.images || []).filter(
+                (img) => img.image_type === "completion"
+              );
+              
+              const makeImageUrl = (imgUrl) => {
+                let url = imgUrl;
+                if (!url.startsWith("http")) {
+                  url = url.startsWith("/")
+                    ? `${import.meta.env.VITE_API_URL || "http://localhost:5000"}${url}`
+                    : `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/${url}`;
+                }
+                return url.replace(/\.(heic|heif)$/i, ".jpg");
+              };
+
+              return (
+                <div className="space-y-6">
+                  {requestImages.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-purple-600 mb-3 flex items-center gap-2">
+                        <ImageIcon size={16} /> รูปภาพแจ้งซ่อม (ก่อนซ่อม)
+                      </h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {requestImages.map((img, index) => {
+                          const imgSrc = makeImageUrl(img.image_url);
+                          return (
+                            <div
+                              key={`req-${index}`}
+                              className="aspect-square rounded-xl overflow-hidden border border-gray-200"
+                            >
+                              <img
+                                src={imgSrc}
+                                alt={`Problem ${index + 1}`}
+                                className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer"
+                                onClick={() => setSelectedImageUrl(imgSrc)}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  ))}
+                  )}
+
+                  {completionImages.length > 0 && (
+                    <div className="border-t border-gray-100 pt-6">
+                      <h4 className="text-sm font-semibold text-green-600 mb-3 flex items-center gap-2">
+                        <ImageIcon size={16} /> รูปภาพการซ่อมเสร็จสิ้น (หลังซ่อม)
+                      </h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {completionImages.map((img, index) => {
+                          const imgSrc = makeImageUrl(img.image_url);
+                          return (
+                            <div
+                              key={`comp-${index}`}
+                              className="aspect-square rounded-xl overflow-hidden border border-gray-200"
+                            >
+                              <img
+                                src={imgSrc}
+                                alt={`Completion ${index + 1}`}
+                                className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer"
+                                onClick={() => setSelectedImageUrl(imgSrc)}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </div>
 
@@ -353,6 +427,13 @@ const JobDetail = () => {
           </div>
         </div>
       </div>
+      
+      {/* Lightbox Modal */}
+      <ImageModal
+        isOpen={!!selectedImageUrl}
+        src={selectedImageUrl}
+        onClose={() => setSelectedImageUrl(null)}
+      />
     </div>
   );
 };
