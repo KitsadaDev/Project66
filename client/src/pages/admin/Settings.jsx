@@ -167,7 +167,7 @@ const Settings = () => {
   }
 
   return (
-    <div>
+    <div className="max-w-3xl mx-auto w-full">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-800">
@@ -179,7 +179,7 @@ const Settings = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-lg border border-purple-100 p-6 max-w-2xl">
+      <div className="bg-white rounded-2xl shadow-lg border border-purple-100 p-6">
         <div className="flex items-center gap-4 mb-8">
           <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600">
             <SettingsIcon size={24} />
@@ -387,7 +387,7 @@ const Settings = () => {
       </div>
 
       {/* Food Court Images Section */}
-      <div className="bg-white rounded-2xl shadow-lg border border-purple-100 p-6 max-w-2xl mt-8">
+      <div className="bg-white rounded-2xl shadow-lg border border-purple-100 p-6 mt-8">
         <div className="flex items-center gap-4 mb-8">
           <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600">
             <ImageIcon size={24} />
@@ -452,7 +452,7 @@ const Settings = () => {
         </div>
       </div>
 
-      <div className="mt-6 p-4 bg-blue-50 rounded-xl border-l-4 border-blue-500 max-w-2xl">
+      <div className="mt-6 p-4 bg-blue-50 rounded-xl border-l-4 border-blue-500">
         <p className="text-xs md:text-sm text-blue-800">
           <strong>หมายเหตุ:</strong>{" "}
           การเปลี่ยนแปลงราคาจะมีผลกับบิลที่สร้างใหม่เท่านั้น
