@@ -12,6 +12,7 @@ model FoodCourt {
   food_court_id Int          @id @default(autoincrement())
   name          String
   total_slots   Int
+  image_url     String?
   rental_slots  RentalSlot[]
 }
 

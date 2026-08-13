@@ -7,9 +7,11 @@ import {
   History,
   AlertTriangle,
   AlertCircle,
+  Image as ImageIcon,
+  Upload
 } from "lucide-react";
 import { toast } from "react-toastify";
-import { settingsAPI } from "../../api";
+import { settingsAPI, foodCourtsAPI } from "../../api";
 
 const Settings = () => {
   const [waterRate, setWaterRate] = useState("");
@@ -21,10 +23,24 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
+  
+  // Food Court Images State
+  const [foodCourts, setFoodCourts] = useState([]);
+  const [uploadingImageId, setUploadingImageId] = useState(null);
 
   useEffect(() => {
     fetchRates();
+    fetchFoodCourts();
   }, []);
+
+  const fetchFoodCourts = async () => {
+    try {
+      const response = await foodCourtsAPI.getAll();
+      setFoodCourts(response.data.data || []);
+    } catch (error) {
+      console.error("Error fetching food courts:", error);
+    }
+  };
 
   const fetchRates = async () => {
     try {
@@ -111,6 +127,34 @@ const Settings = () => {
       toast.error("ไม่สามารถบันทึกได้ กรุณาลองใหม่");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleImageUpload = async (foodCourtId, file) => {
+    if (!file) return;
+    
+    if (!file.type.startsWith('image/')) {
+      toast.error('กรุณาอัปโหลดไฟล์รูปภาพเท่านั้น');
+      return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('ขนาดไฟล์ต้องไม่เกิน 5MB');
+      return;
+    }
+
+    setUploadingImageId(foodCourtId);
+    const formData = new FormData();
+    formData.append("image", file);
+
+    try {
+      await foodCourtsAPI.updateImage(foodCourtId, formData);
+      toast.success("อัปเดตรูปภาพสำเร็จ");
+      fetchFoodCourts();
+    } catch (error) {
+      toast.error("ไม่สามารถอัปเดตรูปภาพได้");
+    } finally {
+      setUploadingImageId(null);
     }
   };
 
@@ -338,6 +382,72 @@ const Settings = () => {
               <History size={14} />
               อัปเดตล่าสุด: {lastUpdated.toLocaleTimeString("th-TH")}
             </span>
+          )}
+        </div>
+      </div>
+
+      {/* Food Court Images Section */}
+      <div className="bg-white rounded-2xl shadow-lg border border-purple-100 p-6 max-w-2xl mt-8">
+        <div className="flex items-center gap-4 mb-8">
+          <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600">
+            <ImageIcon size={24} />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">
+              รูปภาพหน้าปกศูนย์อาหาร
+            </h2>
+            <p className="text-sm text-gray-500">
+              จัดการรูปภาพที่แสดงผลในหน้าแรกของเว็บไซต์
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          {foodCourts.map((fc) => (
+            <div key={fc.food_court_id} className="flex flex-col sm:flex-row gap-4 p-4 rounded-xl border border-gray-100 bg-gray-50/50">
+              <div className="w-full sm:w-48 h-32 rounded-lg bg-gray-200 overflow-hidden flex-shrink-0 relative border border-gray-200 shadow-sm">
+                <img 
+                  src={fc.image_url || `/Food-court-${fc.food_court_id}.png`} 
+                  alt={fc.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => { e.target.src = '/bru-logo.png'; }}
+                />
+                {uploadingImageId === fc.food_court_id && (
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col justify-center flex-1">
+                <h3 className="font-bold text-gray-800">{fc.name}</h3>
+                <p className="text-sm text-gray-500 mb-4">รองรับแผงค้า: {fc.total_slots} ล็อก</p>
+                
+                <div>
+                  <input
+                    type="file"
+                    id={`upload-img-${fc.food_court_id}`}
+                    className="hidden"
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload(fc.food_court_id, e.target.files[0])}
+                    disabled={uploadingImageId === fc.food_court_id}
+                  />
+                  <label
+                    htmlFor={`upload-img-${fc.food_court_id}`}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer shadow-sm ${
+                      uploadingImageId === fc.food_court_id
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 hover:-translate-y-0.5"
+                    }`}
+                  >
+                    <Upload size={16} />
+                    {uploadingImageId === fc.food_court_id ? "กำลังอัปโหลด..." : "เปลี่ยนรูปภาพ"}
+                  </label>
+                </div>
+              </div>
+            </div>
+          ))}
+          {foodCourts.length === 0 && !loading && (
+            <p className="text-center text-gray-500 py-4">ไม่พบข้อมูลศูนย์อาหาร</p>
           )}
         </div>
       </div>

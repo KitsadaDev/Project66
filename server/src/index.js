@@ -19,6 +19,7 @@ const dishwareRoutes = require('./routes/dishware');
 const dishwareTypeRoutes = require('./routes/dishwareTypes');
 const notificationRoutes = require('./routes/notifications'); // Import notification routes
 const shopTypeRoutes = require('./routes/shopTypes');
+const foodCourtRoutes = require('./routes/foodCourts');
 
 const notificationService = require('./services/notificationService');
 const { autoTerminateContracts } = require('./services/contractService');
@@ -39,6 +40,11 @@ async function runMigrations() {
       ADD COLUMN IF NOT EXISTS "water_rate" DOUBLE PRECISION,
       ADD COLUMN IF NOT EXISTS "electricity_rate" DOUBLE PRECISION,
       ADD COLUMN IF NOT EXISTS "grease_trap_fee" DOUBLE PRECISION;
+    `);
+    
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "FoodCourt"
+      ADD COLUMN IF NOT EXISTS "image_url" TEXT;
     `);
     console.log('[Database] Schema is up to date.');
   } catch (err) {
@@ -111,6 +117,7 @@ app.use("/api/dishware", dishwareRoutes);
 app.use("/api/dishware-types", dishwareTypeRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/shop-types", shopTypeRoutes);
+app.use("/api/food-courts", foodCourtRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {

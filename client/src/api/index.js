@@ -101,4 +101,11 @@ export const notificationsAPI = {
   delete: (id) => api.delete(`/notifications/${id}`)
 };
 
+export const foodCourtsAPI = {
+  getAll: () => api.get('/food-courts'),
+  updateImage: (id, formData) => api.put(`/food-courts/${id}/image`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+};
+
 
