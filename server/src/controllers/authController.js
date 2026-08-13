@@ -217,4 +217,47 @@ const updateProfile = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, getProfile, updateProfile };
+// Update Expo push token
+const updatePushToken = async (req, res, next) => {
+  try {
+    const { push_token } = req.body;
+    
+    if (!push_token) {
+      return res.status(400).json({ success: false, message: 'Push token is required.' });
+    }
+
+    await prisma.user.update({
+      where: { user_id: req.user.user_id },
+      data: { push_token }
+    });
+
+    res.json({ success: true, message: 'Push token updated successfully.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Change password (for tenant first login force-change)
+const changePassword = async (req, res, next) => {
+  try {
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const password_hash = await bcrypt.hash(newPassword, salt);
+
+    await prisma.user.update({
+      where: { user_id: req.user.user_id },
+      data: { password_hash, must_change_password: false }
+    });
+
+    res.json({ success: true, message: 'เปลี่ยนรหัสผ่านสำเร็จ' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { register, login, getProfile, updateProfile, updatePushToken, changePassword };

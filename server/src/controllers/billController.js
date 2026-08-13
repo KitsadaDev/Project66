@@ -154,12 +154,21 @@ const createBill = async (req, res, next) => {
       grease_trap_fee: custom_grease_trap_fee
     } = req.body;
 
+    if (!slot_id || !billing_month || !dueDate) {
+      return res.status(400).json({ success: false, message: 'Missing required fields (slot_id, billing_month, dueDate).' });
+    }
+
+    if (isNaN(new Date(billing_month).getTime()) || isNaN(new Date(dueDate).getTime())) {
+      return res.status(400).json({ success: false, message: 'Invalid date format.' });
+    }
+
     // Find active contract for this slot
     const contract = await prisma.rentalContract.findFirst({
       where: { 
         slot_id: parseInt(slot_id),
         status: 'ACTIVE'
-      }
+      },
+      include: { slot: true }
     });
 
     if (!contract) {
@@ -173,7 +182,11 @@ const createBill = async (req, res, next) => {
     if (greaseTrapFee === null) {
       const greaseTrapSetting = await prisma.systemSetting.findUnique({ where: { setting_key: 'GREASE_TRAP_FEE' } });
       const baseGreaseTrapFee = parseFloat(greaseTrapSetting?.setting_value || '500');
-      greaseTrapFee = contract.menuType === 'ของคาว' ? baseGreaseTrapFee : 0;
+      
+      const targetSlots = ['A1','A2','A3','A4','A5','A6','A7','A8','A9','A10','A11','B1','B2','B3','B4','B5','B6','B7','B8'];
+      const isTargetSlot = contract.slot && targetSlots.includes(contract.slot.slot_number);
+      
+      greaseTrapFee = (contract.menuType === 'ของคาว' || isTargetSlot) ? baseGreaseTrapFee : 0;
     }
 
     const total_amount = parseFloat(rent_amount) + parseFloat(water_cost) + parseFloat(electricity_cost) + greaseTrapFee;
@@ -223,6 +236,10 @@ const updateBill = async (req, res, next) => {
     const { id } = req.params;
     const { water_cost, electricity_cost, due_date, status } = req.body;
 
+    if (due_date && isNaN(new Date(due_date).getTime())) {
+      return res.status(400).json({ success: false, message: 'Invalid date format.' });
+    }
+
     const existing = await prisma.monthlyExpense.findUnique({ where: { expense_id: parseInt(id) } });
     if (!existing) {
       return res.status(404).json({ success: false, message: 'Expense not found.' });
@@ -257,9 +274,18 @@ const uploadPaymentProof = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const expense = await prisma.monthlyExpense.findUnique({ where: { expense_id: parseInt(id) } });
+    const expense = await prisma.monthlyExpense.findUnique({ 
+      where: { expense_id: parseInt(id) },
+      include: { contract: true }
+    });
+    
     if (!expense) {
       return res.status(404).json({ success: false, message: 'Expense not found.' });
+    }
+
+    // IDOR prevention: Tenant can only upload slips for their own bills
+    if (req.user.role === 'TENANT' && expense.contract.tenant_id !== req.user.user_id) {
+      return res.status(403).json({ success: false, message: 'Access denied. You can only upload slips for your own bills.' });
     }
 
     if (!req.file) {
@@ -391,7 +417,8 @@ const calculateAmount = async (req, res, next) => {
     }
 
     const contract = await prisma.rentalContract.findFirst({
-      where: { slot_id: parseInt(slot_id), status: 'ACTIVE' }
+      where: { slot_id: parseInt(slot_id), status: 'ACTIVE' },
+      include: { slot: true }
     });
     
     if (!contract) {
@@ -433,10 +460,14 @@ const calculateAmount = async (req, res, next) => {
     const electricCost = electricMeter ? electricMeter.total_cost : 0;
     const rent = contract.monthly_rent;
     
-    // Fetch global grease trap fee, but only apply if menuType is 'ของคาว'
+    // Fetch global grease trap fee, but also apply if slot is in target zones
     const greaseTrapSetting = await prisma.systemSetting.findUnique({ where: { setting_key: 'GREASE_TRAP_FEE' } });
     const baseGreaseTrapFee = parseFloat(greaseTrapSetting?.setting_value || '500');
-    const greaseTrapFee = contract.menuType === 'ของคาว' ? baseGreaseTrapFee : 0;
+    
+    const targetSlots = ['A1','A2','A3','A4','A5','A6','A7','A8','A9','A10','A11','B1','B2','B3','B4','B5','B6','B7','B8'];
+    const isTargetSlot = contract.slot && targetSlots.includes(contract.slot.slot_number);
+    
+    const greaseTrapFee = (contract.menuType === 'ของคาว' || isTargetSlot) ? baseGreaseTrapFee : 0;
 
     const total = rent + waterCost + electricCost + greaseTrapFee;
 

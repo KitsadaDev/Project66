@@ -18,6 +18,7 @@ const settingsRoutes = require("./routes/settings");
 const dishwareRoutes = require('./routes/dishware');
 const dishwareTypeRoutes = require('./routes/dishwareTypes');
 const notificationRoutes = require('./routes/notifications'); // Import notification routes
+const shopTypeRoutes = require('./routes/shopTypes');
 
 const notificationService = require('./services/notificationService');
 const { autoTerminateContracts } = require('./services/contractService');
@@ -109,6 +110,7 @@ app.use("/api/settings", settingsRoutes);
 app.use("/api/dishware", dishwareRoutes);
 app.use("/api/dishware-types", dishwareTypeRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/shop-types", shopTypeRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {
