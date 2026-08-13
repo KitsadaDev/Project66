@@ -33,6 +33,7 @@ router.get('/utility-rates', authenticate, async (req, res) => {
     const greaseTrap = await prisma.systemSetting.findUnique({ where: { setting_key: 'GREASE_TRAP_FEE' } });
     const lateRent = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_RENT_FINE' } });
     const lateUtility = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_UTILITY_FINE' } });
+    const lateFineDelayDays = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_FINE_DELAY_DAYS' } });
 
     res.json({
       success: true,
@@ -41,7 +42,8 @@ router.get('/utility-rates', authenticate, async (req, res) => {
         electricRatePerUnit: parseFloat(electricRate?.setting_value || '7'),
         greaseTrapFee: parseFloat(greaseTrap?.setting_value || '500'),
         lateRentFine: parseFloat(lateRent?.setting_value || '100'),
-        lateUtilityFine: parseFloat(lateUtility?.setting_value || '50')
+        lateUtilityFine: parseFloat(lateUtility?.setting_value || '50'),
+        lateFineDelayDays: parseInt(lateFineDelayDays?.setting_value || '0', 10)
       }
     });
   } catch (error) {
@@ -86,7 +88,7 @@ router.put('/', authenticate, authorize('ADMIN'), async (req, res) => {
 // Update utility rates (Admin only)
 router.put('/utility-rates', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
-    const { waterRatePerUnit, electricRatePerUnit, greaseTrapFee, lateRentFine, lateUtilityFine } = req.body;
+    const { waterRatePerUnit, electricRatePerUnit, greaseTrapFee, lateRentFine, lateUtilityFine, lateFineDelayDays } = req.body;
 
     const updates = [];
 
@@ -170,8 +172,24 @@ router.put('/utility-rates', authenticate, authorize('ADMIN'), async (req, res) 
       );
     }
 
+    if (lateFineDelayDays !== undefined) {
+      updates.push(
+        prisma.systemSetting.upsert({
+          where: { setting_key: 'LATE_FINE_DELAY_DAYS' },
+          update: { setting_value: String(lateFineDelayDays), updated_by: req.user.user_id },
+          create: {
+            setting_key: 'LATE_FINE_DELAY_DAYS',
+            setting_value: String(lateFineDelayDays),
+            description: 'จำนวนวันอนุโลมจ่ายล่าช้าก่อนเริ่มปรับ (วัน)',
+            data_type: 'number',
+            updated_by: req.user.user_id
+          }
+        })
+      );
+    }
+
     await prisma.$transaction(updates);
-    res.json({ success: true, message: 'Utility rates updated successfully', data: { waterRatePerUnit, electricRatePerUnit, greaseTrapFee, lateRentFine, lateUtilityFine } });
+    res.json({ success: true, message: 'Utility rates updated successfully', data: { waterRatePerUnit, electricRatePerUnit, greaseTrapFee, lateRentFine, lateUtilityFine, lateFineDelayDays } });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to update utility rates' });
   }

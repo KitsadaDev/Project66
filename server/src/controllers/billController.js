@@ -8,9 +8,11 @@ const computeLateFees = async (expenses) => {
 
   const lateRent = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_RENT_FINE' } });
   const lateUtility = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_UTILITY_FINE' } });
+  const delaySetting = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_FINE_DELAY_DAYS' } });
   
   const rentFine = parseFloat(lateRent?.setting_value || '100');
   const utilityFine = parseFloat(lateUtility?.setting_value || '50');
+  const delayDays = parseInt(delaySetting?.setting_value || '0', 10);
   const totalDailyFine = rentFine + utilityFine;
 
   const now = new Date();
@@ -24,7 +26,7 @@ const computeLateFees = async (expenses) => {
       if (now > due) {
         const diffTime = now - due;
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        const lateFee = diffDays * totalDailyFine;
+        const lateFee = diffDays > delayDays ? (diffDays - delayDays) * totalDailyFine : 0;
         
         return {
           ...expense,
