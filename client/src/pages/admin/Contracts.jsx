@@ -102,12 +102,29 @@ const AdminContracts = () => {
 
   const filteredContracts = contracts.filter((c) => {
     const searchLower = search.toLowerCase();
-    return (
-      c.contract_number?.toLowerCase().includes(searchLower) ||
+    
+    // 1. Status Filter
+    if (statusFilter !== "ALL" && c.status !== statusFilter) {
+      return false;
+    }
+
+    // 2. Search Filter
+    const matchesSearch = c.contract_number?.toLowerCase().includes(searchLower) ||
       c.tenant?.first_name?.toLowerCase().includes(searchLower) ||
       c.tenant?.last_name?.toLowerCase().includes(searchLower) ||
-      c.slot?.slot_number?.toLowerCase().includes(searchLower)
-    );
+      c.slot?.slot_number?.toLowerCase().includes(searchLower);
+      
+    if (!matchesSearch) return false;
+
+    // 3. Hide old terminated contracts if the tenant has an active contract (only when viewing ALL)
+    if (statusFilter === "ALL" && (c.status === "TERMINATED" || c.status === "EXPIRED")) {
+      const hasActive = contracts.some(
+        (other) => other.tenant?.user_id === c.tenant?.user_id && (other.status === "ACTIVE" || other.status === "PENDING_TERMINATION")
+      );
+      if (hasActive) return false;
+    }
+
+    return true;
   });
 
   return (
