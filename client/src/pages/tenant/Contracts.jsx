@@ -7,6 +7,7 @@ import {
   CheckCircle,
   Info,
   CreditCard,
+  X,
 } from "lucide-react";
 import { formatPhoneNumber } from "../../utils/formatters";
 import { contractsAPI, stallsAPI } from "../../api";
@@ -14,6 +15,7 @@ import { contractsAPI, stallsAPI } from "../../api";
 const Contracts = () => {
   const [contract, setContract] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showImageModal, setShowImageModal] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -21,9 +23,11 @@ const Contracts = () => {
 
   const fetchData = async () => {
     try {
-      // Fetch active contracts for this tenant
-      const response = await contractsAPI.getAll({ status: "ACTIVE" });
-      const myContract = response.data.data?.[0]; // Assuming one active contract per tenant
+      // Fetch all contracts for this tenant
+      const response = await contractsAPI.getAll();
+      const contracts = response.data.data || [];
+      // Find the first contract that is ACTIVE or PENDING_TERMINATION
+      const myContract = contracts.find(c => c.status === "ACTIVE" || c.status === "PENDING_TERMINATION");
 
       if (myContract) {
         // Calculate duration
@@ -56,6 +60,21 @@ const Contracts = () => {
     });
   };
 
+  const handleRequestTermination = async () => {
+    if (window.confirm("คุณต้องการส่งคำขอยกเลิกสัญญาเช่าใช่หรือไม่?\nหากยืนยัน แอดมินจะทำการตรวจสอบและอนุมัติ")) {
+      try {
+        setLoading(true);
+        await contractsAPI.requestTermination(contract.contract_id);
+        toast.success("ส่งคำขอยกเลิกสัญญาเรียบร้อยแล้ว");
+        fetchData(); // Refresh to get updated status
+      } catch (error) {
+        toast.error(error.response?.data?.message || "ไม่สามารถส่งคำขอได้");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -73,9 +92,22 @@ const Contracts = () => {
           </h1>
           <p className="text-gray-500 text-sm">รายละเอียดสัญญาเช่าล็อคของคุณ</p>
         </div>
-        {contract && (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
-            <CheckCircle size={16} /> สัญญามีผลบังคับ
+        {contract && contract.status === 'ACTIVE' && (
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
+              <CheckCircle size={16} /> สัญญามีผลบังคับ
+            </span>
+            <button
+              onClick={handleRequestTermination}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded-full text-sm font-semibold transition-colors shadow-sm"
+            >
+              <Info size={16} /> ขอยกเลิกสัญญา
+            </button>
+          </div>
+        )}
+        {contract && contract.status === 'PENDING_TERMINATION' && (
+          <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-yellow-100 text-yellow-800 rounded-full text-sm font-bold shadow-sm">
+            <Clock size={16} /> รอดำเนินการยกเลิก
           </span>
         )}
       </div>
@@ -96,14 +128,12 @@ const Contracts = () => {
               </div>
             </div>
             {contract.contractImage && (
-              <a
-                href={contract.contractImage}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hidden sm:flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-medium text-sm rounded-xl transition-colors shadow-sm"
+              <button
+                onClick={() => setShowImageModal(true)}
+                className="hidden sm:flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-medium text-sm rounded-xl transition-colors shadow-sm cursor-pointer"
               >
-                <FileText size={16} /> ดูสัญญาฉบับจริง ↗
-              </a>
+                <FileText size={16} /> ดูสัญญาฉบับจริง
+              </button>
             )}
           </div>
 
@@ -113,14 +143,12 @@ const Contracts = () => {
                 <FileText size={20} className="text-purple-600 shrink-0" />
                 <span className="text-xs font-semibold text-gray-800">สัญญาฉบับจริง</span>
               </div>
-              <a
-                href={contract.contractImage}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3 py-1.5 bg-purple-600 text-white font-medium text-xs rounded-lg"
+              <button
+                onClick={() => setShowImageModal(true)}
+                className="px-3 py-1.5 bg-purple-600 text-white font-medium text-xs rounded-lg cursor-pointer"
               >
-                เปิดดู ↗
-              </a>
+                เปิดดู
+              </button>
             </div>
           )}
 
@@ -305,6 +333,29 @@ const Contracts = () => {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
           <FileText size={48} className="mx-auto text-gray-300 mb-4" />
           <p className="text-gray-400">ไม่พบข้อมูลสัญญาเช่า</p>
+        </div>
+      )}
+
+      {/* Image Modal */}
+      {showImageModal && contract?.contractImage && (
+        <div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowImageModal(false)}
+        >
+          <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center">
+            <button
+              onClick={() => setShowImageModal(false)}
+              className="absolute -top-12 right-0 p-2 text-white/70 hover:text-white transition-colors"
+            >
+              <X size={32} />
+            </button>
+            <img 
+              src={contract.contractImage} 
+              alt="Contract" 
+              className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
         </div>
       )}
     </div>

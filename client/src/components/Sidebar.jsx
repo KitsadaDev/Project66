@@ -14,15 +14,16 @@ import {
   Gauge,
   Settings,
   FileBarChart,
-  ShoppingBag,
   Bell,
   LogOut,
   Lock,
   Eye,
   EyeOff,
+  Ban,
 } from "lucide-react";
 import { useAuthStore, useUIStore } from "../store";
-import { maintenanceAPI, notificationsAPI, dishwareAPI, authAPI } from "../api";
+import { maintenanceAPI, notificationsAPI, authAPI } from "../api";
+
 import { toast } from "react-toastify";
 
 const Sidebar = () => {
@@ -83,9 +84,8 @@ const Sidebar = () => {
     setPendingRepairsCount,
     unreadNotificationsCount,
     setUnreadNotificationsCount,
-    pendingDishwareCount,
-    setPendingDishwareCount,
   } = useUIStore();
+
 
   useEffect(() => {
     if (user?.role === "TENANT") {
@@ -117,21 +117,7 @@ const Sidebar = () => {
     ) {
       fetchPendingRepairs();
     }
-    if (user?.role === "ADMIN" || user?.role === "EXECUTIVE") {
-      fetchPendingDishware();
-    }
   }, [user]);
-
-  const fetchPendingDishware = async () => {
-    try {
-      const response = await dishwareAPI.getAll({ status: "PENDING" });
-      const items = response.data.data || [];
-      const pendingCount = items.filter((d) => d.status === "PENDING").length;
-      setPendingDishwareCount(pendingCount);
-    } catch (error) {
-      console.error("Failed to fetch pending dishware count:", error);
-    }
-  };
 
   const fetchPendingRepairs = async () => {
     try {
@@ -151,7 +137,6 @@ const Sidebar = () => {
       { to: "/tenant/contracts", icon: FileText, label: "สัญญาเช่า" },
       { to: "/tenant/payment-history", icon: History, label: "ประวัติชำระ" },
       { to: "/tenant/stall-status", icon: Store, label: "สถานะล็อค" },
-      { to: "/tenant/dishware", icon: ShoppingBag, label: "ถ้วยชาม" },
       { to: "/tenant/report-repair", icon: Wrench, label: "แจ้งซ่อม" },
       { to: "/tenant/track-repairs", icon: ClipboardList, label: "ติดตามซ่อม" },
       {
@@ -164,16 +149,12 @@ const Sidebar = () => {
     ADMIN: [
       { to: "/admin", icon: LayoutDashboard, label: "หน้าแรก", end: true },
       { to: "/admin/tenants", icon: Users, label: "ข้อมูลผู้เช่า" },
+      { to: "/admin/mechanics", icon: Wrench, label: "ข้อมูลช่าง" },
       { to: "/admin/contracts", icon: FileText, label: "ข้อมูลสัญญาเช่า" },
+      { to: "/admin/cancel-contracts", icon: Ban, label: "การยกเลิกสัญญา" },
       { to: "/admin/stalls", icon: Building2, label: "ข้อมูลสถานะแผงค้า" },
       { to: "/admin/meter-recording", icon: Gauge, label: "บันทึกมิเตอร์" },
       { to: "/admin/bills", icon: Receipt, label: "จัดการบิล" },
-      {
-        to: "/admin/dishware",
-        icon: ShoppingBag,
-        label: "ข้อมูลภาชนะ",
-        badge: pendingDishwareCount,
-      },
       { to: "/admin/reports", icon: FileBarChart, label: "รายงานสรุป" },
       {
         to: "/admin/repairs",

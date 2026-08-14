@@ -70,6 +70,94 @@ const getAllUsers = async (req, res, next) => {
   }
 };
 
+// Create user (Admin only)
+const createUser = async (req, res, next) => {
+  try {
+    const {
+      username,
+      password,
+      first_name,
+      last_name,
+      email,
+      phone,
+      role,
+      title,
+      address_line,
+      subdistrict,
+      district,
+      province,
+      postal_code
+    } = req.body;
+
+    // Validate required fields
+    if (!username || !password || !first_name || !role) {
+      return res.status(400).json({ success: false, message: 'กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน' });
+    }
+
+    // Check if user exists
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { username },
+          { email: email || undefined }
+        ]
+      }
+    });
+
+    if (existingUser) {
+      if (existingUser.username === username) {
+        return res.status(400).json({ success: false, message: 'Username นี้ถูกใช้งานแล้ว' });
+      }
+      if (email && existingUser.email === email) {
+        return res.status(400).json({ success: false, message: 'อีเมลนี้ถูกใช้งานแล้ว' });
+      }
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const password_hash = await bcrypt.hash(password, salt);
+    let profile_image_url = null;
+
+    if (req.file) {
+      profile_image_url = req.file.path;
+    }
+
+    const newUser = await prisma.user.create({
+      data: {
+        username,
+        password_hash,
+        first_name,
+        last_name: last_name || null,
+        email: email || null,
+        phone: phone || null,
+        role,
+        title: title || null,
+        address_line: address_line || null,
+        subdistrict: subdistrict || null,
+        district: district || null,
+        province: province || null,
+        postal_code: postal_code || null,
+        profile_image_url,
+        must_change_password: true
+      },
+      select: {
+        user_id: true,
+        username: true,
+        email: true,
+        first_name: true,
+        last_name: true,
+        role: true,
+        phone: true,
+        profile_image_url: true,
+        must_change_password: true
+      }
+    });
+
+    res.status(201).json({ success: true, message: 'สร้างผู้ใช้งานสำเร็จ', data: newUser });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Get user by ID
 const getUserById = async (req, res, next) => {
   try {
@@ -228,4 +316,11 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
-module.exports = { getAllUsers, getUserById, updateUser, deleteUser, resetPassword };
+module.exports = {
+  getAllUsers,
+  createUser,
+  getUserById,
+  updateUser,
+  deleteUser,
+  resetPassword
+};

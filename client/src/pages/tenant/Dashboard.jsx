@@ -217,17 +217,7 @@ const TenantDashboard = () => {
             </span>
           </Link>
 
-          <Link
-            to="/tenant/dishware"
-            className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100 group gap-4 hover:-translate-y-1"
-          >
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-amber-50 text-amber-500 group-hover:scale-110 transition-transform shadow-sm">
-              <ShoppingBag size={28} />
-            </div>
-            <span className="font-semibold text-gray-700 group-hover:text-amber-600">
-              ถ้วยชาม
-            </span>
-          </Link>
+
         </div>
       </div>
     </div>

@@ -55,12 +55,48 @@ const AdminContracts = () => {
             <XCircle size={14} /> ยกเลิกแล้ว
           </span>
         );
+      case "PENDING_TERMINATION":
+        return (
+          <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-yellow-100 text-yellow-800 flex items-center gap-1 w-fit">
+            <Clock size={14} /> ขอยกเลิกสัญญา
+          </span>
+        );
       default:
         return (
           <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-gray-100 text-gray-700 flex items-center gap-1 w-fit">
             ไม่ทราบสถานะ
           </span>
         );
+    }
+  };
+
+  const handleApproveTermination = async (contractId) => {
+    if (window.confirm("ยืนยันการอนุมัติยกเลิกสัญญาเช่าใช่หรือไม่?\nหากอนุมัติ สัญญาจะสิ้นสุดและแผงค้าจะว่างลงทันที")) {
+      try {
+        setLoading(true);
+        await contractsAPI.terminate(contractId);
+        toast.success("อนุมัติการยกเลิกสัญญาเรียบร้อยแล้ว");
+        fetchContracts();
+      } catch (error) {
+        toast.error("เกิดข้อผิดพลาดในการอนุมัติ");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleRejectTermination = async (contractId) => {
+    if (window.confirm("คุณต้องการปฏิเสธคำขอยกเลิกสัญญานี้ใช่หรือไม่?")) {
+      try {
+        setLoading(true);
+        await contractsAPI.rejectTermination(contractId);
+        toast.success("ปฏิเสธคำขอเรียบร้อยแล้ว");
+        fetchContracts();
+      } catch (error) {
+        toast.error("เกิดข้อผิดพลาดในการปฏิเสธคำขอ");
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -119,6 +155,7 @@ const AdminContracts = () => {
             >
               <option value="ALL">สถานะทั้งหมด</option>
               <option value="ACTIVE">ทำสัญญาอยู่</option>
+              <option value="PENDING_TERMINATION">รอยกเลิกสัญญา</option>
               <option value="EXPIRED">หมดอายุ</option>
               <option value="TERMINATED">ยกเลิก/คืนพื้นที่</option>
             </select>
@@ -234,7 +271,25 @@ const AdminContracts = () => {
                       </span>
                     </td>
                     <td className="py-4 px-6">
-                      {getStatusBadge(contract.status)}
+                      <div className="flex flex-col gap-2">
+                        {getStatusBadge(contract.status)}
+                        {contract.status === "PENDING_TERMINATION" && (
+                          <div className="flex items-center gap-2 mt-1">
+                            <button
+                              onClick={() => handleApproveTermination(contract.contract_id)}
+                              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
+                            >
+                              อนุมัติ
+                            </button>
+                            <button
+                              onClick={() => handleRejectTermination(contract.contract_id)}
+                              className="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-xs font-semibold transition-colors"
+                            >
+                              ปฏิเสธ
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

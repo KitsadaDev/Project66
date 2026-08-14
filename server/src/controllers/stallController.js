@@ -158,7 +158,7 @@ const updateSlot = async (req, res, next) => {
             start_date: new Date(),
             end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
             monthly_rent: updatedSlot.rent,
-            deposit_amount: updatedSlot.rent * 2,
+            deposit_amount: updatedSlot.rent * 3,
             menuType: menuType || null,
             status: 'ACTIVE'
           }
@@ -200,15 +200,22 @@ const deleteSlot = async (req, res, next) => {
 const recordMeterReading = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { waterMeter, electricMeter } = req.body;
+    const { waterMeter, electricMeter, waterMeterNumber, electricMeterNumber } = req.body;
 
     const slot = await prisma.rentalSlot.findUnique({ where: { slot_id: parseInt(id) } });
     if (!slot) {
       return res.status(404).json({ success: false, message: 'Slot not found.' });
     }
 
-    const waterPrice = 15; // Default unit price, adjust as needed
-    const electricPrice = 8; // Default unit price, adjust as needed
+    // ดึงราคาจาก SystemSetting (fallback เป็น default ถ้าไม่มี)
+    const [waterSetting, electricSetting] = await Promise.all([
+      prisma.systemSetting.findUnique({ where: { setting_key: 'WATER_RATE_PER_UNIT' } }),
+      prisma.systemSetting.findUnique({ where: { setting_key: 'ELECTRIC_RATE_PER_UNIT' } })
+    ]);
+    const waterPrice = parseFloat(waterSetting?.setting_value || '14');
+    const electricPrice = parseFloat(electricSetting?.setting_value || '6');
+
+    const results = {};
 
     // Process Water Meter
     if (waterMeter !== undefined && waterMeter !== '') {
@@ -220,10 +227,11 @@ const recordMeterReading = async (req, res, next) => {
       const prevWater = lastWater ? parseFloat(lastWater.current_reading) : 0;
       const usedWater = Math.max(0, currWater - prevWater);
 
-      await prisma.utilityMeter.create({
+      const record = await prisma.utilityMeter.create({
         data: {
           slot_id: parseInt(id),
           meter_type: 'WATER',
+          meter_number: waterMeterNumber || null,
           previous_reading: prevWater,
           current_reading: currWater,
           unit_used: usedWater,
@@ -232,6 +240,7 @@ const recordMeterReading = async (req, res, next) => {
           recorded_by: req.user.user_id
         }
       });
+      results.water = record;
     }
 
     // Process Electric Meter
@@ -244,10 +253,11 @@ const recordMeterReading = async (req, res, next) => {
       const prevElectric = lastElectric ? parseFloat(lastElectric.current_reading) : 0;
       const usedElectric = Math.max(0, currElectric - prevElectric);
 
-      await prisma.utilityMeter.create({
+      const record = await prisma.utilityMeter.create({
         data: {
           slot_id: parseInt(id),
           meter_type: 'ELECTRICITY',
+          meter_number: electricMeterNumber || null,
           previous_reading: prevElectric,
           current_reading: currElectric,
           unit_used: usedElectric,
@@ -256,9 +266,10 @@ const recordMeterReading = async (req, res, next) => {
           recorded_by: req.user.user_id
         }
       });
+      results.electricity = record;
     }
 
-    res.status(201).json({ success: true, message: 'Meter readings recorded successfully.' });
+    res.status(201).json({ success: true, message: 'บันทึกมิเตอร์สำเร็จ', data: results });
   } catch (error) {
     next(error);
   }

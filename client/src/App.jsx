@@ -10,7 +10,6 @@ import DashboardLayout from "./layouts/DashboardLayout";
 
 // Auth Pages
 import Login from "./pages/auth/Login";
-import Register from "./pages/auth/Register";
 import Home from "./pages/Home";
 
 // Tenant Pages
@@ -21,21 +20,21 @@ import PaymentHistory from "./pages/tenant/PaymentHistory";
 import StallStatus from "./pages/tenant/StallStatus";
 import ReportRepair from "./pages/tenant/ReportRepair";
 import TrackRepairs from "./pages/tenant/TrackRepairs";
-import TenantDishware from "./pages/tenant/Dishware";
 import Notifications from "./pages/tenant/Notifications";
 import UploadBill from "./pages/tenant/UploadBill";
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/Dashboard";
 import Tenants from "./pages/admin/Tenants";
+import AdminMechanics from "./pages/admin/Mechanics";
 import MeterRecording from "./pages/admin/MeterRecording";
 import Stalls from "./pages/admin/Stalls";
 import AdminRepairs from "./pages/admin/Repairs";
 import AdminSettings from "./pages/admin/Settings";
 import AdminBills from "./pages/admin/Bills";
 import AdminReports from "./pages/admin/Reports";
-import AdminDishware from "./pages/admin/Dishware";
 import AdminContracts from "./pages/admin/Contracts";
+import AdminCancelContracts from "./pages/admin/CancelContracts";
 
 // Maintenance Pages
 import MaintenanceDashboard from "./pages/maintenance/Dashboard";
@@ -103,7 +102,6 @@ function App() {
       <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
 
         {/* Tenant Routes */}
         <Route
@@ -119,7 +117,6 @@ function App() {
           <Route path="contracts" element={<Contracts />} />
           <Route path="payment-history" element={<PaymentHistory />} />
           <Route path="stall-status" element={<StallStatus />} />
-          <Route path="dishware" element={<TenantDishware />} />
           <Route path="report-repair" element={<ReportRepair />} />
           <Route path="track-repairs" element={<TrackRepairs />} />
           <Route path="notifications" element={<Notifications />} />
@@ -137,14 +134,15 @@ function App() {
         >
           <Route index element={<AdminDashboard />} />
           <Route path="tenants" element={<Tenants />} />
+          <Route path="mechanics" element={<AdminMechanics />} />
           <Route path="meter-recording" element={<MeterRecording />} />
           <Route path="stalls" element={<Stalls />} />
           <Route path="bills" element={<AdminBills />} />
-          <Route path="dishware" element={<AdminDishware />} />
           <Route path="reports" element={<AdminReports />} />
           <Route path="repairs" element={<AdminRepairs />} />
           <Route path="settings" element={<AdminSettings />} />
           <Route path="contracts" element={<AdminContracts />} />
+          <Route path="cancel-contracts" element={<AdminCancelContracts />} />
         </Route>
 
         {/* Maintenance Routes */}

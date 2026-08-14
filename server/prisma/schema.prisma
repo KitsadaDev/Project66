@@ -35,8 +35,6 @@ model User {
   must_change_password             Boolean                 @default(false)
   push_token                       String?
   profile_image_url                String?
-  daily_dishware_usages            DailyDishwareUsage[]    @relation("RecordedByUser")
-  daily_dishware_reviewed          DailyDishwareUsage[]    @relation("ReviewedByUser")
   maintenance_assignments_by       MaintenanceAssignment[] @relation("AssignedByUser")
   maintenance_assignments_assigned MaintenanceAssignment[] @relation("AssignedToUser")
   maintenance_requests             MaintenanceRequest[]    @relation("TenantRequests")
@@ -59,6 +57,8 @@ model RentalSlot {
   rental_contracts     RentalContract[]
   food_court           FoodCourt            @relation(fields: [food_court_id], references: [food_court_id])
   utility_meters       UtilityMeter[]
+
+  @@unique([food_court_id, slot_number])
 }
 
 model RentalContract {
@@ -83,7 +83,6 @@ model RentalContract {
   receiptDate           DateTime?
   receiptNumber         String?
   contractImage         String?
-  daily_dishware_usages DailyDishwareUsage[]
   monthly_expenses      MonthlyExpense[]
   slot                  RentalSlot           @relation(fields: [slot_id], references: [slot_id])
   tenant                User                 @relation("TenantContracts", fields: [tenant_id], references: [user_id])
@@ -210,44 +209,6 @@ model SystemSetting {
   updater       User?    @relation("UpdatedByUser", fields: [updated_by], references: [user_id])
 }
 
-model DishwareType {
-  dishware_type_id Int                 @id @default(autoincrement())
-  name             String
-  category         DishwareCategory
-  size_label       String
-  unit_price       Float
-  is_active        Boolean             @default(true)
-  created_at       DateTime            @default(now())
-  order_items      DishwareOrderItem[]
-}
-
-model DailyDishwareUsage {
-  usage_id      Int                 @id @default(autoincrement())
-  contract_id   Int
-  usage_date    DateTime
-  total_cost    Float
-  recorded_by   Int
-  status        DishwareStatus      @default(PENDING)
-  reviewed_by   Int?
-  reviewed_at   DateTime?
-  reject_reason String?
-  created_at    DateTime            @default(now())
-  contract      RentalContract      @relation(fields: [contract_id], references: [contract_id])
-  recorder      User                @relation("RecordedByUser", fields: [recorded_by], references: [user_id])
-  reviewer      User?               @relation("ReviewedByUser", fields: [reviewed_by], references: [user_id])
-  items         DishwareOrderItem[]
-}
-
-model DishwareOrderItem {
-  item_id          Int                @id @default(autoincrement())
-  usage_id         Int
-  dishware_type_id Int
-  quantity         Int
-  unit_price       Float
-  subtotal         Float
-  dishware_type    DishwareType       @relation(fields: [dishware_type_id], references: [dishware_type_id])
-  usage            DailyDishwareUsage @relation(fields: [usage_id], references: [usage_id])
-}
 
 model ShopType {
   shop_type_id        Int      @id @default(autoincrement())
@@ -273,6 +234,7 @@ enum ContractStatus {
   ACTIVE
   EXPIRED
   TERMINATED
+  PENDING_TERMINATION
 }
 
 enum ExpenseStatus {
@@ -291,19 +253,6 @@ enum MaintenanceStatus {
 enum MeterType {
   WATER
   ELECTRICITY
-}
-
-enum DishwareStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
-enum DishwareCategory {
-  PLATE
-  BOWL
-  CUP
-  OTHER
 }
 
 enum NotificationStatus {

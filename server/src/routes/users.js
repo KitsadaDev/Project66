@@ -3,6 +3,7 @@ const router = express.Router();
 const { authenticate, authorize } = require('../middleware/auth');
 const {
   getAllUsers,
+  createUser,
   getUserById,
   updateUser,
   deleteUser,
@@ -16,6 +17,7 @@ router.use(authenticate);
 router.use(authorize('ADMIN', 'EXECUTIVE'));
 
 router.get('/', getAllUsers);
+router.post('/', upload.single('profileImage'), createUser);
 router.get('/:id', getUserById);
 router.put('/:id', upload.single('profileImage'), updateUser);
 router.delete('/:id', deleteUser);

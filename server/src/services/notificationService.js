@@ -62,7 +62,7 @@ const createBillReminder = async (expense) => {
     });
 
     const title = 'แจ้งเตือน: บิลค่าเช่าใกล้ถึงกำหนดชำระ';
-    const message = `บิลรอบเดือน ${month} จำนวน ฿${amount} จะครบกำหนดชำระในอีก 5 วัน (${new Date(expense.due_date).toLocaleDateString('th-TH')})`;
+    const message = `บิลรอบเดือน ${month} จำนวน ฿${amount} จะครบกำหนดชำระในวันที่ 10 (อีก 5 วัน) หากชำระล่าช้าจะมีค่าปรับตามที่ระบุในสัญญา`;
 
     // Check if notification already exists to avoid duplicates
     const existing = await prisma.notification.findFirst({

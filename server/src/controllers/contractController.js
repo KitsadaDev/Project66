@@ -239,10 +239,73 @@ const terminateContract = async (req, res, next) => {
       })
     ]);
 
-    res.json({ success: true, message: 'Contract terminated successfully.' });
+    res.json({ success: true, message: 'อนุมัติการยกเลิกสัญญาเรียบร้อยแล้ว' });
   } catch (error) {
     next(error);
   }
 };
 
-module.exports = { getAllContracts, getContractById, createContract, updateContract, terminateContract };
+// Request Termination (Tenant only)
+const requestTermination = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const contract = await prisma.rentalContract.findUnique({ where: { contract_id: parseInt(id) } });
+    if (!contract) {
+      return res.status(404).json({ success: false, message: 'ไม่พบสัญญาเช่า' });
+    }
+
+    // Verify ownership
+    if (contract.tenant_id !== req.user.user_id) {
+      return res.status(403).json({ success: false, message: 'ไม่มีสิทธิ์ดำเนินการกับสัญญานี้' });
+    }
+
+    if (contract.status !== 'ACTIVE') {
+      return res.status(400).json({ success: false, message: 'สัญญาไม่ได้อยู่ในสถานะที่สามารถยกเลิกได้' });
+    }
+
+    await prisma.rentalContract.update({
+      where: { contract_id: parseInt(id) },
+      data: { status: 'PENDING_TERMINATION' }
+    });
+
+    res.json({ success: true, message: 'ส่งคำขอยกเลิกสัญญาเรียบร้อยแล้ว กรุณารอการอนุมัติ' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Reject Termination (Admin only)
+const rejectTermination = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const contract = await prisma.rentalContract.findUnique({ where: { contract_id: parseInt(id) } });
+    if (!contract) {
+      return res.status(404).json({ success: false, message: 'ไม่พบสัญญาเช่า' });
+    }
+
+    if (contract.status !== 'PENDING_TERMINATION') {
+      return res.status(400).json({ success: false, message: 'สัญญาไม่ได้อยู่ในสถานะรอยกเลิก' });
+    }
+
+    await prisma.rentalContract.update({
+      where: { contract_id: parseInt(id) },
+      data: { status: 'ACTIVE' }
+    });
+
+    res.json({ success: true, message: 'ปฏิเสธคำขอยกเลิกสัญญาเรียบร้อยแล้ว' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { 
+  getAllContracts, 
+  getContractById, 
+  createContract, 
+  updateContract, 
+  terminateContract,
+  requestTermination,
+  rejectTermination
+};

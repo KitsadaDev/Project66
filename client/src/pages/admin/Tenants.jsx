@@ -11,6 +11,7 @@ import {
   Trash2,
   FileText,
   Upload,
+  Camera,
 } from "lucide-react";
 import { formatPhoneNumber } from "../../utils/formatters";
 import { toast } from "react-toastify";
@@ -384,6 +385,19 @@ const Tenants = () => {
     }
   };
 
+  const handleDelete = async (id) => {
+    if (window.confirm("คุณต้องการลบข้อมูลผู้เช่านี้ใช่หรือไม่?")) {
+      try {
+        await usersAPI.delete(id);
+        toast.success("ลบข้อมูลสำเร็จ");
+        fetchData();
+      } catch (error) {
+        console.error(error);
+        toast.error("ไม่สามารถลบข้อมูลได้");
+      }
+    }
+  };
+
   const handleQuickPhotoUpload = async (user_id, file) => {
     if (!file) return;
     setUploadingPhotoId(user_id);
@@ -492,7 +506,7 @@ const Tenants = () => {
           ? existingContract.end_date.split("T")[0]
           : "",
         idCard: existingContract.idCard || "",
-        phone: formatPhoneNumber(existingContract.phone || tenant.phone || ""),
+        phone: existingContract.phone || tenant.phone || "",
         address: existingContract.address || "",
         receiptNumber: existingContract.receiptNumber || "",
         receiptDate: existingContract.receiptDate
@@ -519,11 +533,11 @@ const Tenants = () => {
         });
       } else {
         setAddressObj({
-          houseNoMoo: existingContract.address || "",
-          province: "",
-          district: "",
-          subDistrict: "",
-          zipCode: "",
+          houseNoMoo: existingContract.address || tenant.address_line || "",
+          province: tenant.province || "",
+          district: tenant.district || "",
+          subDistrict: tenant.subdistrict || "",
+          zipCode: tenant.postal_code || "",
         });
       }
     } else {
@@ -540,22 +554,22 @@ const Tenants = () => {
         startDate: today.toISOString().split("T")[0],
         endDate: next3Years.toISOString().split("T")[0],
         idCard: "",
-        phone: formatPhoneNumber(tenant.phone || ""),
+        phone: tenant.phone || "",
         address: "",
         receiptNumber: "",
         receiptDate: "",
-        securityDeposit: tenant.stall.rent ? tenant.stall.rent * 2 : "",
+        securityDeposit: tenant.stall.rent ? tenant.stall.rent * 3 : "",
         menuType: "",
         contractImage: "",
       });
       setContractFile(null);
       setContractFilePreview(null);
       setAddressObj({
-        houseNoMoo: "",
-        province: "",
-        district: "",
-        subDistrict: "",
-        zipCode: "",
+        houseNoMoo: tenant.address_line || "",
+        province: tenant.province || "",
+        district: tenant.district || "",
+        subDistrict: tenant.subdistrict || "",
+        zipCode: tenant.postal_code || "",
       });
     }
     setIsContractModalOpen(true);
@@ -707,9 +721,9 @@ const Tenants = () => {
                               }
                             }}
                           />
-                          {editProfilePreview ? (
+                          {editProfilePreview || tenant.profile_image_url ? (
                             <img
-                              src={editProfilePreview}
+                              src={editProfilePreview || tenant.profile_image_url}
                               alt="Profile"
                               className="w-10 h-10 rounded-full object-cover border-2 border-purple-400 shadow-sm"
                             />
@@ -868,12 +882,22 @@ const Tenants = () => {
                           </button>
                         </>
                       ) : (
-                        <button
-                          onClick={() => handleEdit(tenant)}
-                          className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                        >
-                          <Edit size={18} />
-                        </button>
+                        <>
+                          <button
+                            onClick={() => handleEdit(tenant)}
+                            className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                            title="แก้ไขข้อมูล"
+                          >
+                            <Edit size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(tenant.user_id)}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                            title="ลบข้อมูล"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </>
                       )}
                     </div>
                   </td>
@@ -954,12 +978,12 @@ const Tenants = () => {
                       type="text"
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl"
                       value={contractForm.phone}
-                      maxLength={12}
+                      maxLength={10}
                       onChange={(e) => {
-                        const formatted = formatPhoneNumber(e.target.value);
+                        const unformatted = e.target.value.replace(/\D/g, "");
                         setContractForm({
                           ...contractForm,
-                          phone: formatted,
+                          phone: unformatted,
                         });
                       }}
                     />
@@ -1240,13 +1264,13 @@ const Tenants = () => {
                 <button
                   type="button"
                   onClick={() => setIsContractModalOpen(false)}
-                  className="px-6 py-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+                  className="px-6 py-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
                 >
                   ยกเลิก
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-lg shadow-purple-200 transition-all font-medium"
+                  className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-lg shadow-purple-200 transition-all font-medium cursor-pointer"
                 >
                   บันทึกสัญญา
                 </button>
@@ -1486,7 +1510,7 @@ const Tenants = () => {
                         .filter((s) => s.status === "VACANT")
                         .map((s) => (
                           <option key={s.slot_id} value={s.slot_id}>
-                            {s.slot_number} (ศูนย์ {s.food_court_id}) ({s.size} ตร.ม. - {Number(s.rent).toLocaleString()} บาท)
+                            {s.slot_number} (ศูนย์ {s.food_court_id}) ({s.slot_size} ตร.ม. - {Number(s.rent).toLocaleString()} บาท)
                           </option>
                         ))}
                     </select>
@@ -1554,13 +1578,13 @@ const Tenants = () => {
                     setDistricts([]);
                     setSubdistricts([]);
                   }}
-                  className="px-6 py-2.5 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors text-sm font-medium"
+                  className="px-6 py-2.5 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors text-sm font-medium cursor-pointer"
                 >
                   ยกเลิก
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-lg shadow-purple-200 transition-all text-sm font-medium"
+                  className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-lg shadow-purple-200 transition-all text-sm font-medium cursor-pointer"
                 >
                   บันทึก
                 </button>

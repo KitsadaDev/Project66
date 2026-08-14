@@ -7,7 +7,9 @@ const {
   getContractById,
   createContract,
   updateContract,
-  terminateContract
+  terminateContract,
+  requestTermination,
+  rejectTermination
 } = require('../controllers/contractController');
 
 // All routes require authentication
@@ -19,5 +21,7 @@ router.get('/:id', getContractById);
 router.post('/', authorize('ADMIN'), upload.single('contractFile'), createContract);
 router.put('/:id', authorize('ADMIN'), upload.single('contractFile'), updateContract);
 router.post('/:id/terminate', authorize('ADMIN'), terminateContract);
+router.post('/:id/request-termination', authorize('TENANT'), requestTermination);
+router.post('/:id/reject-termination', authorize('ADMIN'), rejectTermination);
 
 module.exports = router;

@@ -57,12 +57,9 @@ export const useUIStore = create((set) => ({
 
   pendingRepairsCount: 0,
   unreadNotificationsCount: 0,
-  pendingDishwareCount: 0,
-  
+
   setPendingRepairsCount: (count) => set({ pendingRepairsCount: count }),
   setUnreadNotificationsCount: (count) => set({ unreadNotificationsCount: count }),
-  setPendingDishwareCount: (count) => set({ pendingDishwareCount: count }),
 
   decrementPendingRepairs: () => set((state) => ({ pendingRepairsCount: Math.max(0, state.pendingRepairsCount - 1) })),
-  decrementPendingDishware: () => set((state) => ({ pendingDishwareCount: Math.max(0, state.pendingDishwareCount - 1) })),
 }));

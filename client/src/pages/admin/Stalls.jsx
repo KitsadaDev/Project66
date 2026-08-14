@@ -268,9 +268,9 @@ const Stalls = () => {
 
           <div className="min-w-[650px] w-[650px] mx-auto">
             <div style={{ position: "relative", width: 650, height: 540, border: "3px solid #4B5563" }}>
-              {/* ── Stall Column A (A10 down to A1) ── */}
+              {/* ── Stall Column F (F10 down to F1) ── */}
               <div style={{ position: "absolute", top: 24, left: 24, display: "flex", flexDirection: "column", gap: 5 }}>
-                {["A10", "A9", "A8", "A7", "A6", "A5", "A4", "A3", "A2", "A1"].map((id) => (
+                {["F10", "F9", "F8", "F7", "F6", "F5", "F4", "F3", "F2", "F1"].map((id) => (
                   <StallCell key={id} id={id} fixedSize w={44} h={44} />
                 ))}
               </div>

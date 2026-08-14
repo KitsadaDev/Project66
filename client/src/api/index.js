@@ -2,7 +2,7 @@ import api from './axios';
 
 export const authAPI = {
   login: (credentials) => api.post('/auth/login', credentials),
-  register: (userData) => api.post('/auth/register', userData),
+  register: (userData) => api.post('/auth/register', userData, userData instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}),
   getProfile: () => api.get('/auth/me'),
   updateProfile: (data) => api.put('/auth/me', data)
 };
@@ -10,6 +10,9 @@ export const authAPI = {
 export const usersAPI = {
   getAll: (params) => api.get('/users', { params }),
   getById: (id) => api.get(`/users/${id}`),
+  create: (formData) => api.post('/users', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
   update: (id, data) => api.put(`/users/${id}`, data),
   updateWithPhoto: (id, formData) => api.put(`/users/${id}`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
@@ -52,7 +55,9 @@ export const contractsAPI = {
   update: (id, formData) => api.put(`/contracts/${id}`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
-  terminate: (id) => api.post(`/contracts/${id}/terminate`)
+  terminate: (id) => api.post(`/contracts/${id}/terminate`),
+  requestTermination: (id) => api.post(`/contracts/${id}/request-termination`),
+  rejectTermination: (id) => api.post(`/contracts/${id}/reject-termination`)
 };
 
 export const maintenanceAPI = {
@@ -79,21 +84,6 @@ export const settingsAPI = {
   update: (settings) => api.put('/settings', { settings })
 };
 
-export const dishwareAPI = {
-  getAll: (params) => api.get('/dishware', { params }),
-  create: (data) => api.post('/dishware', data),
-  delete: (id) => api.delete(`/dishware/${id}`),
-  getSummary: (params) => api.get('/dishware/summary', { params }),
-  approve: (id) => api.patch(`/dishware/${id}/approve`),
-  reject: (id, data) => api.patch(`/dishware/${id}/reject`, data)
-};
-
-export const dishwareTypeAPI = {
-  getAll: (params) => api.get('/dishware-types', { params }),
-  create: (data) => api.post('/dishware-types', data),
-  update: (id, data) => api.patch(`/dishware-types/${id}`, data),
-  delete: (id) => api.delete(`/dishware-types/${id}`)
-};
 
 export const notificationsAPI = {
   getAll: () => api.get('/notifications'),
