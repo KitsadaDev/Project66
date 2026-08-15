@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
+const { sendPushNotifications } = require('../utils/pushNotification');
 
 // Helper to compute late fees dynamically
 const computeLateFees = async (expenses) => {
@@ -226,7 +227,23 @@ const createBill = async (req, res, next) => {
       // Don't fail the whole request if notification fails
     }
 
-    res.status(201).json({ success: true, message: 'Expense created successfully.', data: expense });
+          // Notify tenant about new bill
+      try {
+        const tenantUser = await prisma.user.findUnique({
+          where: { user_id: contract.tenant_id },
+          select: { push_token: true }
+        });
+        if (tenantUser && tenantUser.push_token) {
+          await sendPushNotifications([tenantUser.push_token], {
+            title: 'มีบิลค่าเช่าใหม่',
+            body: 'กรุณาตรวจสอบบิลและชำระเงินภายในกำหนด',
+            data: { screen: 'expenses', expense_id: expense.expense_id }
+          });
+        }
+      } catch (pushErr) {
+        console.error('[Push] Failed to notify tenant:', pushErr);
+      }
+      res.status(201).json({ success: true, message: 'Expense created successfully.', data: expense });
   } catch (error) {
     next(error);
   }
@@ -306,7 +323,27 @@ const uploadPaymentProof = async (req, res, next) => {
       }
     });
 
-    res.json({ success: true, message: 'Payment slip uploaded.', data: payment });
+          // Notify admins about payment slip
+      try {
+        const admins = await prisma.user.findMany({
+          where: { role: 'ADMIN', push_token: { not: null } },
+          select: { push_token: true }
+        });
+        const adminTokens = admins.map(a => a.push_token).filter(Boolean);
+        const expFull = await prisma.monthlyExpense.findUnique({
+          where: { expense_id: parseInt(id) },
+          include: { contract: { include: { slot: { select: { slot_number: true } } } } }
+        });
+        const slotNum = expFull && expFull.contract && expFull.contract.slot && expFull.contract.slot.slot_number || '';
+        await sendPushNotifications(adminTokens, {
+          title: 'ผู้เช่าแจ้งชำระเงินแล้ว',
+          body: 'ล็อก ' + slotNum + ' โปรดตรวจสอบสลิปการชำระเงิน',
+          data: { screen: 'bills', expense_id: parseInt(id) }
+        });
+      } catch (pushErr) {
+        console.error('[Push] Failed to notify admins:', pushErr);
+      }
+      res.json({ success: true, message: 'Payment slip uploaded.', data: payment });
   } catch (error) {
     next(error);
   }
@@ -340,7 +377,27 @@ const verifyPayment = async (req, res, next) => {
       });
     }
 
-    res.json({ success: true, message: approved ? 'Payment verified.' : 'Payment noted.', data: updatedPayment });
+          // Notify tenant about payment verification
+      try {
+        const expFull = await prisma.monthlyExpense.findUnique({
+          where: { expense_id: payment.expense_id },
+          include: { contract: { include: { tenant: { select: { push_token: true } } } } }
+        });
+        const token = expFull?.contract?.tenant?.push_token;
+        if (token) {
+          const monthStr = expFull.billing_month.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
+          await sendPushNotifications([token], {
+            title: approved ? '✅ ชำระเงินสำเร็จ' : '❌ ชำระเงินไม่ผ่าน',
+            body: approved 
+              ? `บิลเดือน ${monthStr} ได้รับการตรวจสอบแล้ว`
+              : `บิลเดือน ${monthStr} กรุณาตรวจสอบและส่งสลิปใหม่`,
+            data: { screen: 'expenses', expense_id: payment.expense_id }
+          });
+        }
+      } catch (pushErr) {
+        console.error('[Push] Failed to notify tenant on verify:', pushErr);
+      }
+      res.json({ success: true, message: approved ? 'Payment verified.' : 'Payment noted.', data: updatedPayment });
   } catch (error) {
     next(error);
   }

@@ -1,6 +1,7 @@
-const { PrismaClient } = require('@prisma/client');
+﻿const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
+const { sendPushNotifications } = require('../utils/pushNotification');
 
 // Get all maintenance requests (filtered by role)
 const getAllRequests = async (req, res, next) => {
@@ -114,7 +115,23 @@ const createRequest = async (req, res, next) => {
       });
     }
 
-    res.status(201).json({ success: true, message: 'Request submitted successfully.', data: request });
+          // Send push notification to all admins
+      try {
+        const admins = await prisma.user.findMany({
+          where: { role: 'ADMIN', push_token: { not: null } },
+          select: { push_token: true }
+        });
+        const tokens = admins.map(a => a.push_token).filter(Boolean);
+        const slotInfo = await prisma.rentalSlot.findUnique({ where: { slot_id: contract.slot_id }, select: { slot_number: true } });
+        await sendPushNotifications(tokens, {
+          title: 'แจ้งซ่อมใหม่',
+          body: 'ล็อก ' + ((slotInfo && slotInfo.slot_number) || '') + ': ' + title,
+          data: { screen: 'maintenance', request_id: request.request_id }
+        });
+      } catch (pushErr) {
+        console.error('[Push] Failed to notify admins:', pushErr);
+      }
+      res.status(201).json({ success: true, message: 'Request submitted successfully.', data: request });
   } catch (error) {
     next(error);
   }
@@ -197,7 +214,22 @@ const assignStaff = async (req, res, next) => {
       })
     ]);
 
-    res.json({ success: true, message: 'Staff assigned successfully.', data: assignment });
+          // Notify assigned staff
+      try {
+        if (staff.push_token) {
+          const slotInfo = await prisma.rentalSlot.findUnique({
+             where: { slot_id: request.slot_id }, select: { slot_number: true }
+          });
+          await sendPushNotifications([staff.push_token], {
+            title: 'งานมอบหมายใหม่',
+            body: 'คุณได้รับมอบหมายงานซ่อม ล็อก ' + (slotInfo && slotInfo.slot_number || ''),
+            data: { screen: 'maintenance', request_id: request.request_id }
+          });
+        }
+      } catch (pushErr) {
+        console.error('[Push] Failed to notify staff:', pushErr);
+      }
+      res.json({ success: true, message: 'Staff assigned successfully.', data: assignment });
   } catch (error) {
     next(error);
   }
@@ -229,7 +261,51 @@ const updateStatus = async (req, res, next) => {
       })
     ]);
 
-    res.json({ success: true, message: 'Status updated.', data: update });
+    
+    if (req.files && req.files.length > 0) {
+      await prisma.maintenanceImage.createMany({
+        data: req.files.map(file => ({
+          request_id: parseInt(id),
+          image_url: file.path,
+          image_type: 'completion'
+        }))
+      });
+    }
+
+          // Notify admins and tenant about status update
+      try {
+        const admins = await prisma.user.findMany({
+          where: { role: 'ADMIN', push_token: { not: null } },
+          select: { push_token: true }
+        });
+        const tenantUser = await prisma.user.findUnique({
+          where: { user_id: request.tenant_id },
+          select: { push_token: true }
+        });
+        let tokens = admins.map(a => a.push_token);
+        if (tenantUser && tenantUser.push_token) {
+          tokens.push(tenantUser.push_token);
+        }
+        tokens = tokens.filter(Boolean);
+        const slotInfo = await prisma.rentalSlot.findUnique({
+          where: { slot_id: request.slot_id }, select: { slot_number: true }
+        });
+        const statusMap = {
+          'IN_PROGRESS': 'กำลังดำเนินการ',
+          'COMPLETED': 'ซ่อมเสร็จสิ้น',
+          'REJECTED': 'ถูกปฏิเสธ',
+          'PENDING': 'รอดำเนินการ'
+        };
+        const thStatus = statusMap[status] || status;
+        await sendPushNotifications(tokens, {
+          title: 'อัปเดตสถานะงานซ่อม',
+          body: 'ล็อก ' + (slotInfo && slotInfo.slot_number || '') + ' อัปเดตสถานะเป็น: ' + thStatus,
+          data: { screen: 'maintenance', request_id: request.request_id }
+        });
+      } catch (pushErr) {
+        console.error('[Push] Failed to notify admins and tenant:', pushErr);
+      }
+      res.json({ success: true, message: 'Status updated.', data: update });
   } catch (error) {
     next(error);
   }
@@ -304,3 +380,5 @@ module.exports = {
   uploadCompletionProof,
   deleteRequest
 };
+
+

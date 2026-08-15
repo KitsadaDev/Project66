@@ -27,7 +27,7 @@ router.delete('/:id', deleteRequest);
 router.post('/:id/assign', authorize('ADMIN'), assignStaff);
 
 // Staff routes
-router.put('/:id/status', authorize('ADMIN', 'MAINTENANCE'), updateStatus);
+router.put('/:id/status', authorize('ADMIN', 'MAINTENANCE'), upload.array('images', 5), updateStatus);
 router.post('/:id/completion', authorize('MAINTENANCE'), upload.array('completionProof', 5), uploadCompletionProof);
 
 module.exports = router;

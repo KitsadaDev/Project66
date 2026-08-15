@@ -61,31 +61,53 @@ model RentalSlot {
   @@unique([food_court_id, slot_number])
 }
 
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model CancellationRequest {
+  request_id   Int           @id @default(autoincrement())
+  contract_id  Int
+  reason       String        @db.Text
+  note         String?       @db.Text
+  status       RequestStatus @default(PENDING)
+  requested_at DateTime      @default(now())
+  reviewed_at  DateTime?
+
+  contract     RentalContract @relation(fields: [contract_id], references: [contract_id])
+}
+
 model RentalContract {
-  contract_id           Int                  @id @default(autoincrement())
-  slot_id               Int
-  tenant_id             Int
-  contract_number       String               @unique
-  start_date            DateTime
-  end_date              DateTime
-  monthly_rent          Float
-  deposit_amount        Float
-  status                ContractStatus       @default(ACTIVE)
-  created_at            DateTime             @default(now())
-  updated_at            DateTime             @updatedAt
-  address               String?
-  greaseTrapFee         Float                @default(500)
-  idCard                String?
-  lateRentFine          Float?
-  lateUtilityFine       Float?
-  menuType              String?
-  phone                 String?
-  receiptDate           DateTime?
-  receiptNumber         String?
-  contractImage         String?
-  monthly_expenses      MonthlyExpense[]
-  slot                  RentalSlot           @relation(fields: [slot_id], references: [slot_id])
-  tenant                User                 @relation("TenantContracts", fields: [tenant_id], references: [user_id])
+  contract_id      Int              @id @default(autoincrement())
+  slot_id          Int
+  tenant_id        Int
+  contract_number  String           @unique
+  start_date       DateTime
+  end_date         DateTime
+  monthly_rent     Float
+  deposit_amount   Float
+  status           ContractStatus   @default(ACTIVE)
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
+  address          String?
+  greaseTrapFee    Float            @default(500)
+  idCard           String?
+  lateRentFine     Float?
+  lateUtilityFine  Float?
+  menuType         String?
+  phone            String?
+  receiptDate      DateTime?
+  receiptNumber    String?
+  contractImage    String?
+  cancellation_reason       String?
+  cancellation_note         String?
+
+  monthly_expenses MonthlyExpense[]
+  cancellation_requests CancellationRequest[]
+  slot             RentalSlot       @relation(fields: [slot_id], references: [slot_id])
+  tenant           User             @relation("TenantContracts", fields: [tenant_id], references: [user_id])
 }
 
 model UtilityMeter {
@@ -209,7 +231,6 @@ model SystemSetting {
   updater       User?    @relation("UpdatedByUser", fields: [updated_by], references: [user_id])
 }
 
-
 model ShopType {
   shop_type_id        Int      @id @default(autoincrement())
   type_name           String   @unique
@@ -259,3 +280,4 @@ enum NotificationStatus {
   UNREAD
   READ
 }
+

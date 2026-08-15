@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { sendPushNotifications } = require('../utils/pushNotification');
 
 const prisma = new PrismaClient();
 
@@ -70,7 +71,7 @@ const getContractById = async (req, res, next) => {
 const createContract = async (req, res, next) => {
   try {
     const { 
-      slot_id, tenant_id, startDate, endDate, securityDeposit,
+      slot_id, tenant_id, startDate, endDate, deposit_amount,
       idCard, phone, address, receiptNumber, receiptDate,
       lateRentFine, lateUtilityFine, menuType, contract_number, contractNumber
     } = req.body;
@@ -118,7 +119,7 @@ const createContract = async (req, res, next) => {
           start_date: new Date(startDate),
           end_date: new Date(endDate),
           monthly_rent: parseFloat(slot.rent),
-          deposit_amount: securityDeposit && securityDeposit !== '' ? parseFloat(securityDeposit) : 0,
+          deposit_amount: deposit_amount && deposit_amount !== '' ? parseFloat(deposit_amount) : 0,
           idCard: idCard && idCard !== '' ? idCard : null,
           phone: phone && phone !== '' ? phone : null,
           address: address && address !== '' ? address : null,
@@ -154,7 +155,7 @@ const updateContract = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { 
-      startDate, endDate, securityDeposit, status,
+      startDate, endDate, deposit_amount, status,
       idCard, phone, address, receiptNumber, receiptDate,
       lateRentFine, lateUtilityFine, menuType, contract_number, contractNumber
     } = req.body;
@@ -176,7 +177,7 @@ const updateContract = async (req, res, next) => {
     const updateData = {};
     if (startDate && startDate !== '') updateData.start_date = new Date(startDate);
     if (endDate && endDate !== '') updateData.end_date = new Date(endDate);
-    if (securityDeposit !== undefined && securityDeposit !== '') updateData.deposit_amount = parseFloat(securityDeposit);
+    if (deposit_amount !== undefined && deposit_amount !== '') updateData.deposit_amount = parseFloat(deposit_amount);
     if (status) updateData.status = status;
     
     // New fields
@@ -239,7 +240,15 @@ const terminateContract = async (req, res, next) => {
       })
     ]);
 
-    res.json({ success: true, message: 'อนุมัติการยกเลิกสัญญาเรียบร้อยแล้ว' });
+    try {
+        const tenant = await prisma.user.findUnique({ where: { user_id: contract.tenant_id } });
+        if (tenant?.push_token) {
+          await sendPushNotifications([tenant.push_token], { title: 'อนุมัติการยกเลิกสัญญา', body: 'คำขอยกเลิกสัญญาเช่าของคุณได้รับการอนุมัติเรียบร้อยแล้ว' });
+        }
+      } catch (err) {
+        console.error('Notification Error:', err);
+      }
+      res.json({ success: true, message: 'อนุมัติการยกเลิกสัญญาเรียบร้อยแล้ว' });
   } catch (error) {
     next(error);
   }
@@ -249,6 +258,7 @@ const terminateContract = async (req, res, next) => {
 const requestTermination = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const { cancellation_reason, cancellation_note } = req.body;
 
     const contract = await prisma.rentalContract.findUnique({ where: { contract_id: parseInt(id) } });
     if (!contract) {
@@ -264,12 +274,31 @@ const requestTermination = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'สัญญาไม่ได้อยู่ในสถานะที่สามารถยกเลิกได้' });
     }
 
-    await prisma.rentalContract.update({
-      where: { contract_id: parseInt(id) },
-      data: { status: 'PENDING_TERMINATION' }
-    });
+    await prisma.$transaction([
+      prisma.rentalContract.update({
+        where: { contract_id: parseInt(id) },
+        data: { status: 'PENDING_TERMINATION' }
+      }),
+      prisma.cancellationRequest.create({
+        data: {
+          contract_id: parseInt(id),
+          reason: cancellation_reason,
+          note: cancellation_note,
+          status: 'PENDING'
+        }
+      })
+    ]);
 
-    res.json({ success: true, message: 'ส่งคำขอยกเลิกสัญญาเรียบร้อยแล้ว กรุณารอการอนุมัติ' });
+    try {
+        const admins = await prisma.user.findMany({ where: { role: 'ADMIN', push_token: { not: null } } });
+        const tokens = admins.map(a => a.push_token).filter(Boolean);
+        if (tokens.length > 0) {
+          await sendPushNotifications(tokens, { title: 'มีคำขอยกเลิกสัญญาใหม่', body: 'มีการส่งคำขอยกเลิกสัญญาเช่าเข้ามาใหม่ กรุณาตรวจสอบ' });
+        }
+      } catch (err) {
+        console.error('Notification Error:', err);
+      }
+      res.json({ success: true, message: 'ส่งคำขอยกเลิกสัญญาเรียบร้อยแล้ว กรุณารอการอนุมัติ' });
   } catch (error) {
     next(error);
   }
@@ -289,18 +318,75 @@ const rejectTermination = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'สัญญาไม่ได้อยู่ในสถานะรอยกเลิก' });
     }
 
-    await prisma.rentalContract.update({
-      where: { contract_id: parseInt(id) },
-      data: { status: 'ACTIVE' }
+    await prisma.$transaction(async (tx) => {
+      await tx.rentalContract.update({
+        where: { contract_id: parseInt(id) },
+        data: { status: 'ACTIVE' }
+      });
+      
+      const pendingReq = await tx.cancellationRequest.findFirst({
+        where: { contract_id: parseInt(id), status: 'PENDING' },
+        orderBy: { requested_at: 'desc' }
+      });
+      
+      if (pendingReq) {
+        await tx.cancellationRequest.update({
+          where: { request_id: pendingReq.request_id },
+          data: { status: 'REJECTED', reviewed_at: new Date() }
+        });
+      }
     });
 
-    res.json({ success: true, message: 'ปฏิเสธคำขอยกเลิกสัญญาเรียบร้อยแล้ว' });
+    try {
+        const tenant = await prisma.user.findUnique({ where: { user_id: contract.tenant_id } });
+        if (tenant?.push_token) {
+          await sendPushNotifications([tenant.push_token], { title: 'ปฏิเสธการยกเลิกสัญญา', body: 'คำขอยกเลิกสัญญาเช่าของคุณถูกปฏิเสธ กรุณาติดต่อแอดมิน' });
+        }
+      } catch (err) {
+        console.error('Notification Error:', err);
+      }
+      res.json({ success: true, message: 'ปฏิเสธคำขอยกเลิกสัญญาเรียบร้อยแล้ว' });
   } catch (error) {
     next(error);
   }
 };
 
-module.exports = { 
+
+// Get Cancellation Requests (Admin only)
+const getCancellationRequests = async (req, res, next) => {
+  try {
+    
+
+    const requests = await prisma.cancellationRequest.findMany({
+      where: req.user.role === 'TENANT' ? { contract: { tenant_id: req.user.user_id } } : {},
+      include: {
+        contract: {
+          include: { tenant: true, slot: true }
+        }
+      },
+      orderBy: { requested_at: 'desc' }
+    });
+    
+    // Map to old format for frontend compatibility (mostly)
+    const mapped = requests.map(r => ({
+      id: r.request_id,
+      contract_id: r.contract_id,
+      tenant_id: r.contract.tenant_id,
+      cancellation_reason: r.reason,
+      cancellation_note: r.note,
+      cancellation_requested_at: r.requested_at,
+      status: r.status === 'PENDING' ? 'PENDING_TERMINATION' : r.status,
+      tenant: r.contract.tenant,
+      slot: r.contract.slot
+    }));
+    res.json({ success: true, data: mapped });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = {
+  getCancellationRequests, 
   getAllContracts, 
   getContractById, 
   createContract, 

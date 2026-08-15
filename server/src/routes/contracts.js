@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const { authenticate, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -9,13 +9,15 @@ const {
   updateContract,
   terminateContract,
   requestTermination,
-  rejectTermination
+  rejectTermination,
+  getCancellationRequests
 } = require('../controllers/contractController');
 
 // All routes require authentication
 router.use(authenticate);
 
 // Contract routes
+router.get('/cancellations', authorize('ADMIN', 'EXECUTIVE', 'TENANT'), getCancellationRequests);
 router.get('/', authorize('ADMIN', 'EXECUTIVE', 'TENANT'), getAllContracts);
 router.get('/:id', getContractById);
 router.post('/', authorize('ADMIN'), upload.single('contractFile'), createContract);
@@ -25,3 +27,4 @@ router.post('/:id/request-termination', authorize('TENANT'), requestTermination)
 router.post('/:id/reject-termination', authorize('ADMIN'), rejectTermination);
 
 module.exports = router;
+
