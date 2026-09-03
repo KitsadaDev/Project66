@@ -491,6 +491,7 @@ const calculateAmount = async (req, res, next) => {
     }
 
     const date = new Date(month);
+    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
     // End of the billing month
     const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
     // Grace period: allow readings recorded up to 15 days after the month ends
@@ -502,7 +503,7 @@ const calculateAmount = async (req, res, next) => {
       where: { 
         slot_id: parseInt(slot_id), 
         meter_type: 'WATER',
-        created_at: { lte: gracePeriod }
+        created_at: { gte: startOfMonth, lte: gracePeriod }
       },
       orderBy: { created_at: 'desc' }
     });
@@ -512,7 +513,7 @@ const calculateAmount = async (req, res, next) => {
       where: { 
         slot_id: parseInt(slot_id), 
         meter_type: 'ELECTRICITY',
-        created_at: { lte: gracePeriod }
+        created_at: { gte: startOfMonth, lte: gracePeriod }
       },
       orderBy: { created_at: 'desc' }
     });

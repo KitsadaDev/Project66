@@ -76,6 +76,9 @@ app.use(cors({
   credentials: true
 }));
 
+// Trust proxy for rate limiter (if behind Nginx/Cloudflare)
+app.set('trust proxy', 1);
+
 // Rate Limiting
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
