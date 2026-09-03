@@ -369,11 +369,17 @@ const verifyPayment = async (req, res, next) => {
       }
     });
 
-    // If approved, update expense status to PAID
+    // If approved, update expense status to PAID; if rejected, reset to PENDING
     if (approved) {
       await prisma.monthlyExpense.update({
         where: { expense_id: payment.expense_id },
         data: { status: 'PAID' }
+      });
+    } else {
+      // Reset bill back to PENDING so tenant can re-upload a new slip
+      await prisma.monthlyExpense.update({
+        where: { expense_id: payment.expense_id },
+        data: { status: 'PENDING' }
       });
     }
 

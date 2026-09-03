@@ -222,6 +222,12 @@ const updateUser = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'User not found.' });
     }
 
+    // Validate role if provided — only allow known roles
+    const ALLOWED_ROLES = ['TENANT', 'ADMIN', 'EXECUTIVE', 'MAINTENANCE'];
+    if (role && !ALLOWED_ROLES.includes(role)) {
+      return res.status(400).json({ success: false, message: 'Invalid role specified.' });
+    }
+
     let profile_image_url = undefined;
     if (req.file) {
       profile_image_url = req.file.path;

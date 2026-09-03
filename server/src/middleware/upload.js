@@ -48,7 +48,7 @@ const ALLOWED_MIME_TYPES = new Set([
 ]);
 
 const fileFilter = (req, file, cb) => {
-  if (ALLOWED_MIME_TYPES.has(file.mimetype) || file.originalname.toLowerCase().endsWith('.heic') || file.originalname.toLowerCase().endsWith('.heif')) {
+  if (ALLOWED_MIME_TYPES.has(file.mimetype)) {
     return cb(null, true);
   }
   cb(new Error('Only images (jpeg, jpg, png, gif, webp, heic) and PDF files are allowed!'));

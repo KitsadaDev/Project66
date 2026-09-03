@@ -325,7 +325,7 @@ const Tenants = () => {
 
   const fetchContracts = async () => {
     try {
-      const response = await contractsAPI.getAll({ active: true });
+      const response = await contractsAPI.getAll({ status: "ACTIVE" });
       setContracts(response.data.data || []);
     } catch (error) {
       console.error("Error fetching contracts:", error);
@@ -594,7 +594,12 @@ const Tenants = () => {
 
       const formData = new FormData();
       Object.keys(finalForm).forEach((key) => {
-        if (finalForm[key] !== null && finalForm[key] !== undefined) {
+        if (key === "securityDeposit") {
+          // Backend expects deposit_amount, not securityDeposit
+          if (finalForm[key] !== null && finalForm[key] !== undefined) {
+            formData.append("deposit_amount", finalForm[key]);
+          }
+        } else if (finalForm[key] !== null && finalForm[key] !== undefined) {
           formData.append(key, finalForm[key]);
         }
       });
