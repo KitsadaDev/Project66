@@ -149,9 +149,9 @@ const Sidebar = () => {
     ADMIN: [
       { to: "/admin", icon: LayoutDashboard, label: "หน้าแรก", end: true },
       { to: "/admin/tenants", icon: Users, label: "ข้อมูลผู้เช่า" },
-      { to: "/admin/mechanics", icon: Wrench, label: "ข้อมูลช่าง" },
+      { to: "/admin/mechanics", icon: Wrench, label: "แจ้งซ่อม" },
       { to: "/admin/contracts", icon: FileText, label: "ข้อมูลสัญญาเช่า" },
-      { to: "/admin/cancel-contracts", icon: Ban, label: "การยกเลิกสัญญา" },
+      { to: "/admin/cancel-contracts", icon: Ban, label: "คำร้องขอยกเลิกสัญญา" },
       { to: "/admin/stalls", icon: Building2, label: "ข้อมูลสถานะแผงค้า" },
       { to: "/admin/meter-recording", icon: Gauge, label: "บันทึกมิเตอร์" },
       { to: "/admin/bills", icon: Receipt, label: "จัดการบิล" },

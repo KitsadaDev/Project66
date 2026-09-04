@@ -257,7 +257,9 @@ const Mechanics = () => {
                 <th className="py-4 px-6 text-left font-medium">ชื่อช่าง</th>
                 <th className="py-4 px-6 text-left font-medium">เบอร์โทรศัพท์</th>
                 <th className="py-4 px-6 text-left font-medium">อีเมล</th>
-                <th className="py-4 px-6 text-right font-medium">จัดการ</th>
+                <th className="py-4 px-4 text-center font-medium whitespace-nowrap">อัพรูป</th>
+                <th className="py-4 px-4 text-center font-medium whitespace-nowrap">แก้ไขข้อมูลช่าง</th>
+                <th className="py-4 px-4 text-center font-medium whitespace-nowrap">ลบช่าง</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -294,45 +296,52 @@ const Mechanics = () => {
                       <span className="font-medium text-gray-800">{mechanic.email || "-"}</span>
                     </div>
                   </td>
-                  <td className="py-4 px-6 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <label
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors cursor-pointer select-none"
-                        title="อัปโหลดรูปโปรไฟล์"
-                      >
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          disabled={uploadingPhotoId === mechanic.user_id}
-                          onChange={(e) => handleQuickPhotoUpload(mechanic.user_id, e.target.files[0])}
-                        />
-                        {uploadingPhotoId === mechanic.user_id && (
-                          <div className="w-3.5 h-3.5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
-                        )}
-                        อัพรูปโปรไฟล์
-                      </label>
-                      <button
-                        onClick={() => handleEditClick(mechanic)}
-                        className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer"
-                        title="แก้ไขข้อมูล"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(mechanic.user_id)}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                        title="ลบข้อมูล"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
+                  {/* อัพรูป */}
+                  <td className="py-4 px-4 text-center">
+                    <label
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors cursor-pointer select-none"
+                      title="อัปโหลดรูปโปรไฟล์"
+                    >
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingPhotoId === mechanic.user_id}
+                        onChange={(e) => handleQuickPhotoUpload(mechanic.user_id, e.target.files[0])}
+                      />
+                      {uploadingPhotoId === mechanic.user_id && (
+                        <div className="w-3.5 h-3.5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+                      )}
+                      อัพรูปโปรไฟล์
+                    </label>
+                  </td>
+
+                  {/* แก้ไขข้อมูลช่าง */}
+                  <td className="py-4 px-4 text-center">
+                    <button
+                      onClick={() => handleEditClick(mechanic)}
+                      className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center"
+                      title="แก้ไขข้อมูลช่าง"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                  </td>
+
+                  {/* ลบช่าง */}
+                  <td className="py-4 px-4 text-center">
+                    <button
+                      onClick={() => handleDelete(mechanic.user_id)}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center"
+                      title="ลบช่าง"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </td>
                 </tr>
               ))}
               {filteredMechanics.length === 0 && (
                 <tr>
-                  <td colSpan="4" className="py-8 text-center text-gray-500">
+                  <td colSpan="6" className="py-8 text-center text-gray-500">
                     ไม่พบข้อมูลช่างซ่อมบำรุง
                   </td>
                 </tr>

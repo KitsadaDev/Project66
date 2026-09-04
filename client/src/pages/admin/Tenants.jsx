@@ -700,7 +700,18 @@ const Tenants = () => {
                 <th className="py-4 px-6 text-left font-medium">
                   ข้อมูลติดต่อ
                 </th>
-                <th className="py-4 px-6 text-right font-medium">จัดการ</th>
+                <th className="py-4 px-4 text-center font-medium whitespace-nowrap">
+                  อัพรูป
+                </th>
+                <th className="py-4 px-4 text-center font-medium whitespace-nowrap">
+                  จัดการสัญญา
+                </th>
+                <th className="py-4 px-4 text-center font-medium whitespace-nowrap">
+                  แก้ไขข้อมูลผู้เช่า
+                </th>
+                <th className="py-4 px-4 text-center font-medium whitespace-nowrap">
+                  ลบผู้เช่า
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -838,73 +849,87 @@ const Tenants = () => {
                       </div>
                     </div>
                   </td>
-                  <td className="py-4 px-6 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {/* Quick Photo Upload Button */}
-                      {editingId !== tenant.user_id && (
-                        <label
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors cursor-pointer select-none"
-                          title="อัปโหลดรูปโปรไฟล์"
-                        >
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            disabled={uploadingPhotoId === tenant.user_id}
-                            onChange={(e) =>
-                              handleQuickPhotoUpload(tenant.user_id, e.target.files[0])
-                            }
-                          />
-                          {uploadingPhotoId === tenant.user_id && (
-                            <div className="w-3.5 h-3.5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
-                          )}
-                          อัพรูปโปรไฟล์
-                        </label>
-                      )}
-
-                      {/* Manage Contract Button */}
-                      <button
-                        onClick={() => handleManageContract(tenant)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="จัดการสัญญา"
+                  {/* อัพรูป */}
+                  <td className="py-4 px-4 text-center">
+                    {editingId !== tenant.user_id ? (
+                      <label
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors cursor-pointer select-none"
+                        title="อัปโหลดรูปโปรไฟล์"
                       >
-                        <FileText size={18} />
-                      </button>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={uploadingPhotoId === tenant.user_id}
+                          onChange={(e) =>
+                            handleQuickPhotoUpload(tenant.user_id, e.target.files[0])
+                          }
+                        />
+                        {uploadingPhotoId === tenant.user_id && (
+                          <div className="w-3.5 h-3.5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+                        )}
+                        อัพรูปโปรไฟล์
+                      </label>
+                    ) : (
+                      <span className="text-gray-300">-</span>
+                    )}
+                  </td>
 
-                      {editingId === tenant.user_id ? (
-                        <>
-                          <button
-                            onClick={() => handleSave(tenant.user_id)}
-                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                          >
-                            <Save size={18} />
-                          </button>
-                          <button
-                            onClick={handleCancel}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          >
-                            <X size={18} />
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => handleEdit(tenant)}
-                            className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                            title="แก้ไขข้อมูล"
-                          >
-                            <Edit size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(tenant.user_id)}
-                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                            title="ลบข้อมูล"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </>
-                      )}
-                    </div>
+                  {/* จัดการสัญญา */}
+                  <td className="py-4 px-4 text-center">
+                    <button
+                      onClick={() => handleManageContract(tenant)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors inline-flex items-center justify-center"
+                      title="จัดการสัญญา"
+                      disabled={editingId === tenant.user_id}
+                    >
+                      <FileText size={18} />
+                    </button>
+                  </td>
+
+                  {/* แก้ไขข้อมูลผู้เช่า */}
+                  <td className="py-4 px-4 text-center">
+                    {editingId === tenant.user_id ? (
+                      <div className="inline-flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => handleSave(tenant.user_id)}
+                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                          title="บันทึก"
+                        >
+                          <Save size={18} />
+                        </button>
+                        <button
+                          onClick={handleCancel}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="ยกเลิก"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleEdit(tenant)}
+                        className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors inline-flex items-center justify-center"
+                        title="แก้ไขข้อมูลผู้เช่า"
+                      >
+                        <Edit size={18} />
+                      </button>
+                    )}
+                  </td>
+
+                  {/* ลบผู้เช่า */}
+                  <td className="py-4 px-4 text-center">
+                    {editingId === tenant.user_id ? (
+                      <span className="text-gray-300">-</span>
+                    ) : (
+                      <button
+                        onClick={() => handleDelete(tenant.user_id)}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center"
+                        title="ลบผู้เช่า"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
