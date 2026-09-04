@@ -19,11 +19,11 @@ router.use(authenticate);
 
 // Expense routes
 router.get('/', getAllBills);
-router.post('/calculate', authorize('ADMIN', 'EXECUTIVE'), calculateAmount);
+router.post('/calculate', authorize('ADMIN'), calculateAmount);
 router.get('/history', getPaymentHistory);
 router.get('/due-soon', getDueBills);
 router.get('/:id', getBillById);
-router.post('/', authorize('ADMIN', 'EXECUTIVE'), createBill);
+router.post('/', authorize('ADMIN'), createBill);
 router.put('/:id', authorize('ADMIN'), updateBill);
 
 // Payment routes
