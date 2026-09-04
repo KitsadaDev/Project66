@@ -1,79 +1,58 @@
 import { useEffect, useState } from "react";
 import {
-  Users,
   Building2,
-  Receipt,
-  Wrench,
-  TrendingUp,
   DollarSign,
-  AlertCircle,
-  FileBarChart,
+  Wrench,
+  FileText,
 } from "lucide-react";
-import { stallsAPI, usersAPI, billsAPI, maintenanceAPI } from "../../api";
+import { stallsAPI, billsAPI, maintenanceAPI } from "../../api";
+import { exportMaintenanceReportPDF, exportBillsReportPDF } from "../../utils/pdfExport";
 
 const Reports = () => {
-  const [stats, setStats] = useState({
-    totalStalls: 0,
-    occupiedStalls: 0,
-    vacantStalls: 0,
-    totalTenants: 0,
-    totalRevenue: 0,
-    pendingRepairs: 0,
-    pendingBills: 0,
+  const [data, setData] = useState({
+    totalStalls: 0, occupied: 0, vacant: 0, maintenance: 0, occupancyRate: 0,
+    totalBills: 0, paidBills: 0, waitingBills: 0, pendingBills: 0,
+    unbilledBills: 0, targetBase: 0, paidRate: 0,
+    pendingRepairs: 0, completedRepairs: 0,
+    categoryList: [], slotList: [], maxSlotCount: 1,
+    tableBills: [], tableRepairs: [],
   });
   const [loading, setLoading] = useState(true);
-  const [recentBills, setRecentBills] = useState([]);
-  const [allBills, setAllBills] = useState([]); // Store all bills to filter locally
 
   // Filter States
-  const [filterType, setFilterType] = useState("ALL"); // ALL, DAY, MONTH, YEAR
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().slice(0, 10),
-  );
-  const [selectedMonth, setSelectedMonth] = useState(
-    new Date().toISOString().slice(0, 7),
-  );
-  const [selectedYear, setSelectedYear] = useState(
-    new Date().getFullYear().toString(),
-  );
+  const [filterType, setFilterType] = useState("MONTH");
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+
+  const [rawStalls, setRawStalls] = useState([]);
+  const [rawBills, setRawBills] = useState([]);
+  const [rawRepairs, setRawRepairs] = useState([]);
 
   useEffect(() => {
     fetchData();
   }, []);
 
   useEffect(() => {
-    if (allBills.length > 0) {
-      calculateStats(allBills);
+    if (!loading) {
+      processData(rawStalls, rawBills, rawRepairs);
     }
-  }, [filterType, selectedDate, selectedMonth, selectedYear, allBills]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterType, selectedDate, selectedMonth, selectedYear, loading]);
 
   const fetchData = async () => {
     try {
-      const [stallsRes, usersRes, billsRes, repairsRes] = await Promise.all([
+      const [stallsRes, billsRes, repairsRes] = await Promise.all([
         stallsAPI.getAll(),
-        usersAPI.getAll({ role: "TENANT" }),
         billsAPI.getAll(),
         maintenanceAPI.getAll(),
       ]);
-
       const stalls = stallsRes.data.data || [];
-      const tenants = usersRes.data.data || [];
       const bills = billsRes.data.data || [];
       const repairs = repairsRes.data.data || [];
-
-      setAllBills(bills);
-      setRecentBills(bills.slice(0, 5));
-
-      const occupied = stalls.filter((s) => s.status === "OCCUPIED").length;
-
-      setStats((prev) => ({
-        ...prev,
-        totalStalls: stalls.length,
-        occupiedStalls: occupied,
-        vacantStalls: stalls.length - occupied,
-        totalTenants: tenants.length,
-        pendingRepairs: repairs.filter((r) => r.status === "PENDING").length,
-      }));
+      setRawStalls(stalls);
+      setRawBills(bills);
+      setRawRepairs(repairs);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -81,48 +60,130 @@ const Reports = () => {
     }
   };
 
-  const calculateStats = (bills) => {
-    let filteredBills = bills;
+  const processData = (stalls, allBills, allRepairs) => {
+    // 1. Occupancy
+    const occ = stalls.filter((s) => s.status === "OCCUPIED").length;
+    const vac = stalls.filter((s) => s.status === "VACANT").length;
+    const maint = stalls.filter((s) => s.status === "MAINTENANCE").length;
+    const occupancyRate = stalls.length > 0 ? Math.round((occ / stalls.length) * 100) : 0;
+
+    // 2. Filter by date range
+    let currentBills = allBills;
+    let currentRepairs = allRepairs;
 
     if (filterType === "DAY") {
-      filteredBills = bills.filter((b) =>
-        b.paymentDate?.startsWith(selectedDate),
-      );
+      currentBills = allBills.filter((b) => (b.billing_month || b.created_at || "").startsWith(selectedDate));
+      currentRepairs = allRepairs.filter((r) => (r.requested_at || "").startsWith(selectedDate));
     } else if (filterType === "MONTH") {
-      // Filter by bill cycle month (month field in DB is usually YYYY-MM-01)
-      // OR by payment date? Usually Report means "Income received in that month"
-      // Let's stick to Bill Month for now as it represents the cycle,
-      // BUT user said "Summary Day/Month", implying Cash Flow?
-      // "Total Payment" implies money received.
-      // Let's filter by `paymentDate` if status is PAID, otherwise use `dueDate`?
-      // Actually, for "Total Payment", we should only count PAID bills.
-      // And we should filter by WHEN it was paid.
-      // If the user wants to see "Bill for Jan", that's different from "Money received in Jan".
-      // Given "ยอดชำระทั้งหมด" (Total Payment), I will filter PAID bills by their paymentDate if available,
-      // or falling back to bill Month if we just want to track by cycle.
-      // Let's use Bill Month for simplicity for now as Month/Year filter usually refers to the Accounting Period (The Bill's Month).
-
-      filteredBills = bills.filter((b) => b.month.startsWith(selectedMonth));
+      currentBills = allBills.filter((b) => (b.billing_month || b.created_at || "").startsWith(selectedMonth));
+      currentRepairs = allRepairs.filter((r) => (r.requested_at || "").startsWith(selectedMonth));
     } else if (filterType === "YEAR") {
-      filteredBills = bills.filter((b) => b.month.startsWith(selectedYear));
+      currentBills = allBills.filter((b) => (b.billing_month || b.created_at || "").startsWith(selectedYear));
+      currentRepairs = allRepairs.filter((r) => (r.requested_at || "").startsWith(selectedYear));
     }
 
-    const paidBills = filteredBills.filter((b) => b.status === "PAID");
-    const totalRevenue = paidBills.reduce(
-      (sum, b) => sum + (b.total_amount || b.totalAmount || 0),
-      0,
-    );
+    // 3. Bills breakdown
+    const paidCount = currentBills.filter((b) => b.status === "PAID").length;
+    const waitingCount = currentBills.filter((b) => b.status === "WAITING_VERIFICATION" || b.status === "WAITING").length;
+    const pendingCount = currentBills.filter((b) => b.status === "PENDING" || b.status === "OVERDUE").length;
+    const targetBase = Math.max(occ, currentBills.length);
+    const unbilledCount = Math.max(0, targetBase - currentBills.length);
+    const paidRate = targetBase > 0 ? Math.round((paidCount / targetBase) * 100) : 0;
 
-    const pendingBills = filteredBills.filter(
-      (b) => b.status === "PENDING",
-    ).length;
+    // 4. Repairs breakdown
+    const pendingRepairs = currentRepairs.filter((r) => r.status === "PENDING").length;
+    const completedRepairs = currentRepairs.filter((r) => r.status === "COMPLETED").length;
 
-    setStats((prev) => ({
-      ...prev,
-      totalRevenue,
-      pendingBills,
-    }));
+    const categoryMap = {};
+    const slotMap = {};
+    currentRepairs.forEach((r) => {
+      const cat = r.category || "อื่นๆ";
+      categoryMap[cat] = (categoryMap[cat] || 0) + 1;
+      const slotNum = (r.rental_slot && r.rental_slot.slot_number)
+        ? "ล็อก " + r.rental_slot.slot_number
+        : (r.slot && r.slot.slot_number)
+        ? "ล็อก " + r.slot.slot_number
+        : "ไม่ระบุล็อก";
+      slotMap[slotNum] = (slotMap[slotNum] || 0) + 1;
+    });
+
+    const colorMap = {
+      "ระบบน้ำ": "#3B82F6", "ประปา": "#3B82F6",
+      "ระบบไฟ": "#F59E0B", "ไฟฟ้า": "#F59E0B",
+      "อุปกรณ์": "#8B5CF6", "โครงสร้าง": "#6B7280", "อื่นๆ": "#10B981",
+    };
+
+    const categoryList = Object.keys(categoryMap).map((cat) => ({
+      category: cat,
+      count: categoryMap[cat],
+      percent: currentRepairs.length > 0 ? Math.round((categoryMap[cat] / currentRepairs.length) * 100) : 0,
+      color: colorMap[cat] || "#80639A",
+    })).sort((a, b) => b.count - a.count);
+
+    const slotList = Object.keys(slotMap).map((slot_number) => ({
+      slot_number,
+      count: slotMap[slot_number],
+    })).sort((a, b) => b.count - a.count).slice(0, 5);
+
+    const maxSlotCount = slotList.length > 0 ? Math.max(...slotList.map((s) => s.count)) : 1;
+
+    setData({
+      totalStalls: stalls.length, occupied: occ, vacant: vac, maintenance: maint, occupancyRate,
+      totalBills: currentBills.length, paidBills: paidCount, waitingBills: waitingCount,
+      pendingBills: pendingCount, unbilledBills: unbilledCount, targetBase, paidRate,
+      pendingRepairs, completedRepairs, categoryList, slotList, maxSlotCount,
+      tableBills: currentBills, tableRepairs: currentRepairs,
+    });
   };
+
+  const getFilterLabel = () => {
+    if (filterType === "ALL") return "ทั้งหมด";
+    if (filterType === "DAY") return selectedDate;
+    if (filterType === "MONTH") return selectedMonth;
+    return selectedYear;
+  };
+
+  const handleExportBills = () => {
+    exportBillsReportPDF(
+      data.tableBills, getFilterLabel(),
+      data.paidBills, data.waitingBills, data.pendingBills,
+      data.unbilledBills, data.targetBase, data.paidRate
+    );
+  };
+
+  const handleExportRepairs = () => {
+    exportMaintenanceReportPDF(
+      data.tableRepairs, getFilterLabel(),
+      data.categoryList, data.slotList, data.maxSlotCount
+    );
+  };
+
+  // CSS Conic Gradient helper (for live UI)
+  const getConicGradient = (slices, total) => {
+    if (!total || total === 0) return "conic-gradient(#E5E7EB 100%, transparent 0)";
+    let cumulative = 0;
+    const stops = slices.map((slice) => {
+      const start = cumulative;
+      const pct = (slice.value / total) * 100;
+      cumulative += pct;
+      return slice.color + " " + start + "% " + cumulative + "%";
+    });
+    return "conic-gradient(" + stops.join(", ") + ")";
+  };
+
+  const pct = (val, total) => (total > 0 ? Math.round((val / total) * 100) : 0);
+
+  const occupancySlices = [
+    { color: "#059669", value: data.occupied },
+    { color: "#D1FAE5", value: data.vacant },
+    { color: "#F59E0B", value: data.maintenance },
+  ];
+  const billSlices = [
+    { color: "#10B981", value: data.paidBills },
+    { color: "#F59E0B", value: data.waitingBills },
+    { color: "#EF4444", value: data.pendingBills },
+    { color: "#9CA3AF", value: data.unbilledBills },
+  ];
 
   if (loading) {
     return (
@@ -133,17 +194,18 @@ const Reports = () => {
   }
 
   return (
-    <div>
+    <div className="pb-8">
+      {/* Header */}
       <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">รายงานสรุป</h1>
           <p className="text-gray-500 text-sm">ภาพรวมรายได้และสถานะของระบบ</p>
         </div>
 
-        {/* Filters */}
+        {/* Filter Controls */}
         <div className="bg-white p-2 rounded-xl border border-gray-200 flex flex-wrap items-center gap-2 shadow-sm">
           <select
-            className="px-3 py-2 rounded-lg bg-gray-50 border-transparent focus:bg-white focus:ring-2 focus:ring-purple-100 text-sm font-medium text-gray-700 outline-none"
+            className="px-3 py-2 rounded-lg bg-gray-50 text-sm font-medium text-gray-700 outline-none"
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
           >
@@ -152,232 +214,179 @@ const Reports = () => {
             <option value="MONTH">รายเดือน</option>
             <option value="YEAR">รายปี</option>
           </select>
-
           {filterType === "DAY" && (
-            <input
-              type="date"
-              className="px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-purple-400"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-            />
+            <input type="date" className="px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none"
+              value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
           )}
-
           {filterType === "MONTH" && (
-            <input
-              type="month"
-              className="px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-purple-400"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-            />
+            <input type="month" className="px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none"
+              value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} />
           )}
-
           {filterType === "YEAR" && (
-            <select
-              className="px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-purple-400"
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-            >
-              {Array.from(
-                { length: 5 },
-                (_, i) => new Date().getFullYear() - i,
-              ).map((y) => (
-                <option key={y} value={y}>
-                  {y + 543} ({y})
-                </option>
+            <select className="px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none"
+              value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)}>
+              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+                <option key={y} value={y}>{y + 543} ({y})</option>
               ))}
             </select>
           )}
         </div>
       </div>
 
-      {/* Revenue & Pending (High Priority) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col justify-between">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-green-600">
-              <DollarSign size={24} />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">
-                {filterType === "ALL"
-                  ? "ยอดชำระทั้งหมด"
-                  : filterType === "DAY"
-                    ? "ยอดชำระประจำวัน"
-                    : filterType === "MONTH"
-                      ? "ยอดชำระประจำเดือน"
-                      : "ยอดชำระประจำปี"}
-              </p>
-              <h2 className="text-3xl font-bold text-green-600">
-                ฿{stats.totalRevenue.toLocaleString()}
-              </h2>
-            </div>
-          </div>
-          <div className="mt-4 pt-4 border-t border-gray-50 flex justify-between items-center">
-            <p className="text-sm text-gray-400">
-              จากบิลที่ชำระแล้วในช่วงเวลาที่เลือก
-            </p>
-            {filterType !== "ALL" && (
-              <span className="text-xs font-medium bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">
-                {filterType === "DAY"
-                  ? new Date(selectedDate).toLocaleDateString("th-TH")
-                  : filterType === "MONTH"
-                    ? new Date(selectedMonth).toLocaleDateString("th-TH", {
-                        month: "long",
-                        year: "numeric",
-                      })
-                    : selectedYear}
-              </span>
-            )}
-          </div>
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col justify-between">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600">
-              <AlertCircle size={24} />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">รายการที่ต้องดำเนินการ</p>
-              <div className="flex gap-4 mt-1">
-                <div>
-                  <span className="text-2xl font-bold text-orange-500 block">
-                    {stats.pendingBills}
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    บิลรอชำระ (ช่วงที่เลือก)
-                  </span>
-                </div>
-                <div className="w-px bg-gray-200"></div>
-                <div>
-                  <span className="text-2xl font-bold text-red-500 block">
-                    {stats.pendingRepairs}
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    แจ้งซ่อมใหม่ (ทั้งหมด)
-                  </span>
-                </div>
+        {/* ─── Card 1: สถานะล็อก ─── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-base font-bold text-gray-800 mb-5 flex items-center gap-2">
+            <Building2 size={18} className="text-gray-500" /> สถานะล็อก (Occupancy)
+          </h2>
+          <div className="flex justify-center mb-6">
+            <div
+              className="relative w-40 h-40 rounded-full flex items-center justify-center"
+              style={{ background: getConicGradient(occupancySlices, data.totalStalls) }}
+            >
+              <div className="w-28 h-28 bg-white rounded-full flex flex-col items-center justify-center shadow-inner">
+                <span className="text-3xl font-bold text-gray-800">{data.occupancyRate}%</span>
+                <span className="text-xs text-gray-500">อัตราการเช่า</span>
               </div>
             </div>
           </div>
-          <div className="mt-4 pt-4 border-t border-gray-50">
-            <p className="text-sm text-gray-400">สิ่งที่ต้องจัดการโดยเร็ว</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
-              <Building2 size={20} />
+          <div className="space-y-2.5">
+            {[
+              { color: "bg-emerald-600", label: "มีผู้เช่า", val: data.occupied, total: data.totalStalls },
+              { color: "bg-emerald-100", label: "ว่าง", val: data.vacant, total: data.totalStalls },
+              { color: "bg-amber-400", label: "ซ่อมบำรุง", val: data.maintenance, total: data.totalStalls },
+            ].map((row) => (
+              <div key={row.label} className="flex justify-between items-center text-sm">
+                <div className="flex items-center gap-2">
+                  <div className={"w-3 h-3 rounded-full " + row.color}></div>
+                  <span className="text-gray-700">{row.label}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="font-bold text-gray-800">{row.val}</span>
+                  <span className="text-gray-400 text-xs w-8 text-right">{pct(row.val, row.total)}%</span>
+                </div>
+              </div>
+            ))}
+            <div className="pt-3 mt-1 border-t border-gray-100 flex justify-between items-center text-sm">
+              <span className="text-gray-500">ล็อกทั้งหมด</span>
+              <span className="font-bold text-gray-800">{data.totalStalls}</span>
             </div>
-            <span className="text-gray-500 text-sm">แผงค้าทั้งหมด</span>
           </div>
-          <p className="text-2xl font-bold text-gray-800">
-            {stats.totalStalls}
-          </p>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-green-50 text-green-600 rounded-lg">
-              <TrendingUp size={20} />
+        {/* ─── Card 2: บิลและการชำระเงิน ─── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-base font-bold text-gray-800 mb-5 flex items-center gap-2">
+            <DollarSign size={18} className="text-yellow-500" /> บิลและการชำระเงิน
+          </h2>
+          <div className="flex justify-center mb-6">
+            <div
+              className="relative w-40 h-40 rounded-full flex items-center justify-center"
+              style={{ background: getConicGradient(billSlices, data.targetBase) }}
+            >
+              <div className="w-28 h-28 bg-white rounded-full flex flex-col items-center justify-center shadow-inner">
+                <span className="text-3xl font-bold text-gray-800">{data.paidRate}%</span>
+                <span className="text-xs text-gray-500">อัตราจัดเก็บ</span>
+              </div>
             </div>
-            <span className="text-gray-500 text-sm">กำลังเช่าอยู่</span>
           </div>
-          <p className="text-2xl font-bold text-gray-800">
-            {stats.occupiedStalls}
-          </p>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-gray-50 text-gray-600 rounded-lg">
-              <Building2 size={20} />
+          <div className="space-y-2.5">
+            {[
+              { color: "bg-emerald-500", label: "ชำระแล้ว", val: data.paidBills, total: data.targetBase },
+              { color: "bg-amber-400", label: "รอยืนยันสลิป", val: data.waitingBills, total: data.targetBase },
+              { color: "bg-red-500", label: "รอชำระ", val: data.pendingBills, total: data.targetBase },
+              { color: "bg-gray-400", label: "ยังไม่ออกบิล", val: data.unbilledBills, total: data.targetBase },
+            ].map((row) => (
+              <div key={row.label} className="flex justify-between items-center text-sm">
+                <div className="flex items-center gap-2">
+                  <div className={"w-3 h-3 rounded-full " + row.color}></div>
+                  <span className="text-gray-700">{row.label}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="font-bold text-gray-800">{row.val}</span>
+                  <span className="text-gray-400 text-xs w-8 text-right">{pct(row.val, row.total)}%</span>
+                </div>
+              </div>
+            ))}
+            <div className="pt-3 mt-1 border-t border-gray-100 flex justify-between items-center text-sm">
+              <span className="text-gray-500">บิลที่ออกแล้ว</span>
+              <span className="font-bold text-gray-800">{data.totalBills}</span>
             </div>
-            <span className="text-gray-500 text-sm">ว่าง</span>
           </div>
-          <p className="text-2xl font-bold text-gray-800">
-            {stats.vacantStalls}
-          </p>
+          <button
+            onClick={handleExportBills}
+            className="w-full mt-5 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl border border-red-200 flex items-center justify-center gap-2 transition-colors"
+          >
+            <FileText size={16} /> ส่งออก PDF รายงานบิลค่าเช่า
+          </button>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-              <Users size={20} />
+        {/* ─── Card 3: งานซ่อม ─── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
+          <h2 className="text-base font-bold text-gray-800 mb-5 flex items-center gap-2">
+            <Wrench size={18} className="text-gray-500" /> งานซ่อม
+          </h2>
+          <div className="space-y-3 mb-4">
+            <div className="flex justify-between items-center text-sm border-b border-gray-50 pb-3">
+              <span className="text-gray-500">รอดำเนินการ</span>
+              <span className={data.pendingRepairs > 0 ? "font-bold text-red-500" : "font-bold text-gray-800"}>
+                {data.pendingRepairs}
+              </span>
             </div>
-            <span className="text-gray-500 text-sm">ผู้เช่า</span>
+            <div className="flex justify-between items-center text-sm border-b border-gray-50 pb-3">
+              <span className="text-gray-500">เสร็จสิ้น</span>
+              <span className="font-bold text-gray-800">{data.completedRepairs}</span>
+            </div>
           </div>
-          <p className="text-2xl font-bold text-gray-800">
-            {stats.totalTenants}
-          </p>
-        </div>
-      </div>
 
-      {/* Recent Bills Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <Receipt size={20} className="text-purple-500" /> บิลล่าสุดที่ออก
-        </h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-gray-50 text-gray-500">
-              <tr>
-                <th className="px-4 py-3 rounded-l-lg">เดือน</th>
-                <th className="px-4 py-3">ล็อก</th>
-                <th className="px-4 py-3">ยอดเงิน</th>
-                <th className="px-4 py-3 rounded-r-lg">สถานะ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {recentBills.map((bill) => (
-                <tr key={bill.expense_id} className="hover:bg-gray-50/50">
-                  <td className="px-4 py-3 font-medium text-gray-700">
-                    {new Date(bill.billing_month).toLocaleDateString("th-TH", {
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="bg-purple-50 text-purple-700 px-2 py-1 rounded-md text-xs font-bold">
-                      {bill.rental_slot?.slot_number ||
-                        bill.rental_contract?.rental_slot?.slot_number}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 font-bold text-gray-800">
-                    ฿{(bill.total_amount || 0).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-bold ${
-                        bill.status === "PAID"
-                          ? "bg-green-100 text-green-700"
-                          : bill.status === "PENDING"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {bill.status === "PAID"
-                        ? "จ่ายแล้ว"
-                        : bill.status === "PENDING"
-                          ? "รอจ่าย"
-                          : "เกินกำหนด"}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-              {recentBills.length === 0 && (
-                <tr>
-                  <td colSpan="4" className="text-center py-8 text-gray-400">
-                    ยังไม่มีข้อมูลบิล
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <div className="flex-1">
+            {data.categoryList.length > 0 && (
+              <div className="mb-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-2 h-4 rounded-full bg-amber-200"></div>
+                  <h3 className="text-sm font-bold text-gray-700">ประเภทงานที่แจ้งซ่อมบ่อย</h3>
+                </div>
+                {data.categoryList.map((item) => (
+                  <div key={item.category} className="mb-3">
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-gray-700">{item.category} ({item.count} ครั้ง)</span>
+                      <span className="text-gray-500 font-bold">{item.percent}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: item.percent + "%", backgroundColor: item.color }}></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {data.slotList.length > 0 && (
+              <div>
+                <h3 className="text-sm font-bold text-gray-700 mb-3">ล็อกที่แจ้งซ่อมบ่อยที่สุด</h3>
+                {data.slotList.map((item, index) => (
+                  <div key={item.slot_number} className="mb-3">
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-gray-700">{index + 1}. {item.slot_number}</span>
+                      <span className="text-purple-600 font-bold">{item.count} ครั้ง</span>
+                    </div>
+                    <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-purple-600 rounded-full"
+                        style={{ width: pct(item.count, data.maxSlotCount) + "%" }}></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={handleExportRepairs}
+            className="w-full mt-5 py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-600 font-bold rounded-xl border border-purple-200 flex items-center justify-center gap-2 transition-colors"
+          >
+            <FileText size={16} /> ส่งออก PDF รายงานแจ้งซ่อม
+          </button>
         </div>
+
       </div>
     </div>
   );

@@ -157,11 +157,11 @@ const createBill = async (req, res, next) => {
       grease_trap_fee: custom_grease_trap_fee
     } = req.body;
 
-    if (!slot_id || !billing_month || !dueDate) {
-      return res.status(400).json({ success: false, message: 'Missing required fields (slot_id, billing_month, dueDate).' });
+    if (!slot_id || !billing_month) {
+      return res.status(400).json({ success: false, message: 'Missing required fields (slot_id, billing_month).' });
     }
 
-    if (isNaN(new Date(billing_month).getTime()) || isNaN(new Date(dueDate).getTime())) {
+    if (isNaN(new Date(billing_month).getTime())) {
       return res.status(400).json({ success: false, message: 'Invalid date format.' });
     }
 
@@ -192,6 +192,12 @@ const createBill = async (req, res, next) => {
       greaseTrapFee = (contract.menuType === 'ของคาว' || isTargetSlot) ? baseGreaseTrapFee : 0;
     }
 
+    // Auto-calculate Due Date based on setting
+    const dueDaysSetting = await prisma.systemSetting.findUnique({ where: { setting_key: 'BILL_DUE_DAYS' } });
+    const dueDays = parseInt(dueDaysSetting?.setting_value || '10', 10);
+    const calculatedDueDate = new Date(billing_month);
+    calculatedDueDate.setDate(calculatedDueDate.getDate() + dueDays);
+
     const total_amount = parseFloat(rent_amount) + parseFloat(water_cost) + parseFloat(electricity_cost) + greaseTrapFee;
 
     const expense = await prisma.monthlyExpense.create({
@@ -207,7 +213,7 @@ const createBill = async (req, res, next) => {
         electricity_rate: electricity_rate ? parseFloat(electricity_rate) : null,
         grease_trap_fee: greaseTrapFee,
         total_amount,
-        due_date: new Date(dueDate),
+        due_date: calculatedDueDate,
         status: 'PENDING'
       }
     });

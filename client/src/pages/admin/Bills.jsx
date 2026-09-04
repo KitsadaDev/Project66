@@ -32,10 +32,10 @@ const Bills = () => {
   const [formData, setFormData] = useState({
     slot_id: "",
     billing_month: new Date().toISOString().slice(0, 7),
-    dueDate: "",
     water_cost: "",
     electricity_cost: "",
     rent_amount: "",
+    grease_trap_fee: 0,
     total_amount: 0,
   });
 
@@ -94,6 +94,7 @@ const Bills = () => {
         water_cost: amounts.water,
         electricity_cost: amounts.electric,
         rent_amount: amounts.rent,
+        grease_trap_fee: amounts.greaseTrapFee || 0,
         total_amount: amounts.total,
       }));
 
@@ -119,12 +120,11 @@ const Bills = () => {
         billing_month: formData.billing_month + "-01",
         water_cost: formData.water_cost,
         electricity_cost: formData.electricity_cost,
-        dueDate: formData.dueDate,
         water_units: calculationResult?.units?.water,
         electricity_units: calculationResult?.units?.electric,
         water_rate: calculationResult?.rates?.water,
         electricity_rate: calculationResult?.rates?.electric,
-        grease_trap_fee: calculationResult?.amounts?.greaseTrapFee,
+        grease_trap_fee: formData.grease_trap_fee,
       });
       toast.success("สร้างบิลสำเร็จ");
       setIsModalOpen(false);
@@ -132,10 +132,10 @@ const Bills = () => {
       setFormData({
         slot_id: "",
         billing_month: new Date().toISOString().slice(0, 7),
-        dueDate: "",
         water_cost: "",
         electricity_cost: "",
         rent_amount: "",
+        grease_trap_fee: 0,
         total_amount: 0,
       });
       setCalculationResult(null);
@@ -546,28 +546,23 @@ const Bills = () => {
                     </span>
                   )}
                 </div>
-              </div>
-
-              {/* Total & Due Date */}
-              <div className="flex flex-col md:flex-row gap-6 items-end">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    กำหนดชำระ *
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                    ค่าดักไขมัน (บาท)
                   </label>
                   <input
-                    type="date"
-                    required
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-100"
-                    value={formData.dueDate}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        dueDate: e.target.value,
-                      }))
-                    }
+                    type="number"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
+                    value={formData.grease_trap_fee}
+                    readOnly
+                    placeholder="รอการคำนวณ..."
                   />
                 </div>
-                <div className="flex-1 bg-purple-50 p-4 rounded-xl border border-purple-100 text-right">
+              </div>
+
+              {/* Total */}
+              <div className="flex flex-col md:flex-row gap-6 items-end">
+                <div className="flex-1 bg-purple-50 p-4 rounded-xl border border-purple-100 text-center">
                   <span className="block text-sm text-purple-600 mb-1">
                     ยอดรวมทั้งสิ้น
                   </span>
