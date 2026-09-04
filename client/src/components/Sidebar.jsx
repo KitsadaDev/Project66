@@ -149,7 +149,7 @@ const Sidebar = () => {
     ADMIN: [
       { to: "/admin", icon: LayoutDashboard, label: "หน้าแรก", end: true },
       { to: "/admin/tenants", icon: Users, label: "ข้อมูลผู้เช่า" },
-      { to: "/admin/mechanics", icon: Wrench, label: "แจ้งซ่อม" },
+      { to: "/admin/mechanics", icon: Wrench, label: "คำร้องแจ้งซ่อม" },
       { to: "/admin/contracts", icon: FileText, label: "ข้อมูลสัญญาเช่า" },
       { to: "/admin/cancel-contracts", icon: Ban, label: "คำร้องขอยกเลิกสัญญา" },
       { to: "/admin/stalls", icon: Building2, label: "ข้อมูลสถานะแผงค้า" },
