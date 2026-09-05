@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
   FileText,
@@ -11,10 +12,14 @@ import {
   X,
 } from "lucide-react";
 import { formatPhoneNumber } from "../../utils/formatters";
-import { contractsAPI, stallsAPI } from "../../api";
+import { contractsAPI, stallsAPI, settingsAPI } from "../../api";
+
+const GREASE_TRAP_TARGET_SLOTS = ['A1','A2','A3','A4','A5','A6','A7','A8','A9','A10','A11','B1','B2','B3','B4','B5','B6','B7','B8'];
 
 const Contracts = () => {
+  const navigate = useNavigate();
   const [contract, setContract] = useState(null);
+  const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showImageModal, setShowImageModal] = useState(false);
 
@@ -24,9 +29,18 @@ const Contracts = () => {
 
   const fetchData = async () => {
     try {
-      // Fetch all contracts for this tenant
-      const response = await contractsAPI.getAll();
+      // Fetch all contracts and utility rates
+      const [response, settingsRes] = await Promise.all([
+        contractsAPI.getAll(),
+        settingsAPI.getUtilityRates()
+      ]);
       const contracts = response.data.data || [];
+      const settingsData = settingsRes.data.data || null;
+
+      if (settingsData) {
+        setSettings(settingsData);
+      }
+      
       // Find the first contract that is ACTIVE or PENDING_TERMINATION
       const myContract = contracts.find(c => c.status === "ACTIVE" || c.status === "PENDING_TERMINATION");
 
@@ -99,8 +113,8 @@ const Contracts = () => {
               <CheckCircle size={16} /> สัญญามีผลบังคับ
             </span>
             <button
-              onClick={handleRequestTermination}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded-full text-sm font-semibold transition-colors shadow-sm"
+              onClick={() => navigate("/tenant/cancel-contract")}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded-full text-sm font-semibold transition-colors shadow-sm cursor-pointer"
             >
               <Info size={16} /> ขอยกเลิกสัญญา
             </button>
@@ -296,35 +310,37 @@ const Contracts = () => {
                 <div className="flex justify-between items-center py-2 border-b border-gray-200 border-dashed">
                   <span className="text-gray-600">ค่าดักไขมัน</span>
                   <span className="font-bold text-gray-800">
-                    {contract.menuType === "ของคาว" ? "ตามที่กำหนด" : "ฟรี"}
+                    {(contract.menuType === "ของคาว" || (contract.slot?.slot_number && GREASE_TRAP_TARGET_SLOTS.includes(contract.slot.slot_number))) ? `${settings?.greaseTrapFee || 500} ฿/เดือน` : "ฟรี"}
                   </span>
                 </div>
 
-                {/* Fines Section */}
-                {(contract.lateRentFine || contract.lateUtilityFine) && (
-                  <div className="mt-2 bg-red-50 p-4 rounded-lg border border-red-100">
-                    <p className="text-red-800 font-semibold mb-2 text-sm">
-                      อัตราค่าปรับ
-                    </p>
-                    {contract.lateRentFine && (
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-red-600">ปรับค่าเช่าล่าช้า</span>
-                        <span className="font-bold text-red-700">
-                          ฿{contract.lateRentFine}/วัน
-                        </span>
-                      </div>
-                    )}
-                    {contract.lateUtilityFine && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-red-600">
-                          ปรับค่าน้ำ/ไฟล่าช้า
-                        </span>
-                        <span className="font-bold text-red-700">
-                          ฿{contract.lateUtilityFine}/วัน
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                {settings && (
+                  <>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200 border-dashed">
+                      <span className="text-gray-600">ค่าน้ำประปา</span>
+                      <span className="font-bold text-gray-800">
+                        {settings.waterRatePerUnit} ฿/หน่วย
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200 border-dashed">
+                      <span className="text-gray-600">ค่าไฟฟ้า</span>
+                      <span className="font-bold text-gray-800">
+                        {settings.electricRatePerUnit} ฿/หน่วย
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200 border-dashed">
+                      <span className="text-gray-600">ค่าปรับล่าช้า (ค่าเช่า)</span>
+                      <span className="font-bold text-gray-800">
+                        {settings.lateRentFine} ฿/วัน
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200 border-dashed">
+                      <span className="text-gray-600">ค่าปรับล่าช้า (น้ำไฟ)</span>
+                      <span className="font-bold text-gray-800">
+                        {settings.lateUtilityFine} ฿/วัน
+                      </span>
+                    </div>
+                  </>
                 )}
               </div>
             </div>

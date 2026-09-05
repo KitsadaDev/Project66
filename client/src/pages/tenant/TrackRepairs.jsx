@@ -31,26 +31,40 @@ const TrackRepairs = () => {
       setRepairs([
         {
           id: 1,
+          request_id: 1,
           title: "ก๊อกน้ำรั่ว",
           status: "PENDING",
-          createdAt: "2569-02-01",
+          requested_at: "2026-02-01T00:00:00.000Z",
         },
         {
           id: 2,
+          request_id: 2,
           title: "ไฟฟ้าดับบางส่วน",
           status: "IN_PROGRESS",
-          createdAt: "2569-01-28",
+          requested_at: "2026-01-28T00:00:00.000Z",
         },
         {
           id: 3,
+          request_id: 3,
           title: "ประตูพัง",
           status: "COMPLETED",
-          createdAt: "2569-01-15",
+          requested_at: "2026-01-15T00:00:00.000Z",
         },
       ]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "-";
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "-";
+    return date.toLocaleDateString("th-TH", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
   };
 
   const getStatusConfig = (status) => {
@@ -151,7 +165,7 @@ const TrackRepairs = () => {
         {/* Filter Bar */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-gray-500 text-sm font-medium">
-            <Filter size={16} /> ตัวกรอง:
+            <Filter size={16} /> ประวัติ:
           </div>
           <select
             className="px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-purple-400 bg-white text-sm"
@@ -173,7 +187,7 @@ const TrackRepairs = () => {
 
             return (
               <div
-                key={repair.id}
+                key={repair.request_id || repair.id}
                 className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex flex-col md:flex-row md:items-center justify-between gap-4"
               >
                 <div className="flex items-start gap-4">
@@ -189,7 +203,7 @@ const TrackRepairs = () => {
                     <div className="flex items-center gap-3 text-sm text-gray-500">
                       <span className="flex items-center gap-1">
                         <Calendar size={14} />
-                        {new Date(repair.createdAt).toLocaleDateString("th-TH")}
+                        {formatDate(repair.requested_at || repair.createdAt)}
                       </span>
                     </div>
                   </div>

@@ -35,14 +35,30 @@ const JobDetail = () => {
     fetchJob();
   }, [id]);
 
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "-";
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "-";
+    return date.toLocaleDateString("th-TH", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   const fetchJob = async () => {
     try {
       const response = await maintenanceAPI.getById(id);
       const jobData = response.data.data;
       setJob(jobData);
       setStatus(jobData.status);
+      const scheduled =
+        jobData.scheduledDate ||
+        jobData.assignments?.[0]?.scheduled_date;
       setScheduledDate(
-        jobData.scheduledDate ? jobData.scheduledDate.split("T")[0] : "",
+        scheduled ? scheduled.split("T")[0] : ""
       );
     } catch (error) {
       console.error("Error fetching job:", error);
@@ -176,7 +192,7 @@ const JobDetail = () => {
             <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
               <Calendar size={14} />
               <span>
-                แจ้งเมื่อ: {new Date(job.createdAt).toLocaleDateString("th-TH")}
+                แจ้งเมื่อ: {formatDate(job.requested_at || job.createdAt)}
               </span>
             </div>
           </div>

@@ -4,9 +4,6 @@ import {
   Wrench,
   Clock,
   CheckCircle,
-  AlertCircle,
-  ChevronRight,
-  ClipboardList,
 } from "lucide-react";
 import { useAuthStore } from "../../store";
 import { maintenanceAPI } from "../../api";
@@ -34,6 +31,42 @@ const MaintenanceDashboard = () => {
   const pendingJobs = jobs.filter((j) => j.status === "PENDING");
   const inProgressJobs = jobs.filter((j) => j.status === "IN_PROGRESS");
   const completedJobs = jobs.filter((j) => j.status === "COMPLETED");
+
+  const assignedJobs = jobs.filter(
+    (j) => j.status === "PENDING" || j.status === "IN_PROGRESS"
+  );
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "-";
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "-";
+    return date.toLocaleDateString("th-TH");
+  };
+
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case "PENDING":
+        return {
+          label: "รอดำเนินการ",
+          className: "bg-orange-50 text-orange-600 border border-orange-200",
+        };
+      case "IN_PROGRESS":
+        return {
+          label: "กำลังดำเนินการ",
+          className: "bg-blue-50 text-blue-600 border border-blue-200",
+        };
+      case "COMPLETED":
+        return {
+          label: "เสร็จสิ้น",
+          className: "bg-green-50 text-green-600 border border-green-200",
+        };
+      default:
+        return {
+          label: status,
+          className: "bg-gray-50 text-gray-600 border border-gray-200",
+        };
+    }
+  };
 
   if (loading) {
     return (
@@ -84,105 +117,65 @@ const MaintenanceDashboard = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Pending Jobs */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col h-full">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-              <Clock size={20} className="text-orange-500" /> งานที่ต้องทำ
-            </h3>
-            <Link
-              to="/maintenance/jobs"
-              className="text-purple-600 text-sm font-medium hover:text-purple-700 hover:underline"
-            >
-              ดูทั้งหมด →
-            </Link>
-          </div>
+      {/* Assigned Jobs */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-bold text-gray-800">
+            งานที่ได้รับมอบหมาย ({assignedJobs.length})
+          </h3>
+          <Link
+            to="/maintenance/jobs"
+            className="text-purple-600 text-sm font-medium hover:text-purple-700 hover:underline"
+          >
+            ดูทั้งหมด →
+          </Link>
+        </div>
 
-          {pendingJobs.length > 0 ? (
-            <div className="space-y-3">
-              {pendingJobs.slice(0, 5).map((job) => (
+        {assignedJobs.length > 0 ? (
+          <div className="space-y-3">
+            {assignedJobs.map((job) => {
+              const statusBadge = getStatusBadge(job.status);
+              const slotNum =
+                job.slot?.slot_number ||
+                job.slot_number ||
+                job.stall?.slot_number ||
+                "-";
+
+              return (
                 <Link
                   key={job.request_id || job.id}
                   to={`/maintenance/jobs/${job.request_id || job.id}`}
-                  className="flex items-center justify-between p-4 bg-gray-50 hover:bg-purple-50 rounded-xl transition-colors group border border-gray-100"
+                  className="block p-5 bg-white hover:bg-purple-50/30 rounded-2xl transition-all border border-gray-100 shadow-sm hover:shadow-md hover:border-purple-200 group"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-orange-500 shadow-sm font-bold border border-gray-100">
-                      {job.slot_number || job.stall?.slot_number || "?"}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-800 group-hover:text-purple-700 transition-colors">
-                        {job.title}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {new Date(job.createdAt).toLocaleDateString("th-TH")}
-                      </p>
-                    </div>
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <h4 className="font-bold text-gray-800 text-base md:text-lg group-hover:text-purple-600 transition-colors">
+                      {job.title}
+                    </h4>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold shrink-0 ${statusBadge.className}`}
+                    >
+                      {statusBadge.label}
+                    </span>
                   </div>
-                  <ChevronRight
-                    size={18}
-                    className="text-gray-400 group-hover:text-purple-500 group-hover:translate-x-1 transition-all"
-                  />
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center py-8 text-gray-400">
-              <CheckCircle
-                size={48}
-                className="mb-2 text-green-500 opacity-50"
-              />
-              <p>ไม่มีงานค้าง เยี่ยมมาก!</p>
-            </div>
-          )}
-        </div>
 
-        {/* In Progress Jobs */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col h-full">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-              <Wrench size={20} className="text-blue-500" /> กำลังดำเนินการ
-            </h3>
+                  {job.category && (
+                    <div className="text-xs text-gray-500 mb-2">
+                      {job.category}
+                    </div>
+                  )}
+
+                  <div className="text-xs text-gray-500">
+                    ล็อค {slotNum} • {formatDate(job.requested_at || job.createdAt)}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
-
-          {inProgressJobs.length > 0 ? (
-            <div className="space-y-3">
-              {inProgressJobs.slice(0, 5).map((job) => (
-                <Link
-                  key={job.id}
-                  to={`/maintenance/jobs/${job.id}`}
-                  className="flex items-center justify-between p-4 bg-gray-50 hover:bg-blue-50/50 rounded-xl transition-colors group border border-gray-100"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-blue-500 shadow-sm font-bold border border-gray-100">
-                      {job.slot_number || job.stall?.slot_number || "?"}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-800 group-hover:text-blue-700 transition-colors">
-                        {job.title}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {job.updatedAt
-                          ? new Date(job.updatedAt).toLocaleDateString("th-TH")
-                          : "-"}
-                      </p>
-                    </div>
-                  </div>
-                  <ChevronRight
-                    size={18}
-                    className="text-gray-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all"
-                  />
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center py-8 text-gray-400">
-              <AlertCircle size={48} className="mb-2 opacity-20" />
-              <p>ไม่มีงานที่กำลังดำเนินการ</p>
-            </div>
-          )}
-        </div>
+        ) : (
+          <div className="py-12 text-center text-gray-400">
+            <p className="text-sm">ไม่มีงานค้าง เยี่ยมมาก!</p>
+          </div>
+        )}
       </div>
     </div>
   );

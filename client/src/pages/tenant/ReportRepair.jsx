@@ -94,7 +94,7 @@ const ReportRepair = () => {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-800">แจ้งซ่อม</h1>
         <p className="text-gray-500 text-sm">
-          แจ้งปัญหาหรือการชำรุดในล็อคของคุณ
+          แจ้งปัญหาหรือการชำรุดในล็อกของคุณ
         </p>
       </div>
 

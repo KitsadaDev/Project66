@@ -24,20 +24,20 @@ const Jobs = () => {
 
   const fetchJobs = async () => {
     try {
-      const response = await maintenanceAPI.getMyJobs();
+      const response = await maintenanceAPI.getAll();
       setJobs(response.data.data || []);
     } catch (error) {
       console.error("Error fetching jobs:", error);
-      // Fallback
-      try {
-        const all = await maintenanceAPI.getAll();
-        setJobs(all.data.data || []);
-      } catch (e) {
-        console.error("Fallback failed", e);
-      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "-";
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "-";
+    return date.toLocaleDateString("th-TH");
   };
 
   const getStatusConfig = (status) => {
@@ -71,11 +71,14 @@ const Jobs = () => {
   };
 
   const filteredJobs = jobs.filter((job) => {
+    const slotNum =
+      job.slot?.slot_number ||
+      job.slot_number ||
+      job.stall?.slot_number ||
+      "";
     const matchesSearch =
       job.title?.toLowerCase().includes(search.toLowerCase()) ||
-      (job.slot_number || job.stall?.slot_number)
-        ?.toLowerCase()
-        .includes(search.toLowerCase());
+      slotNum.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === "ALL" || job.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -194,13 +197,14 @@ const Jobs = () => {
                         <div className="flex flex-wrap gap-3 items-center text-sm text-gray-500">
                           <span className="flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded-md font-medium text-gray-600">
                             ล็อค{" "}
-                            {job.slot_number || job.stall?.slot_number || "?"}
+                            {job.slot?.slot_number ||
+                              job.slot_number ||
+                              job.stall?.slot_number ||
+                              "?"}
                           </span>
                           <span className="flex items-center gap-1">
                             <Calendar size={14} />
-                            {new Date(job.createdAt).toLocaleDateString(
-                              "th-TH",
-                            )}
+                            {formatDate(job.requested_at || job.createdAt)}
                           </span>
                         </div>
                       </div>

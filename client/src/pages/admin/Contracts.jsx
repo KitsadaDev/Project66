@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Search,
   FileText,
+  FilePlus,
   Download,
   Calendar,
   CheckCircle,
@@ -138,13 +140,22 @@ const AdminContracts = () => {
             ดูรายละเอียดและสถานะสัญญาเช่าทั้งหมดในระบบ
           </p>
         </div>
-        <button
-          onClick={fetchContracts}
-          className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-100 transition-colors shrink-0"
-        >
-          <FileText size={20} />
-          รีเฟรชข้อมูล
-        </button>
+        <div className="flex items-center gap-3 shrink-0">
+          <Link
+            to="/admin/create-contract"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl shadow-md shadow-purple-200 transition-all font-medium text-sm"
+          >
+            <FilePlus size={18} />
+            สร้างสัญญาใหม่
+          </Link>
+          <button
+            onClick={fetchContracts}
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-100 transition-colors"
+          >
+            <FileText size={18} />
+            รีเฟรชข้อมูล
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">

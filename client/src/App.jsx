@@ -22,6 +22,7 @@ import ReportRepair from "./pages/tenant/ReportRepair";
 import TrackRepairs from "./pages/tenant/TrackRepairs";
 import Notifications from "./pages/tenant/Notifications";
 import UploadBill from "./pages/tenant/UploadBill";
+import CancelContract from "./pages/tenant/CancelContract";
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/Dashboard";
@@ -34,6 +35,7 @@ import AdminSettings from "./pages/admin/Settings";
 import AdminBills from "./pages/admin/Bills";
 import AdminReports from "./pages/admin/Reports";
 import AdminContracts from "./pages/admin/Contracts";
+import CreateContract from "./pages/admin/CreateContract";
 import AdminCancelContracts from "./pages/admin/CancelContracts";
 
 // Maintenance Pages
@@ -115,6 +117,7 @@ function App() {
           <Route index element={<TenantDashboard />} />
           <Route path="expenses" element={<Expenses />} />
           <Route path="contracts" element={<Contracts />} />
+          <Route path="cancel-contract" element={<CancelContract />} />
           <Route path="payment-history" element={<PaymentHistory />} />
           <Route path="stall-status" element={<StallStatus />} />
           <Route path="report-repair" element={<ReportRepair />} />
@@ -142,6 +145,7 @@ function App() {
           <Route path="repairs" element={<AdminRepairs />} />
           <Route path="settings" element={<AdminSettings />} />
           <Route path="contracts" element={<AdminContracts />} />
+          <Route path="create-contract" element={<CreateContract />} />
           <Route path="cancel-contracts" element={<AdminCancelContracts />} />
         </Route>
 
