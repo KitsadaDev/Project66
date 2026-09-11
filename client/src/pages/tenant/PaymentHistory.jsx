@@ -211,9 +211,9 @@ const PaymentHistory = () => {
                       {getStatusBadge(payment.status)}
                     </td>
                     <td className="py-4 px-6">
-                      {payment.payments?.[0]?.payment_slip_url && (
+                      {payment.payments?.[0]?.payment_slip_url ? (
                         <button
-                          className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-100 rounded-lg transition-colors"
+                          className="px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg transition-colors shadow-sm whitespace-nowrap"
                           onClick={() =>
                             setViewModal({
                               open: true,
@@ -224,10 +224,12 @@ const PaymentHistory = () => {
                               },
                             })
                           }
-                          title="ดูใบเสร็จ"
+                          title="ดูหลักฐานการชำระเงิน"
                         >
-                          <Eye size={20} />
+                          ดูหลักฐานการชำระเงิน
                         </button>
+                      ) : (
+                        <span className="text-gray-400 text-xs">-</span>
                       )}
                     </td>
                   </tr>

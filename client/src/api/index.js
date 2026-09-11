@@ -56,8 +56,9 @@ export const contractsAPI = {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
   terminate: (id) => api.post(`/contracts/${id}/terminate`),
-  requestTermination: (id) => api.post(`/contracts/${id}/request-termination`),
-  rejectTermination: (id) => api.post(`/contracts/${id}/reject-termination`)
+  requestTermination: (id, data) => api.post(`/contracts/${id}/request-termination`, data),
+  rejectTermination: (id) => api.post(`/contracts/${id}/reject-termination`),
+  getCancellations: () => api.get('/contracts/cancellations')
 };
 
 export const maintenanceAPI = {
@@ -96,6 +97,10 @@ export const foodCourtsAPI = {
   updateImage: (id, formData) => api.put(`/food-courts/${id}/image`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   })
+};
+
+export const shopTypesAPI = {
+  getAll: () => api.get('/shop-types')
 };
 
 

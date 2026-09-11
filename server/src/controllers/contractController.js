@@ -277,7 +277,11 @@ const requestTermination = async (req, res, next) => {
     await prisma.$transaction([
       prisma.rentalContract.update({
         where: { contract_id: parseInt(id) },
-        data: { status: 'PENDING_TERMINATION' }
+        data: {
+          status: 'PENDING_TERMINATION',
+          cancellation_reason,
+          cancellation_note
+        }
       }),
       prisma.cancellationRequest.create({
         data: {
