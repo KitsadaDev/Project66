@@ -12,8 +12,10 @@ import {
 } from "lucide-react";
 import { contractsAPI } from "../../api";
 import { toast } from "react-toastify";
+import { useAuthStore } from "../../store";
 
 const AdminContracts = () => {
+  const { user } = useAuthStore();
   const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -141,13 +143,15 @@ const AdminContracts = () => {
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <Link
-            to="/admin/create-contract"
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl shadow-md shadow-purple-200 transition-all font-medium text-sm"
-          >
-            <FilePlus size={18} />
-            สร้างสัญญาใหม่
-          </Link>
+          {user?.role !== "EXECUTIVE" && (
+            <Link
+              to="/admin/create-contract"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl shadow-md shadow-purple-200 transition-all font-medium text-sm"
+            >
+              <FilePlus size={18} />
+              สร้างสัญญาใหม่
+            </Link>
+          )}
           <button
             onClick={fetchContracts}
             className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-100 transition-colors"
@@ -301,7 +305,7 @@ const AdminContracts = () => {
                     <td className="py-4 px-6">
                       <div className="flex flex-col gap-2">
                         {getStatusBadge(contract.status)}
-                        {contract.status === "PENDING_TERMINATION" && (
+                        {contract.status === "PENDING_TERMINATION" && user?.role !== "EXECUTIVE" && (
                           <div className="flex items-center gap-2 mt-1">
                             <button
                               onClick={() => handleApproveTermination(contract.contract_id)}
