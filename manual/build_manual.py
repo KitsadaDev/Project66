@@ -1,0 +1,794 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""สร้างไฟล์คู่มือ HTML สำหรับระบบบริหารการเช่าพื้นที่ศูนย์อาหาร มรภ.บุรีรัมย์"""
+
+html = """<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>คู่มือการใช้งาน – ระบบบริหารการเช่าพื้นที่ศูนย์อาหาร มรภ.บุรีรัมย์</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<div class="cover">
+  <div class="cover-logo">&#127859;</div>
+  <h1>คู่มือการใช้งานระบบ</h1>
+  <h2>ระบบบริหารการเช่าพื้นที่ศูนย์อาหาร<br/>มหาวิทยาลัยราชภัฏบุรีรัมย์</h2>
+  <div style="display:inline-block;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);border-radius:50px;padding:8px 24px;font-size:.9rem;margin-top:8px">
+    ฉบับสมบูรณ์ — ครอบคลุมทุกบทบาทผู้ใช้งาน
+  </div>
+  <div style="margin-top:20px;opacity:.7;font-size:.85rem">จัดทำปีการศึกษา 2568 | Buriram Rajabhat University</div>
+</div>
+
+<nav class="toc">
+  <div class="toc-inner">
+    <a href="#overview">&#128203; ภาพรวม</a>
+    <a href="#login">&#128274; เข้าสู่ระบบ</a>
+    <a href="#admin">&#128737; Admin</a>
+    <a href="#tenant">&#127978; Tenant</a>
+    <a href="#maintenance">&#128295; ช่าง</a>
+    <a href="#executive">&#128202; Executive</a>
+    <a href="#faq">&#10067; FAQ</a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+<!-- ===== OVERVIEW ===== -->
+<section id="overview">
+  <div class="ch" style="background:linear-gradient(135deg,#7c3aed,#a855f7)">
+    <div class="ch-icon">&#128203;</div>
+    <div><h2>ภาพรวมระบบ</h2><p>ระบบบริหารการเช่าพื้นที่ศูนย์อาหาร มหาวิทยาลัยราชภัฏบุรีรัมย์</p></div>
+  </div>
+  <div class="card">
+    <div class="stitle">ระบบนี้คืออะไร?</div>
+    <p>ระบบบริหารการเช่าพื้นที่ศูนย์อาหาร มรภ.บุรีรัมย์ เป็นแอปพลิเคชันเว็บสำหรับจัดการพื้นที่เช่าในศูนย์อาหาร 2 แห่ง ครอบคลุมการจัดการแผงค้า สัญญาเช่า การออกบิล การจดมิเตอร์ไฟฟ้า-น้ำ และการแจ้งซ่อมบำรุง</p>
+    <div class="ib inf" style="margin-top:16px">
+      <div class="ib-i">&#8505;&#65039;</div>
+      <div>ระบบมี <strong>4 บทบาทผู้ใช้งาน</strong>: ผู้ดูแลระบบ (Admin), ผู้เช่า (Tenant), ช่างซ่อมบำรุง (Maintenance) และผู้บริหาร (Executive) — แต่ละบทบาทมีสิทธิ์เข้าถึงที่แตกต่างกัน</div>
+    </div>
+    <div class="ngrid" style="margin-top:20px">
+      <div class="nc" onclick="document.getElementById('admin').scrollIntoView({behavior:'smooth'})">
+        <div class="ni">&#128737;&#65039;</div><div class="nt">ผู้ดูแลระบบ (Admin)</div>
+        <div class="nd">จัดการทุกอย่าง เพิ่มผู้เช่า สร้างสัญญา ออกบิล</div>
+      </div>
+      <div class="nc" onclick="document.getElementById('tenant').scrollIntoView({behavior:'smooth'})">
+        <div class="ni">&#127978;</div><div class="nt">ผู้เช่า (Tenant)</div>
+        <div class="nd">ดูสัญญา ชำระเงิน แจ้งซ่อม ติดตามงาน</div>
+      </div>
+      <div class="nc" onclick="document.getElementById('maintenance').scrollIntoView({behavior:'smooth'})">
+        <div class="ni">&#128295;</div><div class="nt">ช่างซ่อม (Maintenance)</div>
+        <div class="nd">รับงานซ่อม อัปเดตความคืบหน้า</div>
+      </div>
+      <div class="nc" onclick="document.getElementById('executive').scrollIntoView({behavior:'smooth'})">
+        <div class="ni">&#128202;</div><div class="nt">ผู้บริหาร (Executive)</div>
+        <div class="nd">ดูรายงานภาพรวม สรุปรายได้ สถิติ</div>
+      </div>
+    </div>
+  </div>
+</section>
+<hr class="dv"/>
+
+<!-- ===== LOGIN ===== -->
+<section id="login">
+  <div class="ch" style="background:linear-gradient(135deg,#1e40af,#3b82f6)">
+    <div class="ch-icon">&#128274;</div>
+    <div><h2>หน้าเข้าสู่ระบบ (Login)</h2><p>ใช้ได้กับทุกบทบาท — ระบบนำทางอัตโนมัติตามบทบาท</p></div>
+  </div>
+  <div class="card">
+    <div class="stitle">วิธีเข้าสู่ระบบ</div>
+    <div class="screen">
+      <div class="sbar">
+        <div class="dot" style="background:#ef4444"></div>
+        <div class="dot" style="background:#f59e0b"></div>
+        <div class="dot" style="background:#22c55e"></div>
+        <div class="url">localhost:5173/login</div>
+      </div>
+      <div class="sc">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:center">
+          <div class="lf">
+            <div style="font-size:2rem;margin-bottom:10px">&#128100;</div>
+            <h3 style="font-size:1.3rem;font-weight:800;margin-bottom:6px">Welcome Back</h3>
+            <p style="opacity:.8;font-size:.85rem;margin-bottom:14px">เข้าสู่ระบบจัดการศูนย์อาหาร</p>
+            <div class="ib2" style="position:relative">
+              &#128100; <span style="flex:1">Username</span>
+              <span class="cb" style="position:absolute;top:-10px;right:-10px">&#9312;</span>
+            </div>
+            <div class="ib2" style="margin-top:10px;position:relative">
+              &#128274; <span style="flex:1">Password</span>
+              <span class="cb" style="position:absolute;top:-10px;right:-10px">&#9313;</span>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:14px">
+              <div style="flex:.8;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:12px;padding:10px;text-align:center;font-size:.85rem;position:relative">
+                ย้อนกลับ<span class="cb" style="position:absolute;top:-10px;right:-10px">&#9314;</span>
+              </div>
+              <div class="lbtn" style="flex:1;position:relative">
+                เข้าสู่ระบบ<span class="cb" style="position:absolute;top:-10px;right:-10px">&#9315;</span>
+              </div>
+            </div>
+          </div>
+          <div>
+            <h3 style="font-weight:700;color:#374151;margin-bottom:8px">มหาวิทยาลัยราชภัฏบุรีรัมย์</h3>
+            <p style="color:#6b7280;font-size:.85rem">ระบบบริหารการเช่าพื้นที่ศูนย์อาหาร</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="fig">ภาพ 1.1 หน้าเข้าสู่ระบบ</p>
+    <ul class="steps">
+      <li><span class="cb">&#9312;</span><p><strong>ช่อง Username</strong> — กรอก Username ที่ได้รับจากผู้ดูแลระบบ</p></li>
+      <li><span class="cb">&#9313;</span><p><strong>ช่อง Password</strong> — กรอกรหัสผ่าน กดไอคอนตาเพื่อแสดง/ซ่อน</p></li>
+      <li><span class="cb">&#9314;</span><p><strong>ปุ่มย้อนกลับ</strong> — กลับไปหน้าหลักเว็บไซต์</p></li>
+      <li><span class="cb">&#9315;</span><p><strong>ปุ่มเข้าสู่ระบบ</strong> — ระบบนำทางอัตโนมัติ: Admin→/admin | Tenant→/tenant | Maintenance→/maintenance | Executive→/executive</p></li>
+    </ul>
+    <div class="ib warn"><div class="ib-i">&#9888;&#65039;</div><div>หากกรอกข้อมูลผิด ระบบแจ้งเตือน ให้ติดต่อ Admin เพื่อรีเซ็ตรหัสผ่าน</div></div>
+  </div>
+</section>
+<hr class="dv"/>
+
+<!-- ===== ADMIN ===== -->
+<section id="admin">
+  <div class="ch" style="background:linear-gradient(135deg,#7c3aed,#a855f7)">
+    <div class="ch-icon">&#128737;&#65039;</div>
+    <div><h2>คู่มือผู้ดูแลระบบ (Admin)</h2><p>Admin มีสิทธิ์จัดการทุกส่วน: แผงค้า ผู้เช่า สัญญา บิล มิเตอร์ งานซ่อม และตั้งค่า</p></div>
+  </div>
+
+  <div class="card">
+    <div class="stitle">1. Dashboard / ผังแผงค้า (หน้าหลัก Admin)</div>
+    <span class="rbadge ra">&#128737;&#65039; Admin</span>
+    <p style="margin-top:14px">หน้าหลักแสดงการ์ดศูนย์อาหาร 2 แห่ง เลือกแล้วแสดงผังแผงค้า Interactive พร้อมสีสถานะ</p>
+    <div class="screen" style="margin-top:16px">
+      <div class="sbar">
+        <div class="dot" style="background:#ef4444"></div><div class="dot" style="background:#f59e0b"></div><div class="dot" style="background:#22c55e"></div>
+        <div class="url">localhost:5173/admin</div>
+      </div>
+      <div class="sc" style="text-align:center">
+        <h3 style="font-size:1.1rem;font-weight:800;margin-bottom:16px;color:#1f2937">เลือกศูนย์อาหาร</h3>
+        <div style="display:inline-grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+          <div style="border-radius:14px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.1);background:#fff;position:relative">
+            <div style="height:80px;background:linear-gradient(135deg,#7c3aed,#a855f7);display:flex;align-items:center;justify-content:center;font-size:2rem">&#127836;</div>
+            <div style="padding:12px;font-weight:700;color:#374151">ศูนย์อาหาร 1<span class="cb" style="position:absolute;top:8px;right:8px">&#9312;</span></div>
+          </div>
+          <div style="border-radius:14px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.1);background:#fff;position:relative">
+            <div style="height:80px;background:linear-gradient(135deg,#2563eb,#60a5fa);display:flex;align-items:center;justify-content:center;font-size:2rem">&#127857;</div>
+            <div style="padding:12px;font-weight:700;color:#374151">ศูนย์อาหาร 2<span class="cb" style="position:absolute;top:8px;right:8px">&#9313;</span></div>
+          </div>
+        </div>
+        <div style="background:#f5f3ff;border-radius:12px;padding:14px;text-align:left;max-width:460px;margin:0 auto">
+          <div style="font-weight:700;margin-bottom:10px;color:#374151">ผังแผงค้า (ตัวอย่าง)</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px">
+            <div class="stall sr" style="position:relative">B1<span class="cb" style="position:absolute;top:-8px;right:-8px;width:20px;height:20px;font-size:.6rem">&#9314;</span></div>
+            <div class="stall sg">B2</div><div class="stall sr">B3</div>
+            <div class="stall sg">B4</div><div class="stall sy">B5</div><div class="stall se">B6</div>
+          </div>
+          <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:.75rem;color:#4b5563">
+            <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;margin-right:4px"></span>ว่าง</span>
+            <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;margin-right:4px"></span>มีผู้เช่า</span>
+            <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#eab308;margin-right:4px"></span>ปิดปรับปรุง</span>
+            <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e5e7eb;margin-right:4px"></span>ยังไม่เปิด</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="fig">ภาพ 2.1 หน้า Dashboard Admin และผังแผงค้า</p>
+    <ul class="steps">
+      <li><span class="cb">&#9312;</span><p><strong>ศูนย์อาหาร 1</strong> — คลิกเพื่อดูผังแผงค้า แถว A-E รวม 37 ล็อก</p></li>
+      <li><span class="cb">&#9313;</span><p><strong>ศูนย์อาหาร 2</strong> — คลิกเพื่อดูผังแผงค้า แถว F รวม 10 ล็อก</p></li>
+      <li><span class="cb">&#9314;</span><p><strong>คลิกที่แผงค้า (สีแดง = มีผู้เช่า)</strong> — แสดง Popup: ชื่อผู้เช่า เบอร์โทร ค่าเช่า วันสิ้นสุดสัญญา พร้อม Sidebar เมนูลัด</p></li>
+    </ul>
+    <div class="ib tip"><div class="ib-i">&#128161;</div><div>คลิกแผงค้าสีเขียว (ว่าง) จะมีปุ่ม "ทำสัญญา / แก้ไขแผงค้า" นำทางไปยังหน้าจัดการสถานะโดยตรง</div></div>
+  </div>
+
+  <div class="card">
+    <div class="stitle">2. จัดการข้อมูลผู้เช่า (Tenants)</div>
+    <span class="rbadge ra">&#128737;&#65039; Admin</span>
+    <p style="margin-top:14px">เพิ่ม แก้ไข ดูข้อมูลผู้เช่าทั้งหมด และสร้างสัญญาเช่า</p>
+    <div class="screen" style="margin-top:16px">
+      <div class="sbar">
+        <div class="dot" style="background:#ef4444"></div><div class="dot" style="background:#f59e0b"></div><div class="dot" style="background:#22c55e"></div>
+        <div class="url">localhost:5173/admin/tenants</div>
+      </div>
+      <div class="sc">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <strong>จัดการข้อมูลผู้เช่า</strong>
+          <button class="btn bp" style="position:relative">&#10133; เพิ่มผู้เช่า<span class="cb" style="position:absolute;top:-10px;right:-10px">&#9312;</span></button>
+        </div>
+        <input placeholder="&#128269; ค้นหาชื่อผู้เช่า..." style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:12px;font-size:.85rem;color:#9ca3af;margin-bottom:14px" readonly/>
+        <table class="tbl">
+          <thead><tr><th>ผู้เช่า</th><th>เบอร์โทร</th><th>แผง</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>นายสมชาย ใจดี</strong><br/><small style="color:#9ca3af">somchai@bru.ac.th</small></td>
+              <td>081-234-5678</td>
+              <td><span class="badge bb-b">B1</span></td>
+              <td><span class="badge bg-b">&#10003; ทำสัญญาอยู่</span></td>
+              <td>
+                <button class="btn bs" style="padding:6px 10px;font-size:.75rem;position:relative;margin-right:4px">&#9998; แก้ไข<span class="cb" style="position:absolute;top:-10px;right:-10px;width:20px;height:20px;font-size:.6rem">&#9313;</span></button>
+                <button class="btn" style="background:#ecfdf5;color:#065f46;padding:6px 10px;font-size:.75rem;position:relative">&#128196; สัญญา<span class="cb" style="position:absolute;top:-10px;right:-10px;width:20px;height:20px;font-size:.6rem">&#9314;</span></button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="fig">ภาพ 2.2 หน้าจัดการผู้เช่า</p>
+    <ul class="steps">
+      <li><span class="cb">&#9312;</span><p><strong>ปุ่ม "เพิ่มผู้เช่า"</strong> — เปิด Modal กรอก: ชื่อ-นามสกุล, เบอร์โทร, อีเมล, ที่อยู่ (Dropdown จังหวัด/อำเภอ/ตำบล), Username/Password, ประเภทอาหาร, แผงค้า</p></li>
+      <li><span class="cb">&#9313;</span><p><strong>ปุ่ม "แก้ไข"</strong> — แก้ไขข้อมูลส่วนตัวของผู้เช่า</p></li>
+      <li><span class="cb">&#9314;</span><p><strong>ปุ่ม "สัญญา"</strong> — เปิดฟอร์มสร้าง/แก้ไขสัญญา: เลขสัญญา, วันเริ่ม-สิ้นสุด, เลขบัตรประชาชน, ค่าประกัน, ค่าปรับ, ไฟล์สัญญา</p></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="stitle">3. จัดการสถานะแผงค้า (Stalls)</div>
+    <span class="rbadge ra">&#128737;&#65039; Admin</span>
+    <p style="margin-top:14px">คลิกแผงค้าบนผังเพื่อเพิ่ม/แก้ไขข้อมูล (ขนาด, ค่าเช่า, สถานะ)</p>
+    <div class="screen" style="margin-top:16px">
+      <div class="sbar">
+        <div class="dot" style="background:#ef4444"></div><div class="dot" style="background:#f59e0b"></div><div class="dot" style="background:#22c55e"></div>
+        <div class="url">localhost:5173/admin/stalls</div>
+      </div>
+      <div class="sc">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:16px">
+          <div class="stall sr" style="position:relative">B1<span class="cb" style="position:absolute;top:-8px;right:-8px;width:20px;height:20px;font-size:.6rem">&#9312;</span></div>
+          <div class="stall sg">B2</div><div class="stall sr">B3</div><div class="stall sg">B4</div><div class="stall sy">B5</div>
+        </div>
+        <div style="max-width:280px;border:1.5px solid #e5e7eb;border-radius:14px;padding:16px;background:#fff">
+          <div style="font-weight:700;margin-bottom:12px">แก้ไขล็อก B1</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;font-size:.82rem">
+            <div><label style="font-weight:600;color:#4b5563;display:block;margin-bottom:4px">ขนาด (ตร.ม.)</label><input value="4.5" style="width:100%;padding:8px;border:1.5px solid #e5e7eb;border-radius:8px"/></div>
+            <div><label style="font-weight:600;color:#4b5563;display:block;margin-bottom:4px">ค่าเช่า (บาท)</label><input value="1500" style="width:100%;padding:8px;border:1.5px solid #e5e7eb;border-radius:8px"/></div>
+          </div>
+          <select style="width:100%;padding:8px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.82rem;margin-bottom:10px">
+            <option>OCCUPIED — มีผู้เช่า</option><option>VACANT — ว่าง</option><option>MAINTENANCE — ปิดปรับปรุง</option>
+          </select>
+          <button class="btn bp" style="width:100%;justify-content:center;position:relative">&#128190; บันทึก<span class="cb" style="position:absolute;top:-10px;right:-10px">&#9313;</span></button>
+        </div>
+      </div>
+    </div>
+    <p class="fig">ภาพ 2.3 หน้าจัดการสถานะแผงค้า</p>
+    <ul class="steps">
+      <li><span class="cb">&#9312;</span><p><strong>คลิกแผงค้า</strong> — มีข้อมูลแล้ว: เปิด Modal แก้ไข | ยังไม่มีข้อมูล: เปิด Modal เพิ่มใหม่</p></li>
+      <li><span class="cb">&#9313;</span><p><strong>ปุ่ม "บันทึก"</strong> — บันทึกข้อมูลขนาด ค่าเช่า สถานะ ลงระบบทันที</p></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="stitle">4. ข้อมูลสัญญาเช่า (Contracts)</div>
+    <span class="rbadge ra">&#128737;&#65039; Admin</span>
+    <p style="margin-top:14px">ดูสัญญาทั้งหมด กรองตามสถานะ อนุมัติ/ปฏิเสธคำขอยกเลิกสัญญา</p>
+    <div class="screen" style="margin-top:16px">
+      <div class="sbar">
+        <div class="dot" style="background:#ef4444"></div><div class="dot" style="background:#f59e0b"></div><div class="dot" style="background:#22c55e"></div>
+        <div class="url">localhost:5173/admin/contracts</div>
+      </div>
+      <div class="sc">
+        <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+          <input placeholder="&#128269; ค้นหาสัญญา..." style="flex:1;min-width:160px;padding:9px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:.82rem;color:#9ca3af" readonly/>
+          <select style="padding:9px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:.82rem;color:#374151">
+            <option>สถานะทั้งหมด</option><option>ทำสัญญาอยู่</option><option>รอยกเลิก</option><option>หมดอายุ</option>
+          </select>
+          <span class="cb" style="align-self:center">&#9312;</span>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>สัญญา/แผง</th><th>ผู้เช่า</th><th>ระยะสัญญา</th><th style="text-align:right">ค่าเช่า</th><th>สถานะ</th></tr></thead>
+          <tbody>
+            <tr>
+              <td style="font-family:monospace;font-weight:700">CNT-2568-001<br/><span class="badge bb-b" style="font-size:.7rem">B1</span></td>
+              <td>นายสมชาย ใจดี</td>
+              <td style="font-size:.8rem">1/1/2568–31/12/2568</td>
+              <td style="text-align:right;font-weight:700">1,500 &#3647;</td>
+              <td><span class="badge bg-b">&#10003; ทำสัญญาอยู่</span></td>
+            </tr>
+            <tr>
+              <td style="font-family:monospace;font-weight:700">CNT-2568-002<br/><span class="badge bb-b" style="font-size:.7rem">A3</span></td>
+              <td>นางสาวมาลี สวยงาม</td>
+              <td style="font-size:.8rem">1/6/2568–31/5/2569</td>
+              <td style="text-align:right;font-weight:700">1,200 &#3647;</td>
+              <td>
+                <span class="badge by-b">&#8987; ขอยกเลิก</span><br/>
+                <div style="display:flex;gap:6px;margin-top:6px;position:relative">
+                  <button class="btn bd" style="padding:5px 10px;font-size:.72rem">อนุมัติ<span class="cb" style="position:absolute;top:-10px;left:0;width:20px;height:20px;font-size:.6rem">&#9313;</span></button>
+                  <button class="btn bs" style="padding:5px 10px;font-size:.72rem">ปฏิเสธ<span class="cb" style="position:absolute;top:-10px;right:0;width:20px;height:20px;font-size:.6rem">&#9314;</span></button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="fig">ภาพ 2.4 หน้าสัญญาเช่าทั้งหมด</p>
+    <ul class="steps">
+      <li><span class="cb">&#9312;</span><p><strong>Dropdown กรองสถานะ</strong> — ทั้งหมด / ทำสัญญาอยู่ / รอยกเลิก / หมดอายุ / ยกเลิกแล้ว</p></li>
+      <li><span class="cb">&#9313;</span><p><strong>ปุ่ม "อนุมัติ"</strong> — อนุมัติคำขอยกเลิก แผงค้าเปลี่ยนสถานะว่างทันที</p></li>
+      <li><span class="cb">&#9314;</span><p><strong>ปุ่ม "ปฏิเสธ"</strong> — ปฏิเสธคำขอ สัญญายังคงมีผล</p></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="stitle">5. จัดการบิล (Bills)</div>
+    <span class="rbadge ra">&#128737;&#65039; Admin</span>
+    <p style="margin-top:14px">สร้างบิลรายเดือน และตรวจสอบสลิปการชำระเงิน</p>
+    <div class="screen" style="margin-top:16px">
+      <div class="sbar">
+        <div class="dot" style="background:#ef4444"></div><div class="dot" style="background:#f59e0b"></div><div class="dot" style="background:#22c55e"></div>
+        <div class="url">localhost:5173/admin/bills</div>
+      </div>
+      <div class="sc">
+        <div style="display:flex;justify-content:space-between;margin-bottom:14px;align-items:center">
+          <strong>จัดการบิล</strong>
+          <button class="btn bp" style="position:relative">&#10133; ออกบิลใหม่<span class="cb" style="position:absolute;top:-10px;right:-10px">&#9312;</span></button>
+        </div>
+        <div style="border:1.5px solid #ede9fe;border-radius:14px;padding:16px;background:#fff;margin-bottom:14px;max-width:400px">
+          <strong style="display:block;margin-bottom:12px">&#128221; ออกบิลใหม่</strong>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.82rem;margin-bottom:8px">
+            <div><label style="font-weight:600;color:#4b5563;display:block;margin-bottom:4px">แผงค้า</label><select style="width:100%;padding:8px;border:1.5px solid #e5e7eb;border-radius:8px"><option>B1 – สมชาย</option></select></div>
+            <div><label style="font-weight:600;color:#4b5563;display:block;margin-bottom:4px">เดือน</label><input type="month" value="2025-09" style="width:100%;padding:8px;border:1.5px solid #e5e7eb;border-radius:8px"/></div>
+            <div><label style="font-weight:600;color:#4b5563;display:block;margin-bottom:4px">ค่าน้ำ (บาท)</label><input placeholder="0.00" style="width:100%;padding:8px;border:1.5px solid #e5e7eb;border-radius:8px"/></div>
+            <div><label style="font-weight:600;color:#4b5563;display:block;margin-bottom:4px">ค่าไฟ (บาท)</label><input placeholder="0.00" style="width:100%;padding:8px;border:1.5px solid #e5e7eb;border-radius:8px"/></div>
+          </div>
+          <div style="font-size:.82rem;margin-bottom:10px"><label style="font-weight:600;color:#4b5563;display:block;margin-bottom:4px">ค่าดักไขมัน (บาท)</label><input placeholder="0.00" style="width:100%;padding:8px;border:1.5px solid #e5e7eb;border-radius:8px"/></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn bs" style="flex:1;position:relative;justify-content:center">&#128290; คำนวณ<span class="cb" style="position:absolute;top:-10px;right:-10px">&#9313;</span></button>
+            <button class="btn bp" style="flex:1;position:relative;justify-content:center">&#128190; ออกบิล<span class="cb" style="position:absolute;top:-10px;right:-10px">&#9314;</span></button>
+          </div>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>บิล</th><th>ผู้เช่า/แผง</th><th>เดือน</th><th style="text-align:right">ยอดรวม</th><th>สถานะ</th><th>สลิป</th></tr></thead>
+          <tbody>
+            <tr>
+              <td style="font-family:monospace;font-weight:600">BILL-001</td>
+              <td>สมชาย ใจดี<br/><small style="color:#9ca3af">แผง B1</small></td>
+              <td>ก.ย. 2568</td>
+              <td style="text-align:right;font-weight:700">3,250 &#3647;</td>
+              <td><span class="badge by-b">&#8987; รอตรวจสอบ</span></td>
+              <td><button class="btn" style="background:#f5f3ff;color:#7c3aed;padding:5px 10px;font-size:.75rem;position:relative">&#128065; ดูสลิป<span class="cb" style="position:absolute;top:-10px;right:-10px;width:20px;height:20px;font-size:.6rem">&#9315;</span></button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="fig">ภาพ 2.5 หน้าออกบิลและจัดการสลิป</p>
+    <ul class="steps">
+      <li><span class="cb">&#9312;</span><p><strong>ปุ่ม "ออกบิลใหม่"</strong> — เปิดฟอร์มเลือกแผง กำหนดเดือน ค่าน้ำ ค่าไฟ ค่าดักไขมัน</p></li>
+      <li><span class="cb">&#9313;</span><p><strong>ปุ่ม "คำนวณ"</strong> — แสดงยอดรวมก่อนยืนยัน (ค่าเช่า + ค่าน้ำ + ค่าไฟ + ค่าดักไขมัน)</p></li>
+      <li><span class="cb">&#9314;</span><p><strong>ปุ่ม "ออกบิล"</strong> — ยืนยันสร้างบิล ส่งให้ผู้เช่าทันที</p></li>
+      <li><span class="cb">&#9315;</span><p><strong>ปุ่ม "ดูสลิป"</strong> — ดูสลิปที่ผู้เช่าอัปโหลด แล้ว "อนุมัติ" หรือ "ปฏิเสธ"</p></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="stitle">6. บันทึกมิเตอร์น้ำ-ไฟ (Meter Recording)</div>
+    <span class="rbadge ra">&#128737;&#65039; Admin</span>
+    <p style="margin-top:14px">บันทึกค่ามิเตอร์น้ำและไฟฟ้าของแต่ละแผงค้า เพื่อคำนวณค่าสาธารณูปโภคในบิล</p>
+    <div class="screen" style="margin-top:16px">
+      <div class="sbar">
+        <div class="dot" style="background:#ef4444"></div><div class="dot" style="background:#f59e0b"></div><div class="dot" style="background:#22c55e"></div>
+        <div class="url">localhost:5173/admin/meter-recording</div>
+      </div>
+      <div class="sc">
+        <div style="max-width:420px;border:1.5px solid #e5e7eb;border-radius:14px;padding:16px;background:#fff">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+            <div style="width:40px;height:40px;border-radius:10px;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-weight:800;color:#7c3aed">B1</div>
+            <div><div style="font-weight:700">นายสมชาย ใจดี</div><div style="font-size:.75rem;color:#9ca3af">ศูนย์อาหาร 1</div></div>
+            <button class="btn bp" style="margin-left:auto;padding:6px 12px;font-size:.78rem;position:relative">&#9998; แก้ไข<span class="cb" style="position:absolute;top:-10px;right:-10px;width:20px;height:20px;font-size:.6rem">&#9312;</span></button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+            <div style="background:#eff6ff;border-radius:10px;padding:12px">
+              <div style="font-size:.75rem;color:#1e40af;font-weight:600;margin-bottom:6px">&#128167; มิเตอร์น้ำ</div>
+              <div style="font-size:.7rem;color:#6b7280;margin-bottom:4px">ครั้งก่อน: 1,234 หน่วย</div>
+              <input value="1280" style="width:80px;padding:6px 8px;border:1.5px solid #bfdbfe;border-radius:8px;font-size:.85rem;font-weight:600;text-align:center"/>
+              <div style="margin-top:6px;font-size:.7rem;color:#1e40af">ใช้ 46 หน่วย = 644 &#3647;</div>
+            </div>
+            <div style="background:#fefce8;border-radius:10px;padding:12px">
+              <div style="font-size:.75rem;color:#713f12;font-weight:600;margin-bottom:6px">&#9889; มิเตอร์ไฟ</div>
+              <div style="font-size:.7rem;color:#6b7280;margin-bottom:4px">ครั้งก่อน: 5,120 หน่วย</div>
+              <input value="5340" style="width:80px;padding:6px 8px;border:1.5px solid #fde68a;border-radius:8px;font-size:.85rem;font-weight:600;text-align:center"/>
+              <div style="margin-top:6px;font-size:.7rem;color:#d97706">ใช้ 220 หน่วย = 1,320 &#3647;</div>
+            </div>
+          </div>
+          <button class="btn bg2" style="width:100%;justify-content:center;position:relative">&#128190; บันทึกมิเตอร์<span class="cb" style="position:absolute;top:-10px;right:-10px">&#9313;</span></button>
+        </div>
+      </div>
+    </div>
+    <p class="fig">ภาพ 2.6 หน้าบันทึกมิเตอร์น้ำ-ไฟ</p>
+    <ul class="steps">
+      <li><span class="cb">&#9312;</span><p><strong>ปุ่ม "แก้ไข"</strong> — เปิดโหมดกรอกค่ามิเตอร์ปัจจุบัน</p></li>
+      <li><span class="cb">&#9313;</span><p><strong>ปุ่ม "บันทึกมิเตอร์"</strong> — บันทึกค่า ระบบคำนวณหน่วยใช้อัตโนมัติ (ค่าน้ำ/ค่าไฟต่อหน่วย ตามที่ตั้งใน Settings)</p></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="stitle">7. จัดการงานซ่อม (Repairs)</div>
+    <span class="rbadge ra">&#128737;&#65039; Admin</span>
+    <p style="margin-top:14px">ดูรายการแจ้งซ่อมทั้งหมด มอบหมายให้ช่าง และติดตามสถานะ</p>
+    <div class="screen" style="margin-top:16px">
+      <div class="sbar">
+        <div class="dot" style="background:#ef4444"></div><div class="dot" style="background:#f59e0b"></div><div class="dot" style="background:#22c55e"></div>
+        <div class="url">localhost:5173/admin/repairs</div>
+      </div>
+      <div class="sc">
+        <table class="tbl">
+          <thead><tr><th>ปัญหา/แผง</th><th>ผู้แจ้ง</th><th>วันที่แจ้ง</th><th>มอบหมายช่าง</th><th>สถานะ</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>ไฟฟ้าขัดข้อง</strong><br/><small style="color:#9ca3af">แผง B1</small></td>
+              <td>สมชาย ใจดี</td>
+              <td style="font-size:.8rem">10 ก.ย. 2568</td>
+              <td style="position:relative">
+                <select style="padding:5px 8px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.78rem"><option>นายช่าง วิชัย</option></select>
+                <span class="cb" style="margin-left:6px">&#9312;</span>
+              </td>
+              <td><span class="badge by-b">&#8987; รอดำเนินการ</span></td>
+            </tr>
+            <tr>
+              <td><strong>ท่อน้ำรั่ว</strong><br/><small style="color:#9ca3af">แผง A3</small></td>
+              <td>มาลี สวยงาม</td>
+              <td style="font-size:.8rem">8 ก.ย. 2568</td>
+              <td>นายช่าง สมพร</td>
+              <td><span class="badge bb-b">&#128295; กำลังดำเนินการ</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="fig">ภาพ 2.7 หน้าจัดการงานซ่อม</p>
+    <ul class="steps">
+      <li><span class="cb">&#9312;</span><p><strong>Dropdown มอบหมายช่าง</strong> — เลือกช่างซ่อม งานจะปรากฏในหน้าช่างคนนั้นทันที</p></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="stitle">8. การตั้งค่า (Settings)</div>
+    <span class="rbadge ra">&#128737;&#65039; Admin</span>
+    <p style="margin-top:14px">ตั้งค่าอัตราค่าน้ำและค่าไฟต่อหน่วย ใช้คำนวณบิลรายเดือน</p>
+    <div class="screen" style="margin-top:16px">
+      <div class="sbar">
+        <div class="dot" style="background:#ef4444"></div><div class="dot" style="background:#f59e0b"></div><div class="dot" style="background:#22c55e"></div>
+        <div class="url">localhost:5173/admin/settings</div>
+      </div>
+      <div class="sc" style="max-width:360px">
+        <div style="font-size:1rem;font-weight:800;color:#1f2937;margin-bottom:14px">&#9881;&#65039; ตั้งค่าระบบ</div>
+        <div style="border:1.5px solid #ede9fe;border-radius:14px;padding:18px;background:#fff">
+          <div style="font-weight:700;color:#7c3aed;margin-bottom:12px">อัตราค่าสาธารณูปโภค</div>
+          <div style="margin-bottom:10px;font-size:.82rem"><label style="font-weight:600;color:#4b5563;display:block;margin-bottom:4px">&#128167; ค่าน้ำ (บาท/หน่วย)</label><input value="14" type="number" style="width:100%;padding:10px;border:1.5px solid #e5e7eb;border-radius:10px"/><span class="cb" style="display:inline-block;margin-top:6px">&#9312;</span></div>
+          <div style="margin-bottom:14px;font-size:.82rem"><label style="font-weight:600;color:#4b5563;display:block;margin-bottom:4px">&#9889; ค่าไฟ (บาท/หน่วย)</label><input value="6" type="number" style="width:100%;padding:10px;border:1.5px solid #e5e7eb;border-radius:10px"/><span class="cb" style="display:inline-block;margin-top:6px">&#9313;</span></div>
+          <button class="btn bp" style="width:100%;justify-content:center;position:relative">&#128190; บันทึกการตั้งค่า<span class="cb" style="position:absolute;top:-10px;right:-10px">&#9314;</span></button>
+        </div>
+      </div>
+    </div>
+    <p class="fig">ภาพ 2.8 หน้าตั้งค่าอัตราสาธารณูปโภค</p>
+    <ul class="steps">
+      <li><span class="cb">&#9312;</span><p><strong>ค่าน้ำ</strong> — ค่าเริ่มต้น 14 บาท/หน่วย</p></li>
+      <li><span class="cb">&#9313;</span><p><strong>ค่าไฟ</strong> — ค่าเริ่มต้น 6 บาท/หน่วย</p></li>
+      <li><span class="cb">&#9314;</span><p><strong>ปุ่ม "บันทึก"</strong> — ระบบใช้อัตรานี้คำนวณบิลครั้งถัดไป</p></li>
+    </ul>
+  </div>
+</section>
+<hr class="dv"/>
+
+<!-- ===== TENANT ===== -->
+<section id="tenant">
+  <div class="ch" style="background:linear-gradient(135deg,#059669,#34d399)">
+    <div class="ch-icon">&#127978;</div>
+    <div><h2>คู่มือผู้เช่า (Tenant)</h2><p>ดูสัญญา ค่าใช้จ่าย ชำระเงิน แจ้งซ่อม และติดตามงาน</p></div>
+  </div>
+
+  <div class="card">
+    <div class="stitle">1. Dashboard หน้าหลักผู้เช่า</div>
+    <span class="rbadge rt">&#127978; Tenant</span>
+    <p style="margin-top:14px">แสดงแจ้งเตือนบิลครบกำหนด ผังแผงค้า และเมนูด่วนทุกฟังก์ชัน</p>
+    <div class="screen" style="margin-top:16px">
+      <div class="sbar">
+        <div class="dot" style="background:#ef4444"></div><div class="dot" style="background:#f59e0b"></div><div class="dot" style="background:#22c55e"></div>
+        <div class="url">localhost:5173/tenant</div>
+      </div>
+      <div class="sc">
+        <div style="background:#fef2f2;border:1.5px solid #fecaca;border-radius:14px;padding:14px;margin-bottom:14px;position:relative">
+          <div style="font-weight:700;color:#7f1d1d;margin-bottom:4px">&#9888;&#65039; แจ้งเตือนการชำระเงิน</div>
+          <div style="color:#dc2626;font-size:.85rem;margin-bottom:8px">คุณมีบิลที่ต้องชำระภายใน 7 วัน</div>
+          <div style="background:#fff;border-radius:10px;padding:10px 14px;border:1px solid #fecaca;display:flex;justify-content:space-between;font-size:.85rem">
+            <span>บิลเดือน ก.ย. 2568</span>
+            <span style="font-weight:700;color:#dc2626">3,250 &#3647;</span>
+          </div>
+          <span class="cb" style="position:absolute;top:-10px;right:-10px">&#9312;</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div style="background:#fff;border-radius:12px;padding:14px;text-align:center;border:1px solid #f3f4f6;position:relative"><div style="font-size:1.5rem;margin-bottom:6px">&#129534;</div><div style="font-size:.8rem;font-weight:600">ค่าใช้จ่าย</div><span class="cb" style="position:absolute;top:-8px;right:-8px;width:20px;height:20px;font-size:.6rem">&#9313;</span></div>
+          <div style="background:#fff;border-radius:12px;padding:14px;text-align:center;border:1px solid #f3f4f6;position:relative"><div style="font-size:1.5rem;margin-bottom:6px">&#128196;</div><div style="font-size:.8rem;font-weight:600">สัญญาเช่า</div><span class="cb" style="position:absolute;top:-8px;right:-8px;width:20px;height:20px;font-size:.6rem">&#9314;</span></div>
+          <div style="background:#fff;border-radius:12px;padding:14px;text-align:center;border:1px solid #f3f4f6;position:relative"><div style="font-size:1.5rem;margin-bottom:6px">&#128220;</div><div style="font-size:.8rem;font-weight:600">ประวัติชำระ</div><span class="cb" style="position:absolute;top:-8px;right:-8px;width:20px;height:20px;font-size:.6rem">&#9315;</span></div>
+          <div style="background:#fff;border-radius:12px;padding:14px;text-align:center;border:1px solid #f3f4f6;position:relative"><div style="font-size:1.5rem;margin-bottom:6px">&#128295;</div><div style="font-size:.8rem;font-weight:600">แจ้งซ่อม</div><span class="cb" style="position:absolute;top:-8px;right:-8px;width:20px;height:20px;font-size:.6rem">&#9316;</span></div>
+          <div style="background:#fff;border-radius:12px;padding:14px;text-align:center;border:1px solid #f3f4f6;position:relative"><div style="font-size:1.5rem;margin-bottom:6px">&#128203;</div><div style="font-size:.8rem;font-weight:600">ติดตามซ่อม</div><span class="cb" style="position:absolute;top:-8px;right:-8px;width:20px;height:20px;font-size:.6rem">&#9317;</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="fig">ภาพ 3.1 Dashboard ผู้เช่า</p>
+    <ul class="steps">
+      <li><span class="cb">&#9312;</span><p><strong>กล่องแจ้งเตือน</strong> — แสดงเมื่อมีบิลครบกำหนดภายใน 7 วัน</p></li>
+      <li><span class="cb">&#9313;</span><p><strong>"ค่าใช้จ่าย"</strong> → /tenant/bills — ดูรายการบิลทั้งหมด</p></li>
+      <li><span class="cb">&#9314;</span><p><strong>"สัญญาเช่า"</strong> → /tenant/contracts — ดูสัญญาและยื่นขอยกเลิก</p></li>
+      <li><span class="cb">&#9315;</span><p><strong>"ประวัติชำระ"</strong> → /tenant/payment-history — ดูประวัติและอัปโหลดสลิป</p></li>
+      <li><span class="cb">&#9316;</span><p><strong>"แจ้งซ่อม"</strong> → /tenant/report-repair — ส่งคำขอซ่อมบำรุง</p></li>
+      <li><span class="cb">&#9317;</span><p><strong>"ติดตามซ่อม"</strong> → /tenant/track-repairs — ดูสถานะงานซ่อม</p></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="stitle">2. ชำระเงิน / อัปโหลดสลิป</div>
+    <span class="rbadge rt">&#127978; Tenant</span>
+    <div class="screen" style="margin-top:16px">
+      <div class="sbar">
+        <div class="dot" style="background:#ef4444"></div><div class="dot" style="background:#f59e0b"></div><div class="dot" style="background:#22c55e"></div>
+        <div class="url">localhost:5173/tenant/payment-history</div>
+      </div>
+      <div class="sc">
+        <div style="border:1.5px solid #fecaca;border-radius:14px;padding:16px;background:#fef2f2;max-width:440px">
+          <div style="font-weight:700;color:#7f1d1d;margin-bottom:10px">บิลเดือน ก.ย. 2568 — รอชำระ</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:.8rem;margin-bottom:12px">
+            <div><div style="color:#9ca3af">ค่าเช่า</div><div style="font-weight:600">1,500 &#3647;</div></div>
+            <div><div style="color:#9ca3af">ค่าน้ำ</div><div style="font-weight:600">644 &#3647;</div></div>
+            <div><div style="color:#9ca3af">ค่าไฟ</div><div style="font-weight:600">1,106 &#3647;</div></div>
+            <div><div style="color:#9ca3af">รวม</div><div style="font-weight:800;color:#dc2626">3,250 &#3647;</div></div>
+          </div>
+          <div style="border:2px dashed #fca5a5;border-radius:12px;padding:18px;text-align:center;background:#fff;margin-bottom:10px">
+            <div style="font-size:1.3rem;margin-bottom:6px">&#128206;</div>
+            <div style="font-size:.82rem;color:#6b7280;margin-bottom:8px">ลากไฟล์สลิปมาวาง หรือ</div>
+            <button class="btn bp" style="position:relative">&#128228; เลือกไฟล์สลิป<span class="cb" style="position:absolute;top:-10px;right:-10px">&#9312;</span></button>
+            <div style="font-size:.7rem;color:#9ca3af;margin-top:6px">JPG, PNG, PDF ไม่เกิน 5 MB</div>
+          </div>
+          <button class="btn bg2" style="width:100%;justify-content:center;position:relative">&#128190; ส่งสลิปการชำระเงิน<span class="cb" style="position:absolute;top:-10px;right:-10px">&#9313;</span></button>
+        </div>
+      </div>
+    </div>
+    <p class="fig">ภาพ 3.2 หน้าอัปโหลดสลิปชำระเงิน</p>
+    <ul class="steps">
+      <li><span class="cb">&#9312;</span><p><strong>เลือกไฟล์สลิป</strong> — เลือกภาพสลิปการโอนเงิน (JPG/PNG/PDF ไม่เกิน 5MB)</p></li>
+      <li><span class="cb">&#9313;</span><p><strong>ส่งสลิป</strong> — ส่งให้ Admin ตรวจสอบ สถานะเปลี่ยนเป็น "รอตรวจสอบ"</p></li>
+    </ul>
+    <div class="ib tip"><div class="ib-i">&#128161;</div><div>Admin ตรวจสอบและอนุมัติภายใน 1-2 วันทำการ สถานะจะเปลี่ยนเป็น "ชำระแล้ว"</div></div>
+  </div>
+
+  <div class="card">
+    <div class="stitle">3. สัญญาเช่าและขอยกเลิก</div>
+    <span class="rbadge rt">&#127978; Tenant</span>
+    <div class="screen" style="margin-top:16px">
+      <div class="sbar">
+        <div class="dot" style="background:#ef4444"></div><div class="dot" style="background:#f59e0b"></div><div class="dot" style="background:#22c55e"></div>
+        <div class="url">localhost:5173/tenant/contracts</div>
+      </div>
+      <div class="sc">
+        <div style="border:1.5px solid #e5e7eb;border-radius:14px;padding:18px;background:#fff;max-width:420px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+            <div style="font-family:monospace;font-weight:700;color:#7c3aed">CNT-2568-001</div>
+            <span class="badge bg-b">&#10003; ทำสัญญาอยู่</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.82rem;background:#f9fafb;border-radius:10px;padding:12px;margin-bottom:14px">
+            <div><span style="color:#9ca3af">แผง:</span> B1</div>
+            <div><span style="color:#9ca3af">ค่าเช่า:</span> 1,500 &#3647;/เดือน</div>
+            <div><span style="color:#9ca3af">เริ่ม:</span> 1 ม.ค. 2568</div>
+            <div><span style="color:#9ca3af">สิ้นสุด:</span> 31 ธ.ค. 2568</div>
+          </div>
+          <button class="btn bd" style="position:relative">&#128683; ขอยกเลิกสัญญา<span class="cb" style="position:absolute;top:-10px;right:-10px">&#9312;</span></button>
+        </div>
+      </div>
+    </div>
+    <p class="fig">ภาพ 3.3 หน้าสัญญาเช่า</p>
+    <ul class="steps">
+      <li><span class="cb">&#9312;</span><p><strong>ปุ่ม "ขอยกเลิกสัญญา"</strong> — ส่งคำขอให้ Admin พิจารณา ต้องรอการอนุมัติจึงมีผล</p></li>
+    </ul>
+    <div class="ib warn"><div class="ib-i">&#9888;&#65039;</div><div>ผู้เช่าไม่สามารถยกเลิกสัญญาได้ทันที ต้องรอ Admin อนุมัติเท่านั้น</div></div>
+  </div>
+
+  <div class="card">
+    <div class="stitle">4. แจ้งซ่อม (Report Repair)</div>
+    <span class="rbadge rt">&#127978; Tenant</span>
+    <div class="screen" style="margin-top:16px">
+      <div class="sbar">
+        <div class="dot" style="background:#ef4444"></div><div class="dot" style="background:#f59e0b"></div><div class="dot" style="background:#22c55e"></div>
+        <div class="url">localhost:5173/tenant/report-repair</div>
+      </div>
+      <div class="sc" style="max-width:440px">
+        <div style="font-size:1rem;font-weight:800;margin-bottom:14px">&#128295; แจ้งซ่อมบำรุง</div>
+        <div style="margin-bottom:10px;font-size:.82rem"><label style="font-weight:600;color:#4b5563;display:block;margin-bottom:4px">หัวข้อปัญหา</label><input placeholder="เช่น ไฟฟ้าขัดข้อง, ท่อน้ำรั่ว..." style="width:100%;padding:10px;border:1.5px solid #e5e7eb;border-radius:10px;color:#9ca3af" readonly/><span class="cb" style="display:inline-block;margin-top:6px">&#9312;</span></div>
+        <div style="margin-bottom:10px;font-size:.82rem"><label style="font-weight:600;color:#4b5563;display:block;margin-bottom:4px">รายละเอียด</label><textarea placeholder="อธิบายเพิ่มเติม..." style="width:100%;padding:10px;border:1.5px solid #e5e7eb;border-radius:10px;min-height:70px;resize:none;font-family:inherit;color:#9ca3af"></textarea><span class="cb" style="display:inline-block;margin-top:6px">&#9313;</span></div>
+        <div style="margin-bottom:12px;font-size:.82rem"><label style="font-weight:600;color:#4b5563;display:block;margin-bottom:4px">แนบรูปภาพ (ถ้ามี)</label><div style="border:2px dashed #e5e7eb;border-radius:10px;padding:14px;text-align:center;color:#9ca3af">&#128247; คลิกหรือลากไฟล์</div><span class="cb" style="display:inline-block;margin-top:6px">&#9314;</span></div>
+        <button class="btn bp" style="width:100%;justify-content:center;position:relative">&#128228; ส่งคำขอแจ้งซ่อม<span class="cb" style="position:absolute;top:-10px;right:-10px">&#9315;</span></button>
+      </div>
+    </div>
+    <p class="fig">ภาพ 3.4 หน้าแจ้งซ่อม</p>
+    <ul class="steps">
+      <li><span class="cb">&#9312;</span><p><strong>หัวข้อปัญหา</strong> — ชื่อปัญหาสั้นๆ เช่น "ไฟฟ้าขัดข้อง"</p></li>
+      <li><span class="cb">&#9313;</span><p><strong>รายละเอียด</strong> — อธิบายเพิ่มเติมให้ช่างเตรียมตัวได้ถูกต้อง</p></li>
+      <li><span class="cb">&#9314;</span><p><strong>แนบรูปภาพ</strong> — ไม่บังคับ แต่ช่วยให้ช่างเข้าใจปัญหาได้รวดเร็ว</p></li>
+      <li><span class="cb">&#9315;</span><p><strong>ส่งคำขอ</strong> — Admin รับแจ้งและมอบหมายงานให้ช่าง</p></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="stitle">5. ติดตามงานซ่อม (Track Repairs)</div>
+    <span class="rbadge rt">&#127978; Tenant</span>
+    <div class="screen" style="margin-top:16px">
+      <div class="sbar">
+        <div class="dot" style="background:#ef4444"></div><div class="dot" style="background:#f59e0b"></div><div class="dot" style="background:#22c55e"></div>
+        <div class="url">localhost:5173/tenant/track-repairs</div>
+      </div>
+      <div class="sc">
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="border:1.5px solid #fde68a;border-radius:12px;padding:14px;background:#fffbeb"><div style="display:flex;justify-content:space-between"><strong>ไฟฟ้าขัดข้อง</strong><span class="badge by-b">&#8987; รอดำเนินการ</span></div><div style="font-size:.8rem;color:#92400e">แจ้งเมื่อ: 10 ก.ย. 2568</div></div>
+          <div style="border:1.5px solid #bfdbfe;border-radius:12px;padding:14px;background:#eff6ff"><div style="display:flex;justify-content:space-between"><strong>ท่อน้ำรั่ว</strong><span class="badge bb-b">&#128295; กำลังดำเนินการ</span></div><div style="font-size:.8rem;color:#1e40af">ช่าง: นายช่าง สมพร</div></div>
+          <div style="border:1.5px solid #bbf7d0;border-radius:12px;padding:14px;background:#f0fdf4"><div style="display:flex;justify-content:space-between"><strong>แอร์ไม่เย็น</strong><span class="badge bg-b">&#10003; เสร็จแล้ว</span></div><div style="font-size:.8rem;color:#065f46">เสร็จเมื่อ: 7 ก.ย. 2568</div></div>
+        </div>
+      </div>
+    </div>
+    <p class="fig">ภาพ 3.5 หน้าติดตามสถานะงานซ่อม</p>
+  </div>
+</section>
+<hr class="dv"/>
+
+<!-- ===== MAINTENANCE ===== -->
+<section id="maintenance">
+  <div class="ch" style="background:linear-gradient(135deg,#d97706,#f59e0b)">
+    <div class="ch-icon">&#128295;</div>
+    <div><h2>คู่มือช่างซ่อมบำรุง (Maintenance)</h2><p>รับงานซ่อม อัปเดตสถานะ และดูรายละเอียดงานที่รับผิดชอบ</p></div>
+  </div>
+
+  <div class="card">
+    <div class="stitle">1. รายการงานที่รับผิดชอบ</div>
+    <span class="rbadge rm">&#128295; Maintenance</span>
+    <div class="screen" style="margin-top:16px">
+      <div class="sbar">
+        <div class="dot" style="background:#ef4444"></div><div class="dot" style="background:#f59e0b"></div><div class="dot" style="background:#22c55e"></div>
+        <div class="url">localhost:5173/maintenance/jobs</div>
+      </div>
+      <div class="sc">
+        <div style="font-size:1rem;font-weight:800;margin-bottom:14px">&#128203; รายการงานของฉัน</div>
+        <div style="border:1.5px solid #fde68a;border-radius:14px;padding:16px;background:#fff;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div><div style="font-weight:700;margin-bottom:4px">ไฟฟ้าขัดข้อง</div><div style="font-size:.8rem;color:#6b7280">แผง B1 — นายสมชาย ใจดี</div></div>
+            <div style="text-align:right">
+              <span class="badge by-b">&#8987; รอดำเนินการ</span>
+              <div style="margin-top:8px"><button class="btn" style="background:#f59e0b;color:#fff;padding:6px 12px;font-size:.78rem;position:relative">ดูรายละเอียด<span class="cb" style="position:absolute;top:-10px;right:-10px;width:20px;height:20px;font-size:.6rem">&#9312;</span></button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="fig">ภาพ 4.1 หน้ารายการงานซ่อม</p>
+    <ul class="steps">
+      <li><span class="cb">&#9312;</span><p><strong>ปุ่ม "ดูรายละเอียด"</strong> — เปิดหน้ารายละเอียดงาน สามารถอัปเดตสถานะได้</p></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="stitle">2. อัปเดตสถานะงาน</div>
+    <span class="rbadge rm">&#128295; Maintenance</span>
+    <div class="screen" style="margin-top:16px">
+      <div class="sbar">
+        <div class="dot" style="background:#ef4444"></div><div class="dot" style="background:#f59e0b"></div><div class="dot" style="background:#22c55e"></div>
+        <div class="url">localhost:5173/maintenance/jobs/123</div>
+      </div>
+      <div class="sc" style="max-width:440px">
+        <div style="font-size:1rem;font-weight:800;margin-bottom:14px">รายละเอียดงาน #JOB-001</div>
+        <div style="border:1.5px solid #e5e7eb;border-radius:14px;padding:14px;background:#fff;margin-bottom:12px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.82rem">
+            <div><span style="color:#9ca3af">ปัญหา:</span> ไฟฟ้าขัดข้อง</div>
+            <div><span style="color:#9ca3af">แผง:</span> B1</div>
+            <div><span style="color:#9ca3af">ผู้แจ้ง:</span> สมชาย ใจดี</div>
+            <div><span style="color:#9ca3af">เบอร์:</span> <span style="color:#7c3aed">081-234-5678</span></div>
+          </div>
+        </div>
+        <div style="margin-bottom:10px;font-size:.82rem"><label style="font-weight:600;color:#4b5563;display:block;margin-bottom:4px">อัปเดตสถานะ</label>
+          <select style="width:100%;padding:10px;border:1.5px solid #e5e7eb;border-radius:10px"><option>กำลังดำเนินการ</option><option>เสร็จเรียบร้อย</option></select>
+          <span class="cb" style="display:inline-block;margin-top:6px">&#9312;</span>
+        </div>
+        <div style="margin-bottom:12px;font-size:.82rem"><label style="font-weight:600;color:#4b5563;display:block;margin-bottom:4px">หมายเหตุ</label><textarea placeholder="เพิ่มหมายเหตุ..." style="width:100%;padding:10px;border:1.5px solid #e5e7eb;border-radius:10px;min-height:60px;resize:none;font-family:inherit;color:#9ca3af"></textarea></div>
+        <button class="btn bp" style="width:100%;justify-content:center;position:relative">&#128190; บันทึกสถานะ<span class="cb" style="position:absolute;top:-10px;right:-10px">&#9313;</span></button>
+      </div>
+    </div>
+    <p class="fig">ภาพ 4.2 หน้าอัปเดตสถานะงาน</p>
+    <ul class="steps">
+      <li><span class="cb">&#9312;</span><p><strong>Dropdown สถานะ</strong> — เลือก "กำลังดำเนินการ" หรือ "เสร็จเรียบร้อย"</p></li>
+      <li><span class="cb">&#9313;</span><p><strong>ปุ่ม "บันทึก"</strong> — ผู้เช่าและ Admin เห็นการอัปเดตทันที</p></li>
+    </ul>
+  </div>
+</section>
+<hr class="dv"/>
+
+<!-- ===== EXECUTIVE ===== -->
+<section id="executive">
+  <div class="ch" style="background:linear-gradient(135deg,#1e40af,#3b82f6)">
+    <div class="ch-icon">&#128202;</div>
+    <div><h2>คู่มือผู้บริหาร (Executive)</h2><p>ดูรายงานภาพรวม สถิติ รายได้ — อ่านอย่างเดียว (Read-only)</p></div>
+  </div>
+
+  <div class="card">
+    <div class="stitle">1. Dashboard ผู้บริหาร</div>
+    <span class="rbadge re">&#128202; Executive</span>
+    <div class="screen" style="margin-top:16px">
+      <div class="sbar">
+        <div class="dot" style="background:#ef4444"></div><div class="dot" style="background:#f59e0b"></div><div class="dot" style="background:#22c55e"></div>
+        <div class="url">localhost:5173/executive</div>
+      </div>
+      <div class="sc">
+        <div style="font-size:1rem;font-weight:800;margin-bottom:14px">&#128202; Dashboard ผู้บริหาร</div>
+        <div class="sc-grid">
+          <div class="sc-card"><div class="ic">&#127978;</div><div class="lb">แผงค้าทั้งหมด</div><div class="vl" style="color:#7c3aed">37</div></div>
+          <div class="sc-card"><div class="ic">&#128101;</div><div class="lb">ผู้เช่าทั้งหมด</div><div class="vl" style="color:#2563eb">28</div></div>
+          <div class="sc-card"><div class="ic">&#128176;</div><div class="lb">รายได้เดือนนี้</div><div class="vl" style="color:#059669;font-size:1rem">42,500 &#3647;</div></div>
+          <div class="sc-card"><div class="ic">&#9888;&#65039;</div><div class="lb">บิลค้างชำระ</div><div class="vl" style="color:#dc2626">5</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
+          <div style="border:1.5px solid #e5e7eb;border-radius:12px;padding:14px;background:#fff">
+            <div style="font-weight:700;margin-bottom:10px">สถานะแผงค้า</div>
+            <div style="font-size:.82rem;display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;justify-content:space-between"><span>&#128994; ว่าง</span><span style="font-weight:700">9</span></div>
+              <div style="display:flex;justify-content:space-between"><span>&#128308; มีผู้เช่า</span><span style="font-weight:700">28</span></div>
+              <div style="display:flex;justify-content:space-between"><span>&#128993; ปิดปรับปรุง</span><span style="font-weight:700">0</span></div>
+            </div>
+          </div>
+          <div style="border:1.5px solid #e5e7eb;border-radius:12px;padding:14px;background:#fff">
+            <div style="font-weight:700;margin-bottom:10px">งานซ่อมบำรุง</div>
+            <div style="font-size:.82rem;display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;justify-content:space-between"><span>รอดำเนินการ</span><span class="badge by-b">2</span></div>
+              <div style="display:flex;justify-content:space-between"><span>กำลังดำเนินการ</span><span class="badge bb-b">1</span></div>
+              <div style="display:flex;justify-content:space-between"><span>เสร็จแล้ว</span><span class="badge bg-b">14</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="fig">ภาพ 5.1 Dashboard ผู้บริหาร</p>
+    <div class="ib inf"><div class="ib-i">&#8505;&#65039;</div><div>Executive มีสิทธิ์ <strong>ดูข้อมูลเท่านั้น</strong> ไม่สามารถแก้ไขหรือดำเนินการใดๆ นอกจากนี้ยังดูได้ที่: /executive/tenants | /executive/stalls | /executive/bills | /executive/repairs</div></div>
+  </div>
+</section>
+<hr class="dv"/>
+
+<!-- ===== FAQ ===== -->
+<section id="faq">
+  <div class="ch" style="background:linear-gradient(135deg,#374151,#6b7280)">
+    <div class="ch-icon">&#10067;</div>
+    <div><h2>คำถามที่พบบ่อย (FAQ)</h2><p>ปัญหาที่ผู้ใช้งานพบบ่อยและวิธีแก้ไข</p></div>
+  </div>
+  <div class="card">
+    <div class="stitle">คำถามพบบ่อย</div>
+    <div class="fl">
+      <div class="qa"><div class="qq">Q: ลืม Username หรือ Password ทำอย่างไร?</div><div class="aa">A: ติดต่อผู้ดูแลระบบ (Admin) เพื่อรีเซ็ตรหัสผ่าน ระบบยังไม่รองรับการรีเซ็ตด้วยตนเอง</div></div>
+      <div class="qa"><div class="qq">Q: ส่งสลิปแล้วทำไมสถานะยังเป็น "รอชำระ"?</div><div class="aa">A: หลังส่งสลิปสถานะจะเปลี่ยนเป็น "รอตรวจสอบ" และ Admin ต้องกด "อนุมัติ" ก่อน อาจใช้เวลา 1-2 วันทำการ</div></div>
+      <div class="qa"><div class="qq">Q: แจ้งซ่อมแล้วรู้ว่าช่างรับงานเมื่อไร?</div><div class="aa">A: ดูได้ที่ /tenant/track-repairs สถานะจะเปลี่ยนเป็น "กำลังดำเนินการ" เมื่อ Admin มอบหมายงาน</div></div>
+      <div class="qa"><div class="qq">Q: ค่าน้ำ-ค่าไฟคำนวณอย่างไร?</div><div class="aa">A: ค่าน้ำ = (มิเตอร์ปัจจุบัน − ก่อนหน้า) × อัตราค่าน้ำ | ค่าไฟ = (มิเตอร์ปัจจุบัน − ก่อนหน้า) × อัตราค่าไฟ โดยปรับอัตราได้ที่ /admin/settings</div></div>
+      <div class="qa"><div class="qq">Q: Admin ออกบิลเมื่อไร?</div><div class="aa">A: Admin ออกบิลช่วงต้นเดือน หลังจดมิเตอร์น้ำ-ไฟเรียบร้อยแล้ว</div></div>
+      <div class="qa"><div class="qq">Q: ดูสัญญาย้อนหลังได้หรือไม่?</div><div class="aa">A: ผู้เช่าดูสัญญาปัจจุบันได้ที่ /tenant/contracts | Admin ดูได้ทั้งหมดที่ /admin/contracts โดยเลือก "สถานะทั้งหมด"</div></div>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<footer>
+  <div style="font-size:1.5rem;margin-bottom:8px">&#127859;</div>
+  <div style="font-weight:700;color:#374151;margin-bottom:4px">ระบบบริหารการเช่าพื้นที่ศูนย์อาหาร</div>
+  <div>มหาวิทยาลัยราชภัฏบุรีรัมย์ | Buriram Rajabhat University</div>
+  <div style="margin-top:6px;font-size:.78rem">คู่มือการใช้งาน ฉบับปีการศึกษา 2568</div>
+</footer>
+
+<script>
+const secs=document.querySelectorAll('section[id]');
+const navs=document.querySelectorAll('.toc-inner a');
+window.addEventListener('scroll',()=>{
+  let c='';
+  secs.forEach(s=>{if(window.scrollY>=s.offsetTop-120)c=s.id;});
+  navs.forEach(a=>{a.classList.toggle('active',a.getAttribute('href')==='#'+c);});
+});
+</script>
+</body>
+</html>"""
+
+with open('d:/Code/Pro-66/manual/index.html', 'w', encoding='utf-8') as f:
+    f.write(html)
+
+import os
+size = os.path.getsize('d:/Code/Pro-66/manual/index.html')
+print(f"Done! index.html = {size:,} bytes ({size//1024} KB)")
