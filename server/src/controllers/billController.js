@@ -18,7 +18,9 @@ const { sendPushNotifications } = require('../utils/pushNotification');
 //   รับได้ทั้ง array และ single object
 // -------------------------------------------------------
 const computeLateFees = async (expenses) => {
-  if (!expenses || expenses.length === 0) return expenses;
+  // Bug #6/#10: แก้ early return — Array.isArray() check ก่อน เพราะ single object มี .length === undefined
+  if (!expenses) return expenses;
+  if (Array.isArray(expenses) && expenses.length === 0) return expenses;
 
   // ดึงตั้งค่าค่าปรับจาก SystemSetting
   const lateRent = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_RENT_FINE' } });
@@ -444,7 +446,11 @@ const verifyPayment = async (req, res, next) => {
         data: { status: 'PAID' }
       });
     } else {
-      // ปฏิเสธ → คืนเป็น PENDING เพื่อให้ Tenant ส่งสลิปใหม่
+      // Bug #11: ปฏิเสธ → ลบ payment record เก่าออก เพื่อไม่ให้สลิปเก่าโผล่ซ้ำ
+      // แล้วค่อยคืนสถานะบิลกลับเป็น PENDING ให้ tenant ส่งสลิปใหม่ได้
+      await prisma.payment.delete({
+        where: { payment_id: parseInt(payment_id) }
+      });
       await prisma.monthlyExpense.update({
         where: { expense_id: payment.expense_id },
         data: { status: 'PENDING' }

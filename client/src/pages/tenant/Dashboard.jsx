@@ -95,7 +95,6 @@ const TenantDashboard = () => {
                       ฿
                       {(
                         bill.total_amount ||
-                        bill.total_amount ||
                         bill.totalAmount ||
                         0
                       ).toLocaleString()}

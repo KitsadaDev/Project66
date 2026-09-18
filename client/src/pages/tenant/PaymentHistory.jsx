@@ -40,6 +40,7 @@ const PaymentHistory = () => {
   // หน้าที่: ดึงข้อมูลบิลทั้งหมด และกรองเฉพาะบิลที่อยู่ใน selectedYear
   // -------------------------------------------------------
   const fetchData = async () => {
+    setLoading(true); // Bug #2: reset loading ทุกครั้งที่ fetch ใหม่ (เช่น เมื่อเปลี่ยนปี)
     try {
       const billsRes = await billsAPI.getAll();
       const bills = billsRes.data.data || [];
@@ -215,7 +216,7 @@ const PaymentHistory = () => {
               {payments.length > 0 ? (
                 payments.map((payment) => (
                   <tr
-                    key={payment.id}
+                    key={payment.expense_id}
                     className="border-b border-gray-50 hover:bg-purple-50/30 transition-colors"
                   >
                     {/* เดือนประจำบิล */}

@@ -348,7 +348,7 @@ const Stalls = () => {
               </div>
 
               {/* ซ่อนค่า foodCourt เพื่อรักษาความเข้ากันได้ */}
-              <input type="hidden" value={formData.foodCourt} />
+              <input type="hidden" value={formData.food_court_id} />
 
               {/* ช่องกรอกขนาดและค่าเช่า */}
               <div className="grid grid-cols-2 gap-4">

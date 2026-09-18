@@ -92,15 +92,44 @@ const Reports = () => {
     let currentBills = allBills;
     let currentRepairs = allRepairs;
 
+    // Bug #9: ใช้ Date object เปรียบเทียบแทน startsWith เพื่อหลีกเลี่ยงปัญหา timezone
+    const toLocalYMD = (dateStr) => {
+      const d = new Date(dateStr);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`; // YYYY-MM-DD ตาม local time
+    };
+    const toLocalYM = (dateStr) => toLocalYMD(dateStr).slice(0, 7);  // YYYY-MM
+    const toLocalY = (dateStr) => toLocalYMD(dateStr).slice(0, 4);   // YYYY
+
     if (filterType === "DAY") {
-      currentBills = allBills.filter((b) => (b.billing_month || b.created_at || "").startsWith(selectedDate));
-      currentRepairs = allRepairs.filter((r) => (r.requested_at || "").startsWith(selectedDate));
+      currentBills = allBills.filter((b) => {
+        const d = b.billing_month || b.created_at;
+        return d && toLocalYMD(d) === selectedDate;
+      });
+      currentRepairs = allRepairs.filter((r) => {
+        const d = r.requested_at;
+        return d && toLocalYMD(d) === selectedDate;
+      });
     } else if (filterType === "MONTH") {
-      currentBills = allBills.filter((b) => (b.billing_month || b.created_at || "").startsWith(selectedMonth));
-      currentRepairs = allRepairs.filter((r) => (r.requested_at || "").startsWith(selectedMonth));
+      currentBills = allBills.filter((b) => {
+        const d = b.billing_month || b.created_at;
+        return d && toLocalYM(d) === selectedMonth;
+      });
+      currentRepairs = allRepairs.filter((r) => {
+        const d = r.requested_at;
+        return d && toLocalYM(d) === selectedMonth;
+      });
     } else if (filterType === "YEAR") {
-      currentBills = allBills.filter((b) => (b.billing_month || b.created_at || "").startsWith(selectedYear));
-      currentRepairs = allRepairs.filter((r) => (r.requested_at || "").startsWith(selectedYear));
+      currentBills = allBills.filter((b) => {
+        const d = b.billing_month || b.created_at;
+        return d && toLocalY(d) === selectedYear;
+      });
+      currentRepairs = allRepairs.filter((r) => {
+        const d = r.requested_at;
+        return d && toLocalY(d) === selectedYear;
+      });
     }
 
     // 3. จำแนกสถานะบิลและการคำนวณอัตราการจัดเก็บเงิน

@@ -253,16 +253,24 @@ const Bills = () => {
   }
 
   const filteredBills = bills.filter((bill) => {
+    const tenantFirstName =
+      bill.contract?.tenant?.first_name ||
+      bill.rental_contract?.tenant?.first_name ||
+      "";
+    // Bug #7: เพิ่ม last_name ใน search condition
+    const tenantLastName =
+      bill.contract?.tenant?.last_name ||
+      bill.rental_contract?.tenant?.last_name ||
+      "";
+    const slotNumber =
+      bill.contract?.slot?.slot_number ||
+      bill.rental_slot?.slot_number ||
+      "";
+    const searchLower = search.toLowerCase();
     const matchesSearch =
-      (bill.contract?.slot?.slot_number || bill.rental_slot?.slot_number)
-        ?.toLowerCase()
-        .includes(search.toLowerCase()) ||
-      (
-        bill.contract?.tenant?.first_name ||
-        bill.rental_contract?.tenant?.first_name
-      )
-        ?.toLowerCase()
-        .includes(search.toLowerCase());
+      slotNumber.toLowerCase().includes(searchLower) ||
+      tenantFirstName.toLowerCase().includes(searchLower) ||
+      tenantLastName.toLowerCase().includes(searchLower);
     const matchesStatus =
       statusFilter === "ALL" || bill.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -309,6 +317,7 @@ const Bills = () => {
         >
           <option value="ALL">สถานะทั้งหมด</option>
           <option value="PENDING">รอชำระ</option>
+          <option value="WAITING_VERIFICATION">รอยืนยันสลิป</option>
           <option value="PAID">ชำระแล้ว</option>
           <option value="OVERDUE">เกินกำหนด</option>
         </select>
