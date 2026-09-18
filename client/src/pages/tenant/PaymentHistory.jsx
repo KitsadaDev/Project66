@@ -1,3 +1,13 @@
+// ======================================================
+// pages/tenant/PaymentHistory.jsx - หน้าประวัติการชำระเงินของผู้เช่า (Tenant Payment History)
+// รับผิดชอบ:
+//   - ดึงรายการบิลและประวัติการชำระเงินทั้งหมดของผู้เช่า (billsAPI.getAll)
+//   - กรองข้อมูลตามปีปฏิทินที่เลือก (selectedYear)
+//   - การ์ดสรุปภาพรวม: จำนวนบิลที่ชำระแล้ว, รอตรวจสอบสลิป, ยอดเงินที่ชำระแล้วรวมทั้งปี
+//   - ตารางแสดงประวัติบิลรายเดือน: เดือน, ยอดเงิน, วันที่ชำระ, สถานะ, ปุ่มเปิดดูรูปสลิป
+//   - Modal แสดงรูปภาพสลิปหลักฐานการชำระเงิน (View Receipt Modal)
+// ======================================================
+
 import { useEffect, useState } from "react";
 import {
   History,
@@ -12,21 +22,29 @@ import {
 import { billsAPI, stallsAPI } from "../../api";
 
 const PaymentHistory = () => {
-  const [payments, setPayments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [viewModal, setViewModal] = useState({ open: false, payment: null });
+  // -------------------------------------------------------
+  // Component States
+  // -------------------------------------------------------
+  const [payments, setPayments] = useState([]);             // รายการบิลที่กรองตามปีแล้ว
+  const [loading, setLoading] = useState(true);             // สถานะกำลังโหลดข้อมูล
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear()); // ปีที่เลือก (ค.ศ.)
+  const [viewModal, setViewModal] = useState({ open: false, payment: null }); // State สำหรับ Modal ดูรูปสลิป
 
+  // ดึงข้อมูลใหม่เมื่อเปลี่ยนปี
   useEffect(() => {
     fetchData();
   }, [selectedYear]);
 
+  // -------------------------------------------------------
+  // ฟังก์ชัน: fetchData
+  // หน้าที่: ดึงข้อมูลบิลทั้งหมด และกรองเฉพาะบิลที่อยู่ใน selectedYear
+  // -------------------------------------------------------
   const fetchData = async () => {
     try {
       const billsRes = await billsAPI.getAll();
       const bills = billsRes.data.data || [];
 
-      // Filter by year based on billing_month
+      // กรองบิลตามปีจากฟิลด์ billing_month
       const filteredBills = bills.filter((bill) => {
         if (!bill.billing_month) return false;
         const billYear = new Date(bill.billing_month).getFullYear();
@@ -42,6 +60,10 @@ const PaymentHistory = () => {
     }
   };
 
+  // -------------------------------------------------------
+  // ฟังก์ชัน: getStatusBadge
+  // หน้าที่: แสดง Badge สัญลักษณ์สีและข้อความตามสถานะการชำระเงิน
+  // -------------------------------------------------------
   const getStatusBadge = (status) => {
     const config = {
       PAID: {
@@ -74,6 +96,7 @@ const PaymentHistory = () => {
     );
   };
 
+  // จัดรูปแบบวันที่ภาษาไทย
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
     const date = new Date(dateStr);
@@ -94,6 +117,7 @@ const PaymentHistory = () => {
 
   return (
     <div>
+      {/* ส่วนหัวหน้าจอ และตัวเลือกปี พ.ศ. */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">
@@ -114,8 +138,11 @@ const PaymentHistory = () => {
         </select>
       </div>
 
-      {/* Summary Cards */}
+      {/* ------------------------------------------------------- */}
+      {/* การ์ดสรุปภาพรวม 3 ใบ (Summary Cards) */}
+      {/* ------------------------------------------------------- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {/* บิลที่ชำระแล้ว */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
           <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-green-600">
             <CheckCircle size={24} />
@@ -128,6 +155,7 @@ const PaymentHistory = () => {
           </div>
         </div>
 
+        {/* บิลที่รอตรวจสอบสลิป */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
           <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600">
             <Clock size={24} />
@@ -140,6 +168,7 @@ const PaymentHistory = () => {
           </div>
         </div>
 
+        {/* ยอดเงินที่ชำระแล้วรวมทั้งปี */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
           <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600">
             <CreditCard size={24} />
@@ -157,6 +186,9 @@ const PaymentHistory = () => {
         </div>
       </div>
 
+      {/* ------------------------------------------------------- */}
+      {/* ตารางแสดงรายการประวัติบิลรายเดือน (Table) */}
+      {/* ------------------------------------------------------- */}
       <div className="bg-white rounded-2xl shadow-lg border border-purple-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -186,6 +218,7 @@ const PaymentHistory = () => {
                     key={payment.id}
                     className="border-b border-gray-50 hover:bg-purple-50/30 transition-colors"
                   >
+                    {/* เดือนประจำบิล */}
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-2 font-medium text-gray-800">
                         <Calendar size={18} className="text-purple-400" />
@@ -197,23 +230,27 @@ const PaymentHistory = () => {
                           : "-"}
                       </div>
                     </td>
+                    {/* ยอดเงินรวม */}
                     <td className="py-4 px-6">
                       <span className="font-bold text-purple-600">
                         ฿{payment.total_amount?.toLocaleString()}
                       </span>
                     </td>
+                    {/* วันที่ชำระเงิน */}
                     <td className="py-4 px-6 text-gray-600">
                       {payment.payments?.[0]?.payment_date
                         ? formatDate(payment.payments[0].payment_date)
                         : "-"}
                     </td>
+                    {/* Badge สถานะ */}
                     <td className="py-4 px-6">
                       {getStatusBadge(payment.status)}
                     </td>
+                    {/* ปุ่มกดดูภาพสลิปหลักฐาน */}
                     <td className="py-4 px-6">
                       {payment.payments?.[0]?.payment_slip_url ? (
                         <button
-                          className="px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg transition-colors shadow-sm whitespace-nowrap"
+                          className="px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg transition-colors shadow-sm whitespace-nowrap cursor-pointer"
                           onClick={() =>
                             setViewModal({
                               open: true,
@@ -247,7 +284,9 @@ const PaymentHistory = () => {
         </div>
       </div>
 
-      {/* View Receipt Modal */}
+      {/* ------------------------------------------------------- */}
+      {/* Modal ดูรูปภาพสลิปหลักฐานการชำระเงิน (View Receipt Modal) */}
+      {/* ------------------------------------------------------- */}
       {viewModal.open && (
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
@@ -257,18 +296,20 @@ const PaymentHistory = () => {
             className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fade-in overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Header Modal */}
             <div className="flex justify-between items-center p-4 border-b border-gray-100">
               <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <Receipt size={20} className="text-purple-500" />{" "}
                 หลักฐานการชำระเงิน
               </h3>
               <button
-                className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 flex items-center justify-center transition-colors"
+                className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 flex items-center justify-center transition-colors cursor-pointer"
                 onClick={() => setViewModal({ open: false, payment: null })}
               >
                 ✕
               </button>
             </div>
+            {/* รูปภาพสลิป */}
             <div className="p-4 bg-gray-100 flex items-center justify-center min-h-[300px]">
               {viewModal.payment?.receiptUrl ? (
                 <img
@@ -285,6 +326,7 @@ const PaymentHistory = () => {
                 </div>
               )}
             </div>
+            {/* Footer Modal: สรุปวันที่และยอดเงิน */}
             <div className="p-4 bg-white border-t border-gray-100">
               <div className="flex justify-between items-center text-sm">
                 <span className="text-gray-500">

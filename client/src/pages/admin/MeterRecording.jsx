@@ -13,22 +13,40 @@ import {
 import { toast } from "react-toastify";
 import { stallsAPI, settingsAPI } from "../../api";
 
+/**
+ * คอมโพเนนต์หน้าบันทึกค่ามิเตอร์น้ำและไฟฟ้าประจำเดือน (Admin Meter Recording)
+ * - แสดงรายการเฉพาะแผงค้าที่มีผู้เช่า (OCCUPIED)
+ * - บันทึกเลขอ่านมิเตอร์น้ำประปาและไฟฟ้าครั้งล่าสุด
+ * - คำนวณจำนวนหน่วยที่ใช้ (หน่วยปัจจุบัน - หน่วยก่อนหน้า) และคำนวณค่าใช้จ่ายโดยประมาณแบบ Real-time
+ * - บันทึกแยกทีละล็อก หรือบันทึกพร้อมกันทุกแผงค้าในคลิกเดียว (Save All)
+ * - ขยายดูประวัติการจดมิเตอร์ย้อนหลัง 3 ครั้งล่าสุด
+ */
 const MeterRecording = () => {
+  // รายการแผงค้าที่มีผู้เช่า และสถานะการโหลด
   const [stalls, setStalls] = useState([]);
   const [loading, setLoading] = useState(true);
+  // คำค้นหา และตัวกรองศูนย์อาหาร
   const [search, setSearch] = useState("");
   const [foodCourtFilter, setFoodCourtFilter] = useState("ALL");
+  // เก็บค่ามิเตอร์ที่กำลังกรอกของแต่ละล็อก { [stallId]: { waterMeter, electricMeter, ... } }
   const [meterReadings, setMeterReadings] = useState({});
+  // ควบคุมว่าล็อกไหนกำลังอยู่ในโหมดแก้ไข { [stallId]: boolean }
   const [editingStalls, setEditingStalls] = useState({});
   const [saving, setSaving] = useState(false);
+  // ควบคุมการเปิด/ปิดดูประวัติย้อนหลังของแต่ละล็อก { [stallId]: boolean }
   const [expandedHistory, setExpandedHistory] = useState({});
+  // อัตราค่าน้ำและค่าไฟต่อหน่วยปัจจุบัน
   const [rates, setRates] = useState({ water: 14, electric: 6 });
 
+  // โหลดรายการแผงค้าและอัตราค่าบริการเมื่อเริ่มต้น
   useEffect(() => {
     fetchStalls();
     fetchRates();
   }, []);
 
+  /**
+   * ดึงอัตราค่าน้ำและไฟฟ้าต่อหน่วยจาก API
+   */
   const fetchRates = async () => {
     try {
       const res = await settingsAPI.getUtilityRates();
@@ -37,10 +55,14 @@ const MeterRecording = () => {
         electric: res.data.data.electricRatePerUnit,
       });
     } catch {
-      // use default
+      // ใช้ค่าเริ่มต้นหากโหลดไม่สำเร็จ
     }
   };
 
+  /**
+   * ดึงข้อมูลแผงค้าและกรองเอาเฉพาะแผงค้าที่มีผู้เช่า (OCCUPIED)
+   * พร้อมเตรียม Object สำหรับเก็บค่ามิเตอร์เริ่มต้น
+   */
   const fetchStalls = async () => {
     try {
       const response = await stallsAPI.getAll();
@@ -72,6 +94,12 @@ const MeterRecording = () => {
     }
   };
 
+  /**
+   * จัดการการเปลี่ยนแปลงค่าในช่องกรอกมิเตอร์
+   * @param {number|string} stallId - รหัสแผงค้า
+   * @param {string} field - ชื่อฟิลด์ (waterMeter, electricMeter, etc.)
+   * @param {string} value - ค่าที่ผู้ใช้พิมพ์
+   */
   const handleInputChange = (stallId, field, value) => {
     setMeterReadings((prev) => ({
       ...prev,
@@ -79,6 +107,12 @@ const MeterRecording = () => {
     }));
   };
 
+  /**
+   * คำนวณผลลัพธ์ตัวอย่าง (Preview) แบบ Real-time
+   * คำนวณส่วนต่างหน่วยที่ใช้ และราคาค่าใช้จ่ายโดยประมาณ
+   * @param {number|string} stallId - รหัสแผงค้า
+   * @param {Object} stall - ออบเจกต์ข้อมูลแผงค้า
+   */
   const getPreview = (stallId, stall) => {
     const reading = meterReadings[stallId] || {};
     const lastWater = stall.utility_meters?.find((m) => m.meter_type === "WATER");
@@ -103,6 +137,10 @@ const MeterRecording = () => {
     };
   };
 
+  /**
+   * บันทึกค่ามิเตอร์ของแผงค้ารายบุคคล
+   * @param {number|string} stallId - รหัสแผงค้า
+   */
   const handleSave = async (stallId) => {
     setSaving(true);
     try {
@@ -123,6 +161,9 @@ const MeterRecording = () => {
     }
   };
 
+  /**
+   * บันทึกค่ามิเตอร์ของทุกแผงค้าที่อยู่ในสถานะกำลังแก้ไข (Editing) พร้อมกัน
+   */
   const handleSaveAll = async () => {
     const toSave = Object.entries(editingStalls).filter(([, v]) => v);
     if (toSave.length === 0) {
@@ -150,6 +191,9 @@ const MeterRecording = () => {
     }
   };
 
+  /**
+   * กรองแผงค้าตามคำค้นหา (ชื่อผู้เช่า, หมายเลขล็อก) และศูนย์อาหาร
+   */
   const filteredStalls = stalls.filter((stall) => {
     const tenant = stall.rental_contracts?.[0]?.tenant;
     const tenantName = tenant

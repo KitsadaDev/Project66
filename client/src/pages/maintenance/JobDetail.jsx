@@ -19,22 +19,45 @@ import { maintenanceAPI } from "../../api";
 import { convertHeicToJpeg } from "../../utils/heicConverter";
 import ImageModal from "../../components/ImageModal";
 
+/**
+ * คอมโพเนนต์หน้ารายละเอียดและการบันทึกการซ่อมสำหรับช่าง (Maintenance Job Detail)
+ * - แสดงข้อมูลใบแจ้งซ่อม: แผงค้า, ผู้แจ้ง, วันที่แจ้ง, รายละเอียดปัญหา, รูปภาพก่อนซ่อม
+ * - ช่างสามารถกำหนดวันเข้าซ่อม (Scheduled Date)
+ * - เปลี่ยนสถานะงานซ่อม: รอดำเนินการ (PENDING) -> กำลังดำเนินการ (IN_PROGRESS) -> ซ่อมเสร็จสิ้น (COMPLETED)
+ * - อัปโหลดรูปภาพหลักฐานหลังซ่อมเสร็จ (รองรับการแปลงรูปภาพ HEIC จากมือถือเป็น JPEG อัตโนมัติ)
+ * - ส่งการแจ้งเตือนกลับไปยังผู้เช่าเมื่อซ่อมเสร็จสิ้น
+ * - คลิกดูรูปภาพขนาดเต็มผ่าน ImageModal
+ */
 const JobDetail = () => {
+  // รับพารามิเตอร์ id ของงานแจ้งซ่อมจาก URL
   const { id } = useParams();
   const navigate = useNavigate();
+
+  // สถานะข้อมูลงานแจ้งซ่อม
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // สถานะในฟอร์มแก้ไข: สถานะงานซ่อม และวันที่นัดเข้าซ่อม
   const [status, setStatus] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
+
+  // ไฟล์รูปภาพหลักฐานหลังซ่อม และ URL สำหรับพรีวิวก่อนบันทึก
   const [completionPhotos, setCompletionPhotos] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
+
+  // URL ของรูปภาพที่กำลังเปิดดูขนาดใหญ่ผ่าน ImageModal
   const [selectedImageUrl, setSelectedImageUrl] = useState(null);
 
+  // โหลดข้อมูลงานแจ้งซ่อมเมื่อ id เปลี่ยนแปลง
   useEffect(() => {
     fetchJob();
   }, [id]);
 
+  /**
+   * จัดรูปแบบวันที่และเวลาเป็นภาษาไทย
+   * @param {string} dateStr - วันที่ในรูปแบบ ISO
+   */
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
     const date = new Date(dateStr);
@@ -48,6 +71,9 @@ const JobDetail = () => {
     });
   };
 
+  /**
+   * ดึงข้อมูลรายละเอียดของงานซ่อมจาก API
+   */
   const fetchJob = async () => {
     try {
       const response = await maintenanceAPI.getById(id);
@@ -68,6 +94,12 @@ const JobDetail = () => {
     }
   };
 
+  /**
+   * จัดการการเลือกรูปภาพหลักฐานการซ่อมเสร็จ:
+   * - ตรวจสอบและแปลงไฟล์ HEIC (จาก iPhone/iPad) เป็น JPEG
+   * - สร้าง Object URL เพื่อแสดงภาพตัวอย่างทันที
+   * @param {Event} e - Input Change Event
+   */
   const handlePhotoUpload = async (e) => {
     const files = Array.from(e.target.files);
     const toastId = toast.info("กำลังประมวลผลรูปภาพ...", { autoClose: false });
@@ -86,11 +118,20 @@ const JobDetail = () => {
     }
   };
 
+  /**
+   * ลบรูปภาพที่เลือกไว้ออกจากรายการพรีวิว
+   * @param {number} index - ลำดับรูปที่ต้องการลบ
+   */
   const removePhoto = (index) => {
     setCompletionPhotos((prev) => prev.filter((_, i) => i !== index));
     setPreviewUrls((prev) => prev.filter((_, i) => i !== index));
   };
 
+  /**
+   * บันทึกการเปลี่ยนแปลงงานซ่อม:
+   * 1. หากสถานะเป็น COMPLETED และมีรูปภาพหลักฐาน จะส่งรูปภาพไปยัง Endpoint uploadCompletion
+   * 2. อัปเดตสถานะงานและวันที่นัดหมายผ่าน Endpoint updateStatus
+   */
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -118,6 +159,9 @@ const JobDetail = () => {
     }
   };
 
+  /**
+   * ส่งการแจ้งเตือนไปยังผู้เช่าเพื่อแจ้งความคืบหน้าการซ่อม
+   */
   const handleNotifyTenant = async () => {
     try {
       await maintenanceAPI.notifyTenant(id);
@@ -127,6 +171,10 @@ const JobDetail = () => {
     }
   };
 
+  /**
+   * คืนค่าการตกแต่งสไตล์และข้อความของสถานะงานซ่อม
+   * @param {string} s - สถานะงาน
+   */
   const getStatusConfig = (s) => {
     const config = {
       PENDING: {

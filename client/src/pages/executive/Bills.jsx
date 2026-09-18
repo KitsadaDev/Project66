@@ -9,15 +9,26 @@ import {
 } from "lucide-react";
 import { billsAPI } from "../../api";
 
+/**
+ * คอมโพเนนต์แสดงข้อมูลบิลค่าใช้จ่ายและรายรับสำหรับผู้บริหาร (Executive Bills - Read Only)
+ * - แสดงสถิติภาพรวม: บิลทั้งหมด, ชำระแล้ว, รอชำระ, เกินกำหนด, และยอดรวมรายได้ที่ได้รับชำระแล้ว
+ * - ตารางรายการบิลค่าเช่าและค่าน้ำ-ไฟ พร้อมตัวกรองสถานะ (ชำระแล้ว / รอชำระ / เกินกำหนด)
+ */
 const ExecutiveBills = () => {
+  // รายการบิลทั้งหมด
   const [bills, setBills] = useState([]);
   const [loading, setLoading] = useState(true);
+  // ตัวกรองสถานะบิล (ALL, PAID, PENDING, OVERDUE)
   const [filterStatus, setFilterStatus] = useState("ALL");
 
+  // โหลดข้อมูลบิลเมื่อเปิดหน้าจอ
   useEffect(() => {
     fetchBills();
   }, []);
 
+  /**
+   * ดึงรายการบิลค่าใช้จ่ายทั้งหมดจาก API
+   */
   const fetchBills = async () => {
     try {
       const response = await billsAPI.getAll();
@@ -29,10 +40,15 @@ const ExecutiveBills = () => {
     }
   };
 
+  // คัดกรองบิลตามสถานะที่เลือก
   const filteredBills = bills.filter(
     (bill) => filterStatus === "ALL" || bill.status === filterStatus,
   );
 
+  /**
+   * กำหนดไอคอน สีพื้นหลัง และข้อความภาษาไทยของ Badge สถานะบิล
+   * @param {string} status - สถานะบิล (PAID, PENDING, OVERDUE)
+   */
   const getStatusBadge = (status) => {
     const config = {
       PAID: {
@@ -64,6 +80,7 @@ const ExecutiveBills = () => {
     );
   };
 
+  // คำนวณสรุปสถิติจำนวนบิลแต่ละสถานะ และยอดเงินรวมที่ชำระแล้ว (Total Revenue)
   const stats = {
     total: bills.length,
     paid: bills.filter((b) => b.status === "PAID").length,

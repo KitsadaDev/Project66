@@ -1,3 +1,12 @@
+// ======================================================
+// components/RepairDetailsModal.jsx - หน้าต่างป๊อปอัปแสดงรายละเอียดงานแจ้งซ่อม (Repair Details Modal)
+// รับผิดชอบ:
+//   - แสดงข้อมูลสรุปของคำขอแจ้งซ่อม: หัวข้อ, สถานะ, โรงอาหาร/ล็อค, ผู้แจ้ง, เบอร์โทร, วันเวลา
+//   - แสดงคำอธิบายปัญหาแบบละเอียด
+//   - แสดงแกลเลอรีรูปภาพก่อนซ่อม (Request Images) และรูปภาพหลังซ่อมเสร็จ (Completion Images)
+//   - คลิกที่รูปเพื่อขยายดูขนาดเต็มผ่าน ImageModal (Lightbox)
+// ======================================================
+
 import { useState } from "react";
 import {
   X,
@@ -9,9 +18,16 @@ import {
 } from "lucide-react";
 import ImageModal from "./ImageModal";
 
+/**
+ * คอมโพเนนต์: RepairDetailsModal
+ * @param {object} repair - ข้อมูลของคำขอแจ้งซ่อม
+ * @param {function} onClose - ฟังก์ชันเรียกกลับเมื่อกดปิด Modal
+ */
 const RepairDetailsModal = ({ repair, onClose }) => {
+  // State จัดเก็บ URL รูปภาพที่เลือกดูขนาดใหญ่
   const [selectedImageUrl, setSelectedImageUrl] = useState(null);
 
+  // หากไม่มีข้อมูล repair ส่งมา ไม่ต้อง Render
   if (!repair) return null;
 
   return (
@@ -23,7 +39,7 @@ const RepairDetailsModal = ({ repair, onClose }) => {
         className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
+        {/* ส่วนหัวของ Modal */}
         <div className="p-6 border-b border-gray-100 flex justify-between items-start sticky top-0 bg-white z-10">
           <div>
             <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
@@ -39,9 +55,9 @@ const RepairDetailsModal = ({ repair, onClose }) => {
           </button>
         </div>
 
-        {/* Content */}
+        {/* เนื้อหาภายใน Modal */}
         <div className="p-6 space-y-6">
-          {/* Main Info */}
+          {/* ข้อมูลหลัก: หัวข้อ, สถานะ, สถานที่, ผู้แจ้ง, วันที่ */}
           <div className="grid md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div>
@@ -130,6 +146,7 @@ const RepairDetailsModal = ({ repair, onClose }) => {
             </div>
           </div>
 
+          {/* รายละเอียดข้อความปัญหาเพิ่มเติม */}
           <div className="border-t border-gray-100 pt-6">
             <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
               รายละเอียดเพิ่มเติม
@@ -139,9 +156,9 @@ const RepairDetailsModal = ({ repair, onClose }) => {
             </p>
           </div>
 
-          {/* Images */}
+          {/* รูปภาพประกอบ (แยกภาพก่อนซ่อม และภาพหลังซ่อมเสร็จ) */}
           <div className="border-t border-gray-100 pt-6 space-y-6">
-            {/* Request Images */}
+            {/* รูปภาพแจ้งซ่อม (ก่อนซ่อม - จากผู้เช่า) */}
             {(() => {
               const requestImages = (repair.images || []).filter(
                 (img) => typeof img === "string" || img.image_type !== "completion"
@@ -190,7 +207,7 @@ const RepairDetailsModal = ({ repair, onClose }) => {
               );
             })()}
 
-            {/* Completion Images */}
+            {/* รูปภาพงานซ่อมเสร็จสิ้น (หลังซ่อม - จากช่าง) */}
             {(() => {
               const completionImages = (repair.images || []).filter(
                 (img) => typeof img !== "string" && img.image_type === "completion"
@@ -236,7 +253,7 @@ const RepairDetailsModal = ({ repair, onClose }) => {
               );
             })()}
 
-            {/* Empty State */}
+            {/* กรณีไม่มีรูปภาพประกอบเลย */}
             {(!repair.images || repair.images.length === 0) && (
               <div>
                 <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2 mb-4">
@@ -251,18 +268,18 @@ const RepairDetailsModal = ({ repair, onClose }) => {
           </div>
         </div>
 
-        {/* Footer */}
+        {/* ส่วนท้าย Modal: ปุ่มปิด */}
         <div className="p-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex justify-end">
           <button
             onClick={onClose}
-            className="px-6 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 font-medium transition-colors shadow-sm"
+            className="px-6 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 font-medium transition-colors shadow-sm cursor-pointer"
           >
             ปิด
           </button>
         </div>
       </div>
 
-      {/* Lightbox Modal */}
+      {/* Modal ซ้อนสำหรับดูรูปภาพขนาดเต็ม (Lightbox) */}
       <ImageModal
         isOpen={!!selectedImageUrl}
         src={selectedImageUrl}

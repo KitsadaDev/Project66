@@ -15,25 +15,43 @@ import { maintenanceAPI, usersAPI } from "../../api";
 import { useUIStore } from "../../store";
 import RepairDetailsModal from "../../components/RepairDetailsModal";
 
+/**
+ * คอมโพเนนต์หน้าจัดการงานซ่อมบำรุงสำหรับผู้ดูแลระบบ (Admin Repairs)
+ * - แสดงรายการแจ้งซ่อมทั้งหมดจากผู้เช่า (ล็อก, หัวข้อ, วันที่แจ้ง, สถานะ, ผู้รับผิดชอบ)
+ * - กรองและค้นหารายการแจ้งซ่อมตามคำค้นหาและสถานะ (รอดำเนินการ, กำลังทำ, เสร็จสิ้น)
+ * - เปิดดูรายละเอียดและรูปภาพปัญหา/รูปหลังซ่อมผ่าน RepairDetailsModal
+ * - มอบหมายงานซ่อม (Assign Staff) ให้แก่ช่างซ่อมบำรุงในระบบ
+ */
 const AdminRepairs = () => {
+  // สถานะรายการแจ้งซ่อม และสถานะการโหลด
   const [repairs, setRepairs] = useState([]);
   const [loading, setLoading] = useState(true);
+  // คำค้นหา และตัวกรองสถานะ
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  // สถานะเปิด Modal มอบหมายงาน และงานซ่อมที่กำลังจะมอบหมาย
   const [assignModal, setAssignModal] = useState({ open: false, repair: null });
+  // รายการงานซ่อมที่เลือกเปิดดูรายละเอียดฉบับเต็ม
   const [viewRepair, setViewRepair] = useState(null);
+  // ช่างที่เลือกในกล่อง Dropdown สำหรับมอบหมาย
   const [selectedStaff, setSelectedStaff] = useState("");
 
+  // รายชื่อช่างซ่อมบำรุงทั้งหมดในระบบ
   const [maintenanceStaff, setMaintenanceStaff] = useState([]);
+  // ฟังก์ชันลดจำนวนตัวเลขแจ้งเตือนงานซ่อมค้างใน UI Store
   const decrementPendingRepairs = useUIStore(
     (state) => state.decrementPendingRepairs,
   );
 
+  // ดึงรายการงานซ่อมและรายชื่อช่างเมื่อเริ่มต้น
   useEffect(() => {
     fetchRepairs();
     fetchMaintenanceStaff();
   }, []);
 
+  /**
+   * ดึงรายชื่อผู้ใช้ที่มีบทบาทเป็น MAINTENANCE (ช่างซ่อมบำรุง)
+   */
   const fetchMaintenanceStaff = async () => {
     try {
       const response = await usersAPI.getAll({ role: "MAINTENANCE" });
@@ -43,6 +61,9 @@ const AdminRepairs = () => {
     }
   };
 
+  /**
+   * ดึงรายการแจ้งซ่อมทั้งหมดจาก API
+   */
   const fetchRepairs = async () => {
     try {
       const response = await maintenanceAPI.getAll();
@@ -54,11 +75,18 @@ const AdminRepairs = () => {
     }
   };
 
+  /**
+   * เปิดหน้าต่างป๊อปอัปเพื่อมอบหมายงานให้ช่าง
+   * @param {Object} repair - ข้อมูลงานแจ้งซ่อมที่ต้องการมอบหมาย
+   */
   const handleAssign = (repair) => {
     setAssignModal({ open: true, repair });
     setSelectedStaff("");
   };
 
+  /**
+   * บันทึกการมอบหมายงานซ่อมไปยังเซิร์ฟเวอร์
+   */
   const submitAssignment = async () => {
     if (!selectedStaff) {
       toast.error("กรุณาเลือกเจ้าหน้าที่");
@@ -81,6 +109,10 @@ const AdminRepairs = () => {
     }
   };
 
+  /**
+   * แสดงแท็กสถานะพร้อมไอคอนและสีตามสถานะงานซ่อม
+   * @param {string} status - PENDING, IN_PROGRESS, COMPLETED
+   */
   const getStatusBadge = (status) => {
     const statusConfig = {
       PENDING: {
@@ -110,6 +142,9 @@ const AdminRepairs = () => {
     );
   };
 
+  /**
+   * กรองรายการแจ้งซ่อมตามคำค้นหาและสถานะที่เลือก
+   */
   const filteredRepairs = repairs.filter((repair) => {
     const matchesSearch =
       repair.title?.toLowerCase().includes(search.toLowerCase()) ||

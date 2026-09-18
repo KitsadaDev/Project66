@@ -1,17 +1,31 @@
+// ======================================================
+// stallController.js - Controller จัดการแผงร้านค้า (Rental Slots)
+// รับผิดชอบ: CRUD แผง, บันทึกมิเตอร์น้ำ/ไฟ, สถิติ Dashboard
+// ======================================================
+
+// Prisma Client สำหรับติดต่อฐานข้อมูล
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
-// Get all rental slots
+// -------------------------------------------------------
+// ฟังก์ชัน: getAllSlots
+// หน้าที่: ดึงแผงทั้งหมด (สำหรับแผนผังภาพรวม)
+//   - รองรับ filter: ?food_court_id=1&status=OCCUPIED
+//   - ต้องการ role ทุกระดับสามารถเรียกได้ (เพื่อแสดงแผนนำทาง)
+//   - ดึงกลับมาพร้อม: ผู้เช่าปัจจุบัน (สัญญา ACTIVE), มิเตอร์ล่าสุด
+// -------------------------------------------------------
 const getAllSlots = async (req, res, next) => {
   try {
+    // รับ query parameters สำหรับกรองข้อมูล
     const { food_court_id, status } = req.query;
 
     const where = {};
     if (food_court_id) where.food_court_id = parseInt(food_court_id);
     if (status) where.status = status;
 
-    // Allow all roles to query all slots for visual layout map
+    // ทุก role สามารถดึงข้อมูลแผงได้ (เพื่อแสดงแผนนำทาง)
+    // แต่ข้อมูล tenant จะถูกซ่อนสำหรับ TENANT ที่ frontend
     const slots = await prisma.rentalSlot.findMany({
       where,
       include: {
@@ -41,7 +55,12 @@ const getAllSlots = async (req, res, next) => {
   }
 };
 
-// Get slot by ID
+// -------------------------------------------------------
+// ฟังก์ชัน: getSlotById
+// หน้าที่: ดึงข้อมูลแผงตาม ID พร้อมข้อมูลลึก
+//   - ดึง utility_meters ย้อนหลัง 12 รายการ (ประวัติมิเตอร์)
+//   - ดึง rental_contracts ล่าสุด 5 รายการ (ประวัติการเช่า)
+// -------------------------------------------------------
 const getSlotById = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -76,11 +95,18 @@ const getSlotById = async (req, res, next) => {
   }
 };
 
-// Create slot (Admin only)
+// -------------------------------------------------------
+// ฟังก์ชัน: createSlot
+// หน้าที่: สร้างแผงใหม่ (Admin เท่านั้น)
+//   - ตรวจสอบหมายเลขแผงซ้ำใน food court เดียวกัน
+//   - ใช้ upsert สร้าง FoodCourt อัตโนมัติถ้ายังไม่มี
+//     (ป้องกัน error foreign key constraint)
+// -------------------------------------------------------
 const createSlot = async (req, res, next) => {
   try {
     const { food_court_id, slot_number, slot_size, rent, status } = req.body;
 
+    // ตรวจสอบว่าหมายเลขแผงนี้มีอยู่ใน food court นั้นแล้วหรือไม่
     const existing = await prisma.rentalSlot.findFirst({
       where: { food_court_id: parseInt(food_court_id), slot_number }
     });
@@ -88,7 +114,8 @@ const createSlot = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Slot number already exists in this food court.' });
     }
 
-    // Ensure FoodCourt exists before creating the stall
+    // upsert FoodCourt: สร้างใหม่ถ้าไม่มี, ไม่ทำอะไรถ้ามีอยู่แล้ว
+    // เพื่อป้องกัน Foreign Key Error เวลาสร้าง slot
     await prisma.foodCourt.upsert({
       where: { food_court_id: parseInt(food_court_id) },
       update: {},
@@ -115,7 +142,14 @@ const createSlot = async (req, res, next) => {
   }
 };
 
-// Update slot (Admin only)
+// -------------------------------------------------------
+// ฟังก์ชัน: updateSlot
+// หน้าที่: แก้ไขข้อมูลแผง (Admin เท่านั้น)
+//   - รองรับการเปลี่ยน tenant_id:
+//     * null → ยกเลิกสัญญา ACTIVE ทั้งหมดของแผงนี้
+//     * มีค่า → ยกเลิกสัญญาเก่า แล้วสร้างสัญญาใหม่ default 1 ปีให้ tenant ใหม่
+//   - ใช้ spread operator (...) เพื่ออัปเดตเฉพาะ field ที่ส่งมา
+// -------------------------------------------------------
 const updateSlot = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -126,6 +160,7 @@ const updateSlot = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Slot not found.' });
     }
 
+    // ใช้ spread operator เพื่อ partial update (ใส่เฉพาะ field ที่ส่งมาจริง ๆ)
     const updatedSlot = await prisma.rentalSlot.update({
       where: { slot_id: parseInt(id) },
       data: {
@@ -136,20 +171,21 @@ const updateSlot = async (req, res, next) => {
       }
     });
 
+    // ถ้ามีการส่ง tenant_id มาด้วย → จัดการสัญญา
     if (tenant_id !== undefined) {
       if (tenant_id === null) {
-        // Terminate active contracts for this slot
+        // ยกเลิกสัญญา ACTIVE ทั้งหมดของแผงนี้ (ปล่อยแผงว่าง)
         await prisma.rentalContract.updateMany({
           where: { slot_id: parseInt(id), status: 'ACTIVE' },
           data: { status: 'TERMINATED' }
         });
       } else {
-        // Terminate active contracts
+        // ยกเลิกสัญญาเก่าก่อน
         await prisma.rentalContract.updateMany({
           where: { slot_id: parseInt(id), status: 'ACTIVE' },
           data: { status: 'TERMINATED' }
         });
-        // Create new default active contract
+        // สร้างสัญญา default ใหม่ 1 ปี พร้อม deposit 3 เดือน
         await prisma.rentalContract.create({
           data: {
             slot_id: parseInt(id),
@@ -172,7 +208,12 @@ const updateSlot = async (req, res, next) => {
   }
 };
 
-// Delete slot (Admin only)
+// -------------------------------------------------------
+// ฟังก์ชัน: deleteSlot
+// หน้าที่: ลบแผง (Admin เท่านั้น)
+//   - ป้องกันการลบแผงที่มีสัญญา ACTIVE อยู่
+//   - ต้องยกเลิกสัญญาก่อนจึงจะลบแผงได้
+// -------------------------------------------------------
 const deleteSlot = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -196,7 +237,17 @@ const deleteSlot = async (req, res, next) => {
   }
 };
 
-// Record meter reading (Admin only)
+// -------------------------------------------------------
+// ฟังก์ชัน: recordMeterReading
+// หน้าที่: บันทึกค่ามิเตอร์น้ำ/ไฟสำหรับแผง (Admin เท่านั้น)
+//   ขั้นตอน:
+//   1. ดึงราคาต่อหน่วยจาก SystemSetting (WATER_RATE_PER_UNIT, ELECTRIC_RATE_PER_UNIT)
+//   2. ดึงค่าอ่านมิเตอร์ครั้งก่อนหน้า (previous_reading)
+//   3. คำนวณหน่วยที่ใช้ = ค่าอ่านใหม่ - ค่าอ่านเก่า
+//   4. คำนวณค่าใช้จ่าย = หน่วยที่ใช้ × ราคาต่อหน่วย
+//   5. บันทึก record ใหม่
+//   รองรับทั้งมิเตอร์น้ำและมิเตอร์ไฟในครั้งเดียว
+// -------------------------------------------------------
 const recordMeterReading = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -207,7 +258,8 @@ const recordMeterReading = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Slot not found.' });
     }
 
-    // ดึงราคาจาก SystemSetting (fallback เป็น default ถ้าไม่มี)
+    // ดึงราคาต่อหน่วยจาก SystemSetting (fallback เป็น default ถ้าไม่มี)
+    // น้ำ: 14 บาท/หน่วย, ไฟ: 6 บาท/หน่วย (ค่าตั้งต้น)
     const [waterSetting, electricSetting] = await Promise.all([
       prisma.systemSetting.findUnique({ where: { setting_key: 'WATER_RATE_PER_UNIT' } }),
       prisma.systemSetting.findUnique({ where: { setting_key: 'ELECTRIC_RATE_PER_UNIT' } })
@@ -215,16 +267,18 @@ const recordMeterReading = async (req, res, next) => {
     const waterPrice = parseFloat(waterSetting?.setting_value || '14');
     const electricPrice = parseFloat(electricSetting?.setting_value || '6');
 
-    const results = {};
+    const results = {}; // เก็บผลลัพธ์ทั้งมิเตอร์น้ำและไฟ
 
-    // Process Water Meter
+    // === ประมวลผลมิเตอร์น้ำ ===
     if (waterMeter !== undefined && waterMeter !== '') {
       const currWater = parseFloat(waterMeter) || 0;
+      // ดึงค่าอ่านมิเตอร์น้ำครั้งล่าสุด (เรียงตาม created_at DESC)
       const lastWater = await prisma.utilityMeter.findFirst({
         where: { slot_id: parseInt(id), meter_type: 'WATER' },
         orderBy: { created_at: 'desc' }
       });
       const prevWater = lastWater ? parseFloat(lastWater.current_reading) : 0;
+      // คำนวณหน่วยที่ใช้ (Math.max เพื่อป้องกันค่าติดลบ กรณีมิเตอร์ถูกรีเซ็ต)
       const usedWater = Math.max(0, currWater - prevWater);
 
       const record = await prisma.utilityMeter.create({
@@ -243,14 +297,16 @@ const recordMeterReading = async (req, res, next) => {
       results.water = record;
     }
 
-    // Process Electric Meter
+    // === ประมวลผลมิเตอร์ไฟ ===
     if (electricMeter !== undefined && electricMeter !== '') {
       const currElectric = parseFloat(electricMeter) || 0;
+      // ดึงค่าอ่านมิเตอร์ไฟครั้งล่าสุด
       const lastElectric = await prisma.utilityMeter.findFirst({
         where: { slot_id: parseInt(id), meter_type: 'ELECTRICITY' },
         orderBy: { created_at: 'desc' }
       });
       const prevElectric = lastElectric ? parseFloat(lastElectric.current_reading) : 0;
+      // คำนวณหน่วยที่ใช้
       const usedElectric = Math.max(0, currElectric - prevElectric);
 
       const record = await prisma.utilityMeter.create({
@@ -275,7 +331,13 @@ const recordMeterReading = async (req, res, next) => {
   }
 };
 
-// Get meter readings for a slot
+// -------------------------------------------------------
+// ฟังก์ชัน: getMeterReadings
+// หน้าที่: ดึงประวัติการอ่านมิเตอร์ของแผง
+//   - รองรับ filter ?meter_type=WATER หรือ ELECTRICITY
+//   - เรียงจากล่าสุดก่อน (desc)
+//   - ดึงข้อมูลผู้บันทึก (recorder) มาด้วย
+// -------------------------------------------------------
 const getMeterReadings = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -300,9 +362,20 @@ const getMeterReadings = async (req, res, next) => {
   }
 };
 
-// Get dashboard stats (Admin only)
+// -------------------------------------------------------
+// ฟังก์ชัน: getDashboardStats
+// หน้าที่: ดึงสถิติภาพรวมสำหรับ Admin Dashboard
+//   ใช้ Promise.all เพื่อ query พร้อมกัน 7 queries (ประหยัดเวลา)
+//   ข้อมูลที่ดึงมา:
+//   - จำนวนแผงทั้งหมด, OCCUPIED, VACANT, MAINTENANCE
+//   - จำนวน Tenant ทั้งหมด
+//   - บิลที่ยังไม่ชำระ (PENDING)
+//   - งานซ่อมที่ค้างอยู่ (PENDING + IN_PROGRESS)
+//   - สถิติแยกตาม food_court (groupBy)
+// -------------------------------------------------------
 const getDashboardStats = async (req, res, next) => {
   try {
+    // Query 7 ข้อมูลพร้อมกันด้วย Promise.all ประหยัดเวลา
     const [totalSlots, occupiedSlots, vacantSlots, maintenanceSlots, totalTenants, pendingExpenses, pendingRepairs] =
       await Promise.all([
         prisma.rentalSlot.count(),

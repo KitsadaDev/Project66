@@ -11,25 +11,40 @@ import {
 } from "lucide-react";
 import { stallsAPI } from "../../api";
 
+/**
+ * คอมโพเนนต์หน้าแดชบอร์ดของผู้ดูแลระบบ (Admin Dashboard)
+ * - แสดงตัวเลือกศูนย์อาหาร (ศูนย์อาหาร 1 และ ศูนย์อาหาร 2)
+ * - แสดงผังแผงค้าจำลองแบบ 2D Interactive ตามตำแหน่งจริงในโรงอาหาร
+ * - แสดงสีบอกสถานะล็อก: ว่าง (เขียว), มีผู้เช่า (แดง), ปิดปรับปรุง (เหลือง), ปิดบริการ (เทา)
+ * - สามารถคลิกที่ล็อกเพื่อเปิด Modal ดูข้อมูลผู้เช่า สัญญาเช่า ค่าเช่า และสถานะ
+ * - มีเมนูลัดสำหรับนำทางไปยังหน้าข้อมูลผู้เช่า และจัดการสถานะแผงค้า
+ */
 const AdminDashboard = () => {
+  // ดึงพารามิเตอร์ foodCourt จาก URL query string (เช่น ?foodCourt=1)
   const [searchParams] = useSearchParams();
   const foodCourt = searchParams.get("foodCourt") || null;
   const navigate = useNavigate();
 
+  // สถานะข้อมูลแผงค้า, แผงค้าที่ถูกเลือกดูข้อมูลใน Modal, และสถานะการโหลด
   const [stalls, setStalls] = useState([]);
   const [selectedStall, setSelectedStall] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // โหลดข้อมูลแผงค้าใหม่เมื่อมีการเปลี่ยนแปลงศูนย์อาหารที่เลือก
   useEffect(() => {
     fetchStalls();
   }, [foodCourt]);
 
+  /**
+   * ดึงข้อมูลแผงค้าทั้งหมดจาก API
+   * หากมีการเลือก foodCourt จะกรองเอาเฉพาะแผงค้าที่สังกัดศูนย์อาหารนั้น
+   */
   const fetchStalls = async () => {
     try {
       const response = await stallsAPI.getAll();
       let data = response.data.data || [];
 
-      // Filter by food court if selected
+      // กรองเฉพาะศูนย์อาหารที่ตรงกับพารามิเตอร์
       if (foodCourt) {
         data = data.filter((s) => s.food_court_id === parseInt(foodCourt));
       }
@@ -42,6 +57,11 @@ const AdminDashboard = () => {
     }
   };
 
+  /**
+   * กำหนดคลาสสี Tailwind CSS ตามสถานะของล็อกแผงค้า
+   * @param {string} status - สถานะของล็อก เช่น 'occupied', 'vacant', 'maintenance'
+   * @param {boolean} isSelected - ถูกคลิกเลือกอยู่หรือไม่
+   */
   const getStallColor = (status, isSelected) => {
     const baseClasses =
       "transition-all duration-300 cursor-pointer border-2 shadow-sm relative";
@@ -62,23 +82,35 @@ const AdminDashboard = () => {
     }
   };
 
+  /**
+   * ค้นหาออบเจกต์ข้อมูลแผงค้าจากรหัสล็อก (slot_number)
+   * @param {string} slot_number - เลขล็อก เช่น 'A1', 'B2', 'F1'
+   */
   const getStallData = (slot_number) => {
     const fcId = foodCourt ? parseInt(foodCourt) : 1;
     return stalls.find((s) => s.slot_number === slot_number && s.food_court_id === fcId);
   };
 
+  /**
+   * ตรวจสอบสถานะของแผงค้าตามหมายเลขล็อก
+   * @param {string} slot_number - เลขล็อก
+   */
   const getStallStatus = (slot_number) => {
     const stall = getStallData(slot_number);
     if (!stall) return "empty";
     return stall.status.toLowerCase();
   };
 
+  /**
+   * จัดการเมื่อคลิกเลือกช่องล็อกแผงค้าบนผัง
+   * @param {string} slot_number - เลขล็อกที่คลิก
+   */
   const handleStallClick = (slot_number) => {
     const stall = getStallData(slot_number);
     setSelectedStall(stall ?? { slot_number, status: "EMPTY" });
   };
 
-  // Food Court Selection View
+  // หน้าจอสำหรับเลือกศูนย์อาหาร (แสดงเมื่อ URL ไม่มี ?foodCourt=...)
   if (!foodCourt) {
     return (
       <div className="max-w-7xl mx-auto p-6 md:p-10">
@@ -88,7 +120,7 @@ const AdminDashboard = () => {
           </h1>
         </div>
 
-        {/* Food Court Cards */}
+        {/* การ์ดเลือกศูนย์อาหาร 1 และ ศูนย์อาหาร 2 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
           <Link
             to="/admin?foodCourt=1"
@@ -142,7 +174,13 @@ const AdminDashboard = () => {
     );
   }
 
-  // Common Stall Cell Component
+  /**
+   * คอมโพเนนต์ย่อยสำหรับเรนเดอร์ช่องล็อกแผงค้าแต่ละเซลล์ในผัง
+   * @param {string} id - หมายเลขล็อก
+   * @param {boolean} fixedSize - กำหนดขนาดตายตัวหรือไม่
+   * @param {number} w - ความกว้าง (พิกเซล)
+   * @param {number} h - ความสูง (พิกเซล)
+   */
   const StallCell = ({ id, fixedSize = false, w = 44, h = 44 }) => (
     <div
       style={fixedSize ? { width: w, height: h } : {}}
@@ -308,212 +346,221 @@ const AdminDashboard = () => {
               )}
             </div>
 
-            {/* Legend */}
-            <div className="mt-6 flex flex-wrap gap-4 sm:gap-6 border-t border-gray-100 pt-4 sm:pt-6">
-              {[
-                ["border-green-300 bg-green-100", "ว่าง (พร้อมเช่า)"],
-                ["border-red-300 bg-red-100", "มีผู้เช่าแล้ว"],
-                ["border-yellow-300 bg-yellow-100", "ปิดปรับปรุง"],
-                ["border-dashed border-gray-300 bg-gray-50", "ยังไม่เปิดบริการ"],
-              ].map(([c, l]) => (
-                <div key={l} className="flex items-center gap-2">
-                  <div className={`w-4 h-4 rounded border ${c}`} />
-                  <span className="text-xs sm:text-sm text-gray-600">{l}</span>
-                </div>
-              ))}
+              {/* คำอธิบายสัญลักษณ์สีบนผัง (Legend) */}
+              <div className="mt-6 flex flex-wrap gap-4 sm:gap-6 border-t border-gray-100 pt-4 sm:pt-6">
+                {[
+                  ["border-green-300 bg-green-100", "ว่าง (พร้อมเช่า)"],
+                  ["border-red-300 bg-red-100", "มีผู้เช่าแล้ว"],
+                  ["border-yellow-300 bg-yellow-100", "ปิดปรับปรุง"],
+                  ["border-dashed border-gray-300 bg-gray-50", "ยังไม่เปิดบริการ"],
+                ].map(([c, l]) => (
+                  <div key={l} className="flex items-center gap-2">
+                    <div className={`w-4 h-4 rounded border ${c}`} />
+                    <span className="text-xs sm:text-sm text-gray-600">{l}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Modal Popup */}
-      {selectedStall && (() => {
-        const activeContract = selectedStall.rental_contracts?.[0];
-        const tenant = activeContract?.tenant;
-        const tenantName = tenant
-          ? `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim()
-          : activeContract?.phone
-          ? "ผู้เช่า"
-          : "ไม่มีข้อมูลชื่อผู้เช่า";
-        const tenantPhone = tenant?.phone || activeContract?.phone || "-";
-        const tenantEmail = tenant?.email || "-";
-        const menuType = activeContract?.menuType || "ไม่ระบุประเภท";
-        const contractNum = activeContract?.contract_number || "-";
-        const monthlyRent = activeContract?.monthly_rent || selectedStall.rent;
-        const formatDate = (dStr) => {
-          if (!dStr) return "-";
-          const d = new Date(dStr);
-          return isNaN(d.getTime()) ? "-" : d.toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" });
-        };
-        const startDate = formatDate(activeContract?.start_date);
-        const endDate = formatDate(activeContract?.end_date);
-        const isOccupied = selectedStall.status === "OCCUPIED" || selectedStall.status === "occupied";
-        const isMaintenance = selectedStall.status === "MAINTENANCE" || selectedStall.status === "maintenance";
-        const isVacant = selectedStall.status === "VACANT" || selectedStall.status === "vacant";
+        {/* หน้าต่างป๊อปอัป (Modal) แสดงข้อมูลรายละเอียดของล็อกที่คลิกเลือก */}
+        {selectedStall && (() => {
+          // ดึงสัญญาเช่าที่ยังเปิดใช้งานอยู่ของแผงค้านี้
+          const activeContract = selectedStall.rental_contracts?.[0];
+          const tenant = activeContract?.tenant;
+          const tenantName = tenant
+            ? `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim()
+            : activeContract?.phone
+            ? "ผู้เช่า"
+            : "ไม่มีข้อมูลชื่อผู้เช่า";
+          const tenantPhone = tenant?.phone || activeContract?.phone || "-";
+          const tenantEmail = tenant?.email || "-";
+          const menuType = activeContract?.menuType || "ไม่ระบุประเภท";
+          const contractNum = activeContract?.contract_number || "-";
+          const monthlyRent = activeContract?.monthly_rent || selectedStall.rent;
+          // แปลงวันที่เป็นรูปแบบภาษาไทย
+          const formatDate = (dStr) => {
+            if (!dStr) return "-";
+            const d = new Date(dStr);
+            return isNaN(d.getTime()) ? "-" : d.toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" });
+          };
+          const startDate = formatDate(activeContract?.start_date);
+          const endDate = formatDate(activeContract?.end_date);
+          // เช็คสถานะล็อก
+          const isOccupied = selectedStall.status === "OCCUPIED" || selectedStall.status === "occupied";
+          const isMaintenance = selectedStall.status === "MAINTENANCE" || selectedStall.status === "maintenance";
+          const isVacant = selectedStall.status === "VACANT" || selectedStall.status === "vacant";
 
-        return (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-            onClick={() => setSelectedStall(null)}
-          >
+          return (
             <div
-              className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 md:p-8 relative"
-              onClick={(e) => e.stopPropagation()}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+              onClick={() => setSelectedStall(null)}
             >
-              <button
-                onClick={() => setSelectedStall(null)}
-                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 transition-colors"
+              <div
+                className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 md:p-8 relative"
+                onClick={(e) => e.stopPropagation()}
               >
-                <X size={16} />
-              </button>
-              <div className="flex flex-col items-center mb-6">
-                <div
-                  className={`w-20 h-20 rounded-full flex items-center justify-center mb-3 text-2xl font-bold shadow-md ${
-                    isOccupied
-                      ? "bg-red-100 text-red-600"
-                      : isMaintenance
-                      ? "bg-yellow-100 text-yellow-600"
-                      : isVacant
-                      ? "bg-green-100 text-green-600"
-                      : "bg-gray-100 text-gray-400"
-                  }`}
+                {/* ปุ่มปิด Modal */}
+                <button
+                  onClick={() => setSelectedStall(null)}
+                  className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 transition-colors"
                 >
-                  {selectedStall.slot_number}
-                </div>
-                <h3 className="text-xl font-bold text-gray-800">
-                  {isOccupied
-                    ? "มีผู้เช่าแล้ว"
-                    : isMaintenance
-                    ? "ปิดปรับปรุง"
-                    : isVacant
-                    ? "ว่าง"
-                    : "ยังไม่เปิดบริการ"}
-                </h3>
-                <span
-                  className={`mt-1.5 px-3 py-0.5 rounded-full text-xs font-bold ${
-                    isOccupied
-                      ? "bg-red-100 text-red-700"
-                      : isMaintenance
-                      ? "bg-yellow-100 text-yellow-700"
-                      : isVacant
-                      ? "bg-green-100 text-green-700"
-                      : "bg-gray-100 text-gray-500"
-                  }`}
-                >
-                  {isOccupied
-                    ? "สถานะปกติ"
-                    : isMaintenance
-                    ? "ปิดชั่วคราว"
-                    : isVacant
-                    ? "พร้อมเช่า"
-                    : "ยังไม่เปิด"}
-                </span>
-              </div>
-
-              {isOccupied ? (
-                <div className="space-y-3 bg-red-50/60 p-4 rounded-2xl border border-red-100 text-left text-xs">
-                  <div className="flex items-center justify-between pb-2 border-b border-red-100 font-bold text-red-800 text-sm">
-                    <span className="flex items-center gap-1.5">
-                      <User size={16} /> ข้อมูลผู้เช่า
-                    </span>
-                    <span className="text-[10px] font-mono font-normal text-red-600 bg-red-100 px-2 py-0.5 rounded-md">
-                      {contractNum}
-                    </span>
+                  <X size={16} />
+                </button>
+                <div className="flex flex-col items-center mb-6">
+                  <div
+                    className={`w-20 h-20 rounded-full flex items-center justify-center mb-3 text-2xl font-bold shadow-md ${
+                      isOccupied
+                        ? "bg-red-100 text-red-600"
+                        : isMaintenance
+                        ? "bg-yellow-100 text-yellow-600"
+                        : isVacant
+                        ? "bg-green-100 text-green-600"
+                        : "bg-gray-100 text-gray-400"
+                    }`}
+                  >
+                    {selectedStall.slot_number}
                   </div>
+                  <h3 className="text-xl font-bold text-gray-800">
+                    {isOccupied
+                      ? "มีผู้เช่าแล้ว"
+                      : isMaintenance
+                      ? "ปิดปรับปรุง"
+                      : isVacant
+                      ? "ว่าง"
+                      : "ยังไม่เปิดบริการ"}
+                  </h3>
+                  <span
+                    className={`mt-1.5 px-3 py-0.5 rounded-full text-xs font-bold ${
+                      isOccupied
+                        ? "bg-red-100 text-red-700"
+                        : isMaintenance
+                        ? "bg-yellow-100 text-yellow-700"
+                        : isVacant
+                        ? "bg-green-100 text-green-700"
+                        : "bg-gray-100 text-gray-500"
+                    }`}
+                  >
+                    {isOccupied
+                      ? "สถานะปกติ"
+                      : isMaintenance
+                      ? "ปิดชั่วคราว"
+                      : isVacant
+                      ? "พร้อมเช่า"
+                      : "ยังไม่เปิด"}
+                  </span>
+                </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-gray-700">
-                    <div>
-                      <span className="text-gray-400 block text-[11px]">ชื่อผู้เช่า</span>
-                      <span className="font-semibold text-gray-800">{tenantName}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-400 block text-[11px]">เบอร์โทรศัพท์</span>
-                      <a href={`tel:${tenantPhone}`} className="font-semibold text-purple-600 hover:underline">
-                        {tenantPhone}
-                      </a>
-                    </div>
-                    <div>
-                      <span className="text-gray-400 block text-[11px]">ประเภทร้านอาหาร</span>
-                      <span className="font-semibold text-gray-800">{menuType}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-400 block text-[11px]">ค่าเช่ารายเดือน</span>
-                      <span className="font-semibold text-gray-800">
-                        {monthlyRent ? `${Number(monthlyRent).toLocaleString()} ฿` : "-"}
+                {/* เนื้อหาแสดงตามสถานะล็อก */}
+                {isOccupied ? (
+                  /* กรณีมีผู้เช่า: แสดงข้อมูลผู้เช่าและสัญญา */
+                  <div className="space-y-3 bg-red-50/60 p-4 rounded-2xl border border-red-100 text-left text-xs">
+                    <div className="flex items-center justify-between pb-2 border-b border-red-100 font-bold text-red-800 text-sm">
+                      <span className="flex items-center gap-1.5">
+                        <User size={16} /> ข้อมูลผู้เช่า
+                      </span>
+                      <span className="text-[10px] font-mono font-normal text-red-600 bg-red-100 px-2 py-0.5 rounded-md">
+                        {contractNum}
                       </span>
                     </div>
-                    <div>
-                      <span className="text-gray-400 block text-[11px]">วันเริ่มสัญญา</span>
-                      <span className="font-semibold text-gray-800">{startDate}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-400 block text-[11px]">วันสิ้นสุดสัญญาเช่า</span>
-                      <span className="font-semibold text-gray-800">{endDate}</span>
-                    </div>
-                    {tenantEmail !== "-" && (
-                      <div className="col-span-2">
-                        <span className="text-gray-400 block text-[11px]">อีเมล</span>
-                        <span className="font-medium text-gray-700">{tenantEmail}</span>
+
+                    <div className="grid grid-cols-2 gap-2 text-gray-700">
+                      <div>
+                        <span className="text-gray-400 block text-[11px]">ชื่อผู้เช่า</span>
+                        <span className="font-semibold text-gray-800">{tenantName}</span>
                       </div>
-                    )}
-                    {activeContract?.contractImage && (
-                      <div className="col-span-2 pt-1">
-                        <a
-                          href={activeContract.contractImage}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-medium text-xs rounded-lg transition-colors border border-purple-200"
-                        >
-                          <FileText size={14} /> ดูรูป/ไฟล์สัญญาฉบับจริง ↗
+                      <div>
+                        <span className="text-gray-400 block text-[11px]">เบอร์โทรศัพท์</span>
+                        <a href={`tel:${tenantPhone}`} className="font-semibold text-purple-600 hover:underline">
+                          {tenantPhone}
                         </a>
                       </div>
-                    )}
-                  </div>
+                      <div>
+                        <span className="text-gray-400 block text-[11px]">ประเภทร้านอาหาร</span>
+                        <span className="font-semibold text-gray-800">{menuType}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 block text-[11px]">ค่าเช่ารายเดือน</span>
+                        <span className="font-semibold text-gray-800">
+                          {monthlyRent ? `${Number(monthlyRent).toLocaleString()} ฿` : "-"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 block text-[11px]">วันเริ่มสัญญา</span>
+                        <span className="font-semibold text-gray-800">{startDate}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 block text-[11px]">วันสิ้นสุดสัญญาเช่า</span>
+                        <span className="font-semibold text-gray-800">{endDate}</span>
+                      </div>
+                      {tenantEmail !== "-" && (
+                        <div className="col-span-2">
+                          <span className="text-gray-400 block text-[11px]">อีเมล</span>
+                          <span className="font-medium text-gray-700">{tenantEmail}</span>
+                        </div>
+                      )}
+                      {activeContract?.contractImage && (
+                        <div className="col-span-2 pt-1">
+                          <a
+                            href={activeContract.contractImage}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-medium text-xs rounded-lg transition-colors border border-purple-200"
+                          >
+                            <FileText size={14} /> ดูรูป/ไฟล์สัญญาฉบับจริง ↗
+                          </a>
+                        </div>
+                      )}
+                    </div>
 
-                  <div className="pt-2">
+                    <div className="pt-2">
+                      <button
+                        onClick={() => navigate("/admin/tenants")}
+                        className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-medium text-xs shadow-sm transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <FileText size={14} /> ดูรายละเอียดผู้เช่าทั้งหมด
+                      </button>
+                    </div>
+                  </div>
+                ) : isMaintenance ? (
+                  /* กรณีปิดปรับปรุง */
+                  <div className="text-center p-5 bg-yellow-50 rounded-2xl border border-yellow-100 space-y-2">
+                    <p className="text-yellow-700 font-medium text-sm">ล็อกนี้ปิดปรับปรุงชั่วคราว</p>
+                    <p className="text-xs text-yellow-600">
+                      ค่าเช่า: {selectedStall.rent ? `${Number(selectedStall.rent).toLocaleString()} ฿/เดือน` : "-"}
+                    </p>
                     <button
-                      onClick={() => navigate("/admin/tenants")}
-                      className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-medium text-xs shadow-sm transition-colors flex items-center justify-center gap-1.5"
+                      onClick={() => navigate("/admin/stalls")}
+                      className="mt-2 w-full py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-xl font-medium text-xs shadow-sm transition-colors"
                     >
-                      <FileText size={14} /> ดูรายละเอียดผู้เช่าทั้งหมด
+                      จัดการสถานะแผงค้า
                     </button>
                   </div>
-                </div>
-              ) : isMaintenance ? (
-                <div className="text-center p-5 bg-yellow-50 rounded-2xl border border-yellow-100 space-y-2">
-                  <p className="text-yellow-700 font-medium text-sm">ล็อกนี้ปิดปรับปรุงชั่วคราว</p>
-                  <p className="text-xs text-yellow-600">
-                    ค่าเช่า: {selectedStall.rent ? `${Number(selectedStall.rent).toLocaleString()} ฿/เดือน` : "-"}
-                  </p>
-                  <button
-                    onClick={() => navigate("/admin/stalls")}
-                    className="mt-2 w-full py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-xl font-medium text-xs shadow-sm transition-colors"
-                  >
-                    จัดการสถานะแผงค้า
-                  </button>
-                </div>
-              ) : isVacant ? (
-                <div className="text-center p-5 border-2 border-dashed border-green-200 rounded-2xl bg-green-50/50 space-y-2">
-                  <p className="text-green-700 font-medium text-sm">ล็อกนี้ยังว่างอยู่ (พร้อมเช่า)</p>
-                  <p className="text-xs text-green-600">
-                    ค่าเช่า: {selectedStall.rent ? `${Number(selectedStall.rent).toLocaleString()} ฿/เดือน` : "-"}
-                  </p>
-                  <button
-                    onClick={() => navigate("/admin/stalls")}
-                    className="mt-2 w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium text-xs shadow-sm transition-colors"
-                  >
-                    ทำสัญญา / แก้ไขแผงค้า
-                  </button>
-                </div>
-              ) : (
-                <div className="text-center p-5 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                  <p className="text-gray-400 font-medium">ยังไม่เปิดให้บริการ</p>
-                </div>
-              )}
+                ) : isVacant ? (
+                  /* กรณีล็อกว่าง */
+                  <div className="text-center p-5 border-2 border-dashed border-green-200 rounded-2xl bg-green-50/50 space-y-2">
+                    <p className="text-green-700 font-medium text-sm">ล็อกนี้ยังว่างอยู่ (พร้อมเช่า)</p>
+                    <p className="text-xs text-green-600">
+                      ค่าเช่า: {selectedStall.rent ? `${Number(selectedStall.rent).toLocaleString()} ฿/เดือน` : "-"}
+                    </p>
+                    <button
+                      onClick={() => navigate("/admin/stalls")}
+                      className="mt-2 w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium text-xs shadow-sm transition-colors"
+                    >
+                      ทำสัญญา / แก้ไขแผงค้า
+                    </button>
+                  </div>
+                ) : (
+                  /* กรณียังไม่เปิดให้บริการ */
+                  <div className="text-center p-5 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                    <p className="text-gray-400 font-medium">ยังไม่เปิดให้บริการ</p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
     </div>
   );
 };

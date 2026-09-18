@@ -14,17 +14,31 @@ import { contractsAPI } from "../../api";
 import { toast } from "react-toastify";
 import { useAuthStore } from "../../store";
 
+/**
+ * คอมโพเนนต์หน้าจัดการสัญญาเช่าทั้งหมดสำหรับผู้ดูแลระบบ (Admin Contracts)
+ * - แสดงตารางรายการสัญญาเช่าทั้งหมด (เลขที่สัญญา, ชื่อผู้เช่า, ล็อก, ค่าเช่า, ระยะเวลา)
+ * - กรองสัญญาตามสถานะ (ทำสัญญาอยู่, หมดอายุ, ขอยกเลิก, ยกเลิกแล้ว)
+ * - ค้นหาตามเลขสัญญา, ชื่อ-นามสกุลผู้เช่า, หรือเลขแผงค้า
+ * - ดำเนินการอนุมัติ หรือปฏิเสธคำขอยกเลิกสัญญาเช่า (Pending Termination)
+ * - มีปุ่มสำหรับไปยังหน้าสร้างสัญญาเช่าใหม่ (Create Contract)
+ */
 const AdminContracts = () => {
   const { user } = useAuthStore();
+  // สถานะเก็บรายการสัญญาเช่า และสถานะการโหลด
   const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(true);
+  // คำค้นหา และตัวกรองสถานะ
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
 
+  // โหลดรายการสัญญาเช่าใหม่เมื่อมีการเปลี่ยนสถานะตัวกรอง
   useEffect(() => {
     fetchContracts();
   }, [statusFilter]);
 
+  /**
+   * ดึงรายการสัญญาเช่าจาก API โดยส่ง Query กรองตามสถานะที่เลือก
+   */
   const fetchContracts = async () => {
     try {
       setLoading(true);
@@ -39,6 +53,10 @@ const AdminContracts = () => {
     }
   };
 
+  /**
+   * แสดงแท็กสถานะ (Badge) พร้อมไอคอนตามสถานะของสัญญา
+   * @param {string} status - สถานะของสัญญา
+   */
   const getStatusBadge = (status) => {
     switch (status) {
       case "ACTIVE":
@@ -74,6 +92,12 @@ const AdminContracts = () => {
     }
   };
 
+  /**
+   * อนุมัติคำขอยกเลิกสัญญาเช่า
+   * - สัญญาจะถูกเปลี่ยนสถานะเป็น TERMINATED
+   * - แผงค้าจะถูกปลดล็อกกลับมาเป็นสถานะ VACANT (ว่าง) อัตโนมัติ
+   * @param {string|number} contractId - รหัสสัญญาเช่า
+   */
   const handleApproveTermination = async (contractId) => {
     if (window.confirm("ยืนยันการอนุมัติยกเลิกสัญญาเช่าใช่หรือไม่?\nหากอนุมัติ สัญญาจะสิ้นสุดและแผงค้าจะว่างลงทันที")) {
       try {
@@ -89,6 +113,10 @@ const AdminContracts = () => {
     }
   };
 
+  /**
+   * ปฏิเสธคำขอยกเลิกสัญญาเช่า (สถานะสัญญาจะคงเป็น ACTIVE ตามเดิม)
+   * @param {string|number} contractId - รหัสสัญญาเช่า
+   */
   const handleRejectTermination = async (contractId) => {
     if (window.confirm("คุณต้องการปฏิเสธคำขอยกเลิกสัญญานี้ใช่หรือไม่?")) {
       try {
@@ -104,15 +132,18 @@ const AdminContracts = () => {
     }
   };
 
+  /**
+   * กรองสัญญาเช่าตามคำค้นหา (เลขที่สัญญา, ชื่อ-สกุลผู้เช่า, เลขแผงค้า) และฟิลเตอร์สถานะ
+   */
   const filteredContracts = contracts.filter((c) => {
     const searchLower = search.toLowerCase();
     
-    // 1. Status Filter
+    // 1. กรองตามสถานะที่เลือก
     if (statusFilter !== "ALL" && c.status !== statusFilter) {
       return false;
     }
 
-    // 2. Search Filter
+    // 2. กรองตามคำค้นหา
     const matchesSearch = c.contract_number?.toLowerCase().includes(searchLower) ||
       c.tenant?.first_name?.toLowerCase().includes(searchLower) ||
       c.tenant?.last_name?.toLowerCase().includes(searchLower) ||
@@ -120,7 +151,7 @@ const AdminContracts = () => {
       
     if (!matchesSearch) return false;
 
-    // 3. Hide old terminated contracts if the tenant has an active contract (only when viewing ALL)
+    // 3. ซ่อนสัญญาเก่าที่ยกเลิกหรือหมดอายุแล้ว หากผู้เช่ารายนั้นมีสัญญาใหม่ที่ยังเปิดใช้งานอยู่ (เฉพาะเมื่อดูแท็บ ALL)
     if (statusFilter === "ALL" && (c.status === "TERMINATED" || c.status === "EXPIRED")) {
       const hasActive = contracts.some(
         (other) => other.tenant?.user_id === c.tenant?.user_id && (other.status === "ACTIVE" || other.status === "PENDING_TERMINATION")

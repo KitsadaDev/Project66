@@ -12,16 +12,31 @@ import {
 } from "lucide-react";
 import { maintenanceAPI } from "../../api";
 
+/**
+ * คอมโพเนนต์หน้ารายการงานซ่อมบำรุงทั้งหมดสำหรับช่าง (Maintenance Jobs)
+ * - แสดงรายการงานซ่อมบำรุงที่ได้รับมอบหมาย
+ * - สรุปสถิติจำนวนงานตามสถานะ (รอดำเนินการ, กำลังดำเนินการ, เสร็จสิ้น)
+ * - ค้นหาตามชื่องาน หรือหมายเลขแผงค้า (ล็อค)
+ * - กรองงานตามสถานะ
+ * - ลิงก์ไปยังหน้ารายละเอียดการซ่อมแต่ละงานเพื่ออัปเดตสถานะและแนบรูปภาพ
+ */
 const Jobs = () => {
+  // รายการงานซ่อมทั้งหมด
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  // คำค้นหาในกล่อง Search
   const [search, setSearch] = useState("");
+  // ตัวกรองสถานะ (ALL, PENDING, IN_PROGRESS, COMPLETED)
   const [statusFilter, setStatusFilter] = useState("ALL");
 
+  // โหลดรายการงานซ่อมเมื่อคอมโพเนนต์ถูก Render ครั้งแรก
   useEffect(() => {
     fetchJobs();
   }, []);
 
+  /**
+   * ดึงข้อมูลงานซ่อมบำรุงทั้งหมดจาก API
+   */
   const fetchJobs = async () => {
     try {
       const response = await maintenanceAPI.getAll();
@@ -33,6 +48,10 @@ const Jobs = () => {
     }
   };
 
+  /**
+   * จัดรูปแบบวันที่เป็นภาษาไทย (วัน/เดือน/ปี พ.ศ.)
+   * @param {string} dateStr - วันที่ในรูปแบบ ISO
+   */
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
     const date = new Date(dateStr);
@@ -40,6 +59,13 @@ const Jobs = () => {
     return date.toLocaleDateString("th-TH");
   };
 
+  /**
+   * การตั้งค่า UI และสีตามสถานะงานซ่อม:
+   * - PENDING: สีส้ม (รอดำเนินการ)
+   * - IN_PROGRESS: สีฟ้า (กำลังดำเนินการ)
+   * - COMPLETED: สีเขียว (เสร็จสิ้น)
+   * @param {string} status - รหัสสถานะงานซ่อม
+   */
   const getStatusConfig = (status) => {
     const config = {
       PENDING: {
@@ -70,6 +96,7 @@ const Jobs = () => {
     return config[status] || config.PENDING;
   };
 
+  // กรองรายการงานซ่อมตามคำค้นหาและสถานะที่เลือก
   const filteredJobs = jobs.filter((job) => {
     const slotNum =
       job.slot?.slot_number ||
@@ -83,6 +110,7 @@ const Jobs = () => {
     return matchesSearch && matchesStatus;
   });
 
+  // นับจำนวนงานในแต่ละสถานะสำหรับแสดงผลในการ์ด KPI ด้านบน
   const pendingCount = jobs.filter((j) => j.status === "PENDING").length;
   const inProgressCount = jobs.filter((j) => j.status === "IN_PROGRESS").length;
   const completedCount = jobs.filter((j) => j.status === "COMPLETED").length;

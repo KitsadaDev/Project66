@@ -17,14 +17,28 @@ import { formatPhoneNumber } from "../../utils/formatters";
 import { toast } from "react-toastify";
 import { stallsAPI, authAPI, usersAPI, contractsAPI } from "../../api";
 
+/**
+ * คอมโพเนนต์หน้าจัดการข้อมูลผู้เช่าแผงค้าสำหรับผู้ดูแลระบบ (Admin Tenants)
+ * - แสดงตารางรายชื่อผู้เช่าทั้งหมด (ชื่อ-สกุล, แผงค้าที่เช่า, เบอร์โทร, อีเมล, สัญญาเช่า)
+ * - เพิ่มผู้เช่าใหม่ (Add Tenant): บันทึกข้อมูลส่วนตัว, ที่อยู่ประเทศไทย (Cascading), สร้างบัญชีผู้ใช้ และกำหนดแผงค้า
+ * - แก้ไขข้อมูลผู้เช่า และย้ายแผงค้า (Inline Edit / Update with Photo)
+ * - อัปโหลดรูปภาพโปรไฟล์ด่วนจากในตาราง
+ * - ดูและจัดการสัญญาเช่าของผู้เช่า (Contract Modal): แก้ไขเลขสัญญา, วันที่, เงินประกัน, ใบเสร็จ, และเอกสารสัญญา
+ * - ลบข้อมูลผู้เช่าออกจากระบบ
+ */
 const Tenants = () => {
+  // ข้อมูลผู้เช่า, แผงค้าทั้งหมด, และสัญญาเช่าที่เปิดใช้งานอยู่
   const [tenants, setTenants] = useState([]);
   const [allStalls, setAllStalls] = useState([]);
   const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+
+  // สถานะการแก้ไขข้อมูลผู้เช่าในแถวตาราง (Inline Edit)
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
+
+  // สถานะสำหรับหน้าต่างป๊อปอัปเพิ่มผู้เช่าใหม่ (Add Modal)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addForm, setAddForm] = useState({
     title: "",
@@ -45,14 +59,14 @@ const Tenants = () => {
   const [profileFile, setProfileFile] = useState(null);
   const [profilePreview, setProfilePreview] = useState(null);
 
-  // Edit-mode profile image state
+  // รูปโปรไฟล์ในโหมดแก้ไขข้อมูล
   const [editProfileFile, setEditProfileFile] = useState(null);
   const [editProfilePreview, setEditProfilePreview] = useState(null);
 
-  // Quick photo upload state
+  // รหัสผู้ใช้ที่กำลังอัปโหลดรูปโปรไฟล์แบบด่วน
   const [uploadingPhotoId, setUploadingPhotoId] = useState(null);
 
-  // Contract Modal State
+  // สถานะสำหรับหน้าต่างป๊อปอัปจัดการสัญญาเช่า (Contract Modal)
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
   const [contractForm, setContractForm] = useState({
     id: null,
@@ -62,11 +76,11 @@ const Tenants = () => {
     startDate: "",
     endDate: "",
     idCard: "",
-    phone: "", // Contact number in contract
+    phone: "", // เบอร์โทรติดต่อในสัญญา
     address: "",
     receiptNumber: "",
     receiptDate: "",
-    contractFee: "", // mapped to securityDeposit or general fee? User said "ค่าประกันสัญญา" -> securityDeposit
+    contractFee: "", // ค่าประกันสัญญา
     securityDeposit: "",
     lateRentFine: "",
     lateUtilityFine: "",
@@ -77,7 +91,7 @@ const Tenants = () => {
   const [contractFilePreview, setContractFilePreview] = useState(null);
   const [selectedTenantName, setSelectedTenantName] = useState("");
 
-  // Thai Address Cascading Dropdown States
+  // เก็บออบเจกต์ที่อยู่สำหรับฟอร์มสัญญาเช่า
   const [addressObj, setAddressObj] = useState({
     houseNoMoo: "",
     province: "",
@@ -86,17 +100,19 @@ const Tenants = () => {
     zipCode: "",
   });
 
-  // Address Cascading Dropdown States
+  // ข้อมูลที่อยู่ประเทศไทย (โหลดจาก thailand-address.json) สำหรับ Cascading Dropdown
   const [addressData, setAddressData] = useState([]);
   const [provinces, setProvinces] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [subdistricts, setSubdistricts] = useState([]);
 
-  // Contract Address Cascading Dropdown States
+  // ข้อมูลอำเภอ/ตำบลสำหรับฟอร์มสัญญาเช่า
   const [contractDistricts, setContractDistricts] = useState([]);
   const [contractSubdistricts, setContractSubdistricts] = useState([]);
 
-  // Load address database dynamically when Add Modal or Contract Modal is open
+  /**
+   * โหลดฐานข้อมูลที่อยู่ประเทศไทยเมื่อเปิด Modal เพิ่มผู้เช่า หรือ Modal สัญญาเช่า
+   */
   useEffect(() => {
     if ((isAddModalOpen || isContractModalOpen) && addressData.length === 0) {
       fetch("/thailand-address.json")
@@ -110,7 +126,9 @@ const Tenants = () => {
     }
   }, [isAddModalOpen, isContractModalOpen, addressData]);
 
-  // Synchronize Contract Dropdowns when existing contract address is loaded
+  /**
+   * เชื่อมโยงข้อมูลอำเภอ/ตำบลอัตโนมัติเมื่อเปิดดูสัญญาเดิมที่มีที่อยู่อยู่แล้ว
+   */
   useEffect(() => {
     if (isContractModalOpen && addressData.length > 0) {
       if (addressObj.province) {
@@ -135,6 +153,9 @@ const Tenants = () => {
     }
   }, [isContractModalOpen, addressData, addressObj.province, addressObj.district]);
 
+  /**
+   * จัดการเมื่อเปลี่ยนจังหวัดในฟอร์มสัญญาเช่า (รีเซ็ตอำเภอ ตำบล และรหัสไปรษณีย์)
+   */
   const handleContractProvinceChange = (provinceName) => {
     if (!provinceName) {
       setAddressObj((prev) => ({
@@ -165,6 +186,9 @@ const Tenants = () => {
     setContractSubdistricts([]);
   };
 
+  /**
+   * จัดการเมื่อเปลี่ยนอำเภอในฟอร์มสัญญาเช่า (รีเซ็ตตำบล และรหัสไปรษณีย์)
+   */
   const handleContractDistrictChange = (districtName) => {
     if (!districtName) {
       setAddressObj((prev) => ({
@@ -191,6 +215,9 @@ const Tenants = () => {
     setContractSubdistricts(sortedSubdistricts);
   };
 
+  /**
+   * จัดการเมื่อเปลี่ยนตำบลในฟอร์มสัญญาเช่า (ดึงรหัสไปรษณีย์อัตโนมัติ)
+   */
   const handleContractSubdistrictChange = (subdistrictName) => {
     if (!subdistrictName) {
       setAddressObj((prev) => ({
@@ -211,6 +238,9 @@ const Tenants = () => {
     }));
   };
 
+  /**
+   * จัดการเมื่อเปลี่ยนจังหวัดในฟอร์มเพิ่มผู้เช่าใหม่
+   */
   const handleProvinceChange = (provinceName) => {
     if (!provinceName) {
       setAddForm((prev) => ({
@@ -298,6 +328,12 @@ const Tenants = () => {
 
 
 
+  /**
+   * โหลดข้อมูลเริ่มต้นทั้งหมดสำหรับหน้านี้:
+   * 1. รายชื่อผู้เช่าทั้งหมด (role: TENANT)
+   * 2. รายชื่อแผงค้าทั้งหมด
+   * 3. รายชื่อสัญญาเช่าที่มีสถานะ ACTIVE
+   */
   useEffect(() => {
     fetchData();
   }, []);
@@ -313,16 +349,25 @@ const Tenants = () => {
     }
   };
 
+  /**
+   * ดึงรายชื่อผู้เช่าทั้งหมดจากระบบ
+   */
   const fetchTenants = async () => {
     const response = await usersAPI.getAll({ role: "TENANT" });
     setTenants(response.data.data || []);
   };
 
+  /**
+   * ดึงรายการแผงค้าทั้งหมด
+   */
   const fetchStalls = async () => {
     const response = await stallsAPI.getAll();
     setAllStalls(response.data.data || []);
   };
 
+  /**
+   * ดึงรายการสัญญาเช่าที่มีผลบังคับใช้อยู่ (ACTIVE)
+   */
   const fetchContracts = async () => {
     try {
       const response = await contractsAPI.getAll({ status: "ACTIVE" });
@@ -332,6 +377,10 @@ const Tenants = () => {
     }
   };
 
+  /**
+   * เปิดโหมดแก้ไขข้อมูลผู้เช่าแถวที่เลือก (Inline Edit)
+   * @param {Object} tenant - ข้อมูลผู้เช่าที่ต้องการแก้ไข
+   */
   const handleEdit = (tenant) => {
     setEditingId(tenant.user_id);
     setEditForm({
@@ -345,6 +394,10 @@ const Tenants = () => {
     setEditProfilePreview(tenant.profile_image_url || null);
   };
 
+  /**
+   * บันทึกการแก้ไขข้อมูลผู้เช่า (รวมถึงการย้าย/สลับแผงค้า และการอัปโหลดรูปภาพโปรไฟล์ใหม่)
+   * @param {number} user_id - รหัสผู้เช่าที่ต้องการบันทึก
+   */
   const handleSave = async (user_id) => {
     try {
       const { slot_id, originalSlotId, ...userData } = editForm;
@@ -385,6 +438,10 @@ const Tenants = () => {
     }
   };
 
+  /**
+   * ลบข้อมูลผู้เช่าออกจากระบบ พร้อมแสดงกล่องยืนยัน
+   * @param {number} id - รหัสผู้ใช้ของผู้เช่า
+   */
   const handleDelete = async (id) => {
     if (window.confirm("คุณต้องการลบข้อมูลผู้เช่านี้ใช่หรือไม่?")) {
       try {
@@ -398,6 +455,11 @@ const Tenants = () => {
     }
   };
 
+  /**
+   * อัปโหลดรูปภาพโปรไฟล์แบบเร่งด่วนจากไอคอนกล้องในตาราง
+   * @param {number} user_id - รหัสผู้ใช้
+   * @param {File} file - ไฟล์รูปภาพ
+   */
   const handleQuickPhotoUpload = async (user_id, file) => {
     if (!file) return;
     setUploadingPhotoId(user_id);
@@ -415,6 +477,11 @@ const Tenants = () => {
     }
   };
 
+  /**
+   * บันทึกการเพิ่มผู้เช่าใหม่เข้าสู่ระบบ:
+   * 1. สร้างบัญชีผู้ใช้ (Role: TENANT) พร้อมข้อมูลที่อยู่และรูปภาพโปรไฟล์
+   * 2. กำหนดแผงค้าให้ผู้เช่า (ถ้ามีการเลือกแผงค้า) และเปลี่ยนสถานะแผงเป็น OCCUPIED
+   */
   const handleAddSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -479,7 +546,12 @@ const Tenants = () => {
     }
   };
 
-  // --- Contract Management ---
+  /**
+   * เปิดหน้าต่างจัดการสัญญาเช่าของผู้เช่าที่เลือก
+   * - หากมีสัญญาเดิมอยู่แล้ว จะโหลดข้อมูลสัญญามาแสดงในฟอร์มเพื่อแก้ไข
+   * - หากยังไม่มีสัญญา จะตั้งค่าเริ่มต้นเป็นสัญญาใหม่ระยะเวลา 3 ปี และคำนวณเงินประกัน 3 เดือนอัตโนมัติ
+   * @param {Object} tenant - ข้อมูลผู้เช่า
+   */
   const handleManageContract = (tenant) => {
     if (!tenant.stall) {
       toast.warn(
@@ -575,10 +647,16 @@ const Tenants = () => {
     setIsContractModalOpen(true);
   };
 
+  /**
+   * บันทึกหรืออัปเดตข้อมูลสัญญาเช่า:
+   * 1. ตรวจสอบเงื่อนไขระยะเวลาสัญญาต้องไม่เกิน 3 ปี
+   * 2. รวมข้อมูลที่อยู่ให้เป็นข้อความเต็มตามรูปแบบราชการ
+   * 3. แปลงเป็น FormData เพื่อรองรับการอัปโหลดไฟล์เอกสารสัญญา
+   */
   const handleContractSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Validate Max 3 Years
+      // ตรวจสอบว่าระยะเวลาสัญญาไม่เกิน 3 ปี
       const start = new Date(contractForm.startDate);
       const end = new Date(contractForm.endDate);
       const maxEnd = new Date(start);
@@ -588,14 +666,14 @@ const Tenants = () => {
         return;
       }
 
-      // Combine address before submit
+      // รวมที่อยู่ให้เป็นข้อความสมบูรณ์
       const combinedAddress = `บ้านเลขที่ ${addressObj.houseNoMoo}, ตำบล${addressObj.subDistrict}, อำเภอ${addressObj.district}, จังหวัด${addressObj.province} ${addressObj.zipCode}`;
       const finalForm = { ...contractForm, address: combinedAddress };
 
       const formData = new FormData();
       Object.keys(finalForm).forEach((key) => {
         if (key === "securityDeposit") {
-          // Backend expects deposit_amount, not securityDeposit
+          // ฝั่ง Backend ใช้ชื่อฟิลด์ deposit_amount
           if (finalForm[key] !== null && finalForm[key] !== undefined) {
             formData.append("deposit_amount", finalForm[key]);
           }
@@ -622,6 +700,9 @@ const Tenants = () => {
     }
   };
 
+  /**
+   * ยกเลิกโหมดแก้ไขแถวในตาราง และคืนค่าสถานะฟอร์ม
+   */
   const handleCancel = () => {
     setEditingId(null);
     setEditForm({});
@@ -629,6 +710,7 @@ const Tenants = () => {
     setEditProfilePreview(null);
   };
 
+  // กรองรายชื่อผู้เช่าตามคำค้นหา (ชื่อ, อีเมล, หรือหมายเลขแผงค้า)
   const filteredTenants = tenants.filter(
     (tenant) =>
       tenant.first_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -644,6 +726,9 @@ const Tenants = () => {
     );
   }
 
+  /**
+   * คำนวณวันสิ้นสุดสัญญาเช่าสูงสุดที่เป็นไปได้ (วันเริ่มต้น + 3 ปี)
+   */
   const getMaxEndDate = () => {
     if (!contractForm.startDate) return "";
     const start = new Date(contractForm.startDate);

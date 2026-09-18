@@ -1,3 +1,12 @@
+// ======================================================
+// pages/tenant/ReportRepair.jsx - แบบฟอร์มแจ้งซ่อมสำหรับผู้เช่า (Tenant Repair Report Form)
+// รับผิดชอบ:
+//   - รับข้อมูลแจ้งปัญหาชำรุด: หัวข้อ, หมวดหมู่ปัญหา (ประปา, ไฟฟ้า, โครงสร้าง, อุปกรณ์ ฯลฯ), รายละเอียด
+//   - อัปโหลดรูปภาพความเสียหาย (สูงสุด 5 รูป) พร้อมแปลงไฟล์ HEIC/HEIF เป็น JPEG อัตโนมัติ
+//   - ส่งข้อมูลผ่าน FormData ไปยัง API (maintenanceAPI.create)
+//   - เมื่อแจ้งซ่อมสำเร็จ นำทางไปยังหน้าติดตามงานซ่อม (/tenant/track-repairs)
+// ======================================================
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Wrench, Camera, X, Send, AlertCircle, ArrowRight } from "lucide-react";
@@ -10,13 +19,17 @@ const ReportRepair = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("");
-  const [photos, setPhotos] = useState([]);
-  const [photoUrls, setPhotoUrls] = useState([]);
-  const [submitting, setSubmitting] = useState(false);
+  // -------------------------------------------------------
+  // Form States
+  // -------------------------------------------------------
+  const [title, setTitle] = useState("");              // หัวข้อปัญหา
+  const [description, setDescription] = useState("");  // คำอธิบายรายละเอียดปัญหา
+  const [category, setCategory] = useState("");        // หมวดหมู่ประเภทปัญหา
+  const [photos, setPhotos] = useState([]);            // รายการไฟล์รูปภาพ (File Objects)
+  const [photoUrls, setPhotoUrls] = useState([]);      // URL สำหรับ Preview รูปภาพ
+  const [submitting, setSubmitting] = useState(false); // สถานะกำลังส่งข้อมูล
 
+  // รายการหมวดหมู่ปัญหาการซ่อม
   const categories = [
     { value: "PLUMBING", label: "ปัญหาระบบประปา" },
     { value: "ELECTRICAL", label: "ปัญหาระบบไฟฟ้า" },
@@ -25,6 +38,10 @@ const ReportRepair = () => {
     { value: "OTHER", label: "อื่นๆ" },
   ];
 
+  // -------------------------------------------------------
+  // ฟังก์ชัน: handlePhotoUpload
+  // หน้าที่: รับไฟล์รูปภาพ ตรวจสอบจำนวนไม่เกิน 5 รูป และแปลง HEIC -> JPEG ก่อนบันทึกลง State
+  // -------------------------------------------------------
   const handlePhotoUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (photos.length + files.length > 5) {
@@ -34,6 +51,7 @@ const ReportRepair = () => {
 
     const toastId = toast.info("กำลังประมวลผลรูปภาพ...", { autoClose: false });
     try {
+      // แปลงไฟล์ HEIC/HEIF จาก iPhone ให้กลายเป็น JPEG
       const convertedFiles = await Promise.all(
         files.map((file) => convertHeicToJpeg(file))
       );
@@ -48,11 +66,16 @@ const ReportRepair = () => {
     }
   };
 
+  // ลบรูปภาพที่เลือกออกจากรายการ
   const removePhoto = (index) => {
     setPhotos((prev) => prev.filter((_, i) => i !== index));
     setPhotoUrls((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // -------------------------------------------------------
+  // ฟังก์ชัน: handleSubmit
+  // หน้าที่: ตรวจสอบความถูกต้องของแบบฟอร์ม และส่งข้อมูลคำขอแจ้งซ่อมผ่าน FormData
+  // -------------------------------------------------------
   const handleSubmit = async () => {
     if (!title.trim()) {
       toast.error("กรุณากรอกหัวข้อปัญหา");
@@ -74,14 +97,16 @@ const ReportRepair = () => {
       formData.append("description", description);
       formData.append("category", category);
 
+      // แนบไฟล์รูปภาพทั้งหมดเข้าไปใน FormData (ฟิลด์ images)
       photos.forEach((photo) => {
         formData.append("images", photo);
       });
 
+      // เรียก API สร้างคำขอแจ้งซ่อม
       await maintenanceAPI.create(formData);
 
       toast.success("แจ้งซ่อมสำเร็จ รอการดำเนินการ");
-      navigate("/tenant/track-repairs");
+      navigate("/tenant/track-repairs"); // ไปหน้าติดตามผลงานซ่อม
     } catch (error) {
       toast.error("ไม่สามารถแจ้งซ่อมได้ กรุณาลองใหม่");
     } finally {
@@ -91,6 +116,7 @@ const ReportRepair = () => {
 
   return (
     <div>
+      {/* ส่วนหัวหน้าจอ */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-800">แจ้งซ่อม</h1>
         <p className="text-gray-500 text-sm">
@@ -100,6 +126,7 @@ const ReportRepair = () => {
 
       <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-2xl shadow-lg border border-purple-100 overflow-hidden">
+          {/* ส่วนหัวการ์ดฟอร์ม */}
           <div className="bg-purple-50 p-6 border-b border-purple-100 flex items-center gap-3">
             <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-purple-600 shadow-sm">
               <Wrench size={20} />
@@ -108,9 +135,10 @@ const ReportRepair = () => {
           </div>
 
           <div className="p-6 md:p-8 space-y-8">
-            {/* Section 1: Basic Info */}
+            {/* ส่วนที่ 1: ข้อมูลพื้นฐาน (หัวข้อ, ประเภท, รายละเอียด) */}
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* หัวข้อปัญหา */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">
                     หัวข้อปัญหา <span className="text-red-500">*</span>
@@ -124,6 +152,7 @@ const ReportRepair = () => {
                   />
                 </div>
 
+                {/* ประเภทปัญหา */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">
                     ประเภทปัญหา <span className="text-red-500">*</span>
@@ -143,6 +172,7 @@ const ReportRepair = () => {
                 </div>
               </div>
 
+              {/* รายละเอียดปัญหา */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">
                   รายละเอียดปัญหา <span className="text-red-500">*</span>
@@ -156,11 +186,13 @@ const ReportRepair = () => {
               </div>
             </div>
 
+            {/* ส่วนที่ 2: แนบรูปภาพประกอบ */}
             <div className="border-t border-gray-100 pt-8">
               <label className="block text-sm font-medium text-gray-700 mb-4">
                 แนบรูปภาพ (ถ้ามี)
               </label>
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {/* กล่องกดเพิ่มรูปภาพ */}
                 <div
                   className="aspect-square border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer flex flex-col items-center justify-center p-2 text-center"
                   onClick={() =>
@@ -184,6 +216,7 @@ const ReportRepair = () => {
                   />
                 </div>
 
+                {/* แสดง Preview รูปภาพที่แนบ */}
                 {photoUrls.map((url, index) => (
                   <div
                     key={index}
@@ -194,8 +227,9 @@ const ReportRepair = () => {
                       alt={`Preview ${index + 1}`}
                       className="w-full h-full object-cover"
                     />
+                    {/* ปุ่มลบรูปภาพ */}
                     <button
-                      className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                       onClick={() => removePhoto(index)}
                     >
                       <X size={12} />
@@ -206,15 +240,16 @@ const ReportRepair = () => {
             </div>
           </div>
 
+          {/* ส่วนท้ายการ์ด: ปุ่มยกเลิก และปุ่มส่งแจ้งซ่อม */}
           <div className="p-6 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-4">
             <button
-              className="px-6 py-2.5 text-gray-500 font-medium hover:text-gray-700 hover:bg-gray-200 rounded-xl transition-colors"
+              className="px-6 py-2.5 text-gray-500 font-medium hover:text-gray-700 hover:bg-gray-200 rounded-xl transition-colors cursor-pointer"
               onClick={() => navigate(-1)}
             >
               ยกเลิก
             </button>
             <button
-              className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white px-8 py-2.5 rounded-xl font-semibold shadow-lg shadow-purple-200 hover:shadow-xl hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white px-8 py-2.5 rounded-xl font-semibold shadow-lg shadow-purple-200 hover:shadow-xl hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               onClick={handleSubmit}
               disabled={submitting}
             >

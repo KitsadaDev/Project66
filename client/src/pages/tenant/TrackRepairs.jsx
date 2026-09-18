@@ -1,3 +1,13 @@
+// ======================================================
+// pages/tenant/TrackRepairs.jsx - หน้าติดตามสถานะการแจ้งซ่อมของผู้เช่า (Tenant Repair Tracker)
+// รับผิดชอบ:
+//   - ดึงรายการคำขอแจ้งซ่อมทั้งหมดของผู้เช่า (maintenanceAPI.getAll)
+//   - แสดงกล่องสรุปสถิติจำนวนงานตามสถานะ: รอดำเนินการ (PENDING), กำลังดำเนินการ (IN_PROGRESS), เสร็จสิ้น (COMPLETED)
+//   - กรองรายการแจ้งซ่อมตามสถานะ (Status Filter Dropdown)
+//   - แสดงรายการการ์ดแจ้งซ่อม พร้อมไอคอนและ Badge สีสถานะ
+//   - ปุ่มนำทางไปยังหน้าแจ้งซ่อมใหม่ (/tenant/report-repair)
+// ======================================================
+
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -13,21 +23,28 @@ import {
 import { maintenanceAPI } from "../../api";
 
 const TrackRepairs = () => {
-  const [repairs, setRepairs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  // -------------------------------------------------------
+  // Component States
+  // -------------------------------------------------------
+  const [repairs, setRepairs] = useState([]);             // รายการคำขอแจ้งซ่อมทั้งหมด
+  const [loading, setLoading] = useState(true);           // สถานะกำลังโหลดข้อมูล
+  const [statusFilter, setStatusFilter] = useState("ALL"); // สถานะที่ต้องการกรอง (ALL, PENDING, IN_PROGRESS, COMPLETED)
 
   useEffect(() => {
     fetchRepairs();
   }, []);
 
+  // -------------------------------------------------------
+  // ฟังก์ชัน: fetchRepairs
+  // หน้าที่: เรียก API ดึงประวัติการแจ้งซ่อมของผู้เช่า
+  // -------------------------------------------------------
   const fetchRepairs = async () => {
     try {
-      const response = await maintenanceAPI.getAll(); // Assuming tenant gets their own requests
+      const response = await maintenanceAPI.getAll();
       setRepairs(response.data.data || []);
     } catch (error) {
       console.error("Error fetching repairs:", error);
-      // Mock data for demo
+      // ข้อมูลตัวอย่างสำหรับแสดงผลกรณีจำลอง
       setRepairs([
         {
           id: 1,
@@ -56,6 +73,7 @@ const TrackRepairs = () => {
     }
   };
 
+  // แปลงรูปแบบวันที่เป็นภาษาไทย
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
     const date = new Date(dateStr);
@@ -67,6 +85,10 @@ const TrackRepairs = () => {
     });
   };
 
+  // -------------------------------------------------------
+  // ฟังก์ชัน: getStatusConfig
+  // หน้าที่: กำหนดการจัดรูปแบบ สี และไอคอนตามสถานะงานซ่อม
+  // -------------------------------------------------------
   const getStatusConfig = (status) => {
     const config = {
       PENDING: {
@@ -97,6 +119,7 @@ const TrackRepairs = () => {
     return config[status] || config.PENDING;
   };
 
+  // กรองรายการตาม statusFilter
   const filteredRepairs = repairs.filter(
     (repair) => statusFilter === "ALL" || repair.status === statusFilter,
   );
@@ -111,6 +134,7 @@ const TrackRepairs = () => {
 
   return (
     <div>
+      {/* ส่วนหัวหน้าจอ และปุ่มแจ้งซ่อมใหม่ */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">ติดตามการซ่อม</h1>
@@ -118,14 +142,17 @@ const TrackRepairs = () => {
         </div>
         <Link
           to="/tenant/report-repair"
-          className="flex items-center justify-center gap-2 bg-purple-500 hover:bg-purple-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-purple-200 hover:shadow-xl hover:-translate-y-0.5 transition-all"
+          className="flex items-center justify-center gap-2 bg-purple-500 hover:bg-purple-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-purple-200 hover:shadow-xl hover:-translate-y-0.5 transition-all cursor-pointer"
         >
           <Plus size={20} /> แจ้งซ่อมใหม่
         </Link>
       </div>
 
-      {/* Summary Stats */}
+      {/* ------------------------------------------------------- */}
+      {/* การ์ดสรุปสถิติสถานะงานซ่อม 3 สถานะ (Summary Stats) */}
+      {/* ------------------------------------------------------- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {/* รอดำเนินการ */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
           <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600">
             <Clock size={24} />
@@ -137,6 +164,8 @@ const TrackRepairs = () => {
             <p className="text-sm text-gray-500">รอดำเนินการ</p>
           </div>
         </div>
+
+        {/* กำลังดำเนินการ */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
           <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600">
             <Wrench size={24} />
@@ -148,6 +177,8 @@ const TrackRepairs = () => {
             <p className="text-sm text-gray-500">กำลังดำเนินการ</p>
           </div>
         </div>
+
+        {/* เสร็จสิ้น */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
           <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-green-600">
             <CheckCircle size={24} />
@@ -162,13 +193,13 @@ const TrackRepairs = () => {
       </div>
 
       <div className="space-y-6">
-        {/* Filter Bar */}
+        {/* ตัวเลือกกรองสถานะ (Filter Bar) */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-gray-500 text-sm font-medium">
             <Filter size={16} /> ประวัติ:
           </div>
           <select
-            className="px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-purple-400 bg-white text-sm"
+            className="px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-purple-400 bg-white text-sm cursor-pointer"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
@@ -179,7 +210,9 @@ const TrackRepairs = () => {
           </select>
         </div>
 
-        {/* Repairs List */}
+        {/* ------------------------------------------------------- */}
+        {/* รายการการ์ดแจ้งซ่อม (Repairs List) */}
+        {/* ------------------------------------------------------- */}
         <div className="space-y-4">
           {filteredRepairs.map((repair) => {
             const config = getStatusConfig(repair.status);
@@ -191,15 +224,18 @@ const TrackRepairs = () => {
                 className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex flex-col md:flex-row md:items-center justify-between gap-4"
               >
                 <div className="flex items-start gap-4">
+                  {/* ไอคอนสถานะ */}
                   <div
                     className={`w-12 h-12 rounded-2xl ${config.iconBg} flex items-center justify-center shrink-0`}
                   >
                     <Icon size={24} />
                   </div>
                   <div>
+                    {/* หัวข้องานซ่อม */}
                     <h3 className="font-bold text-gray-800 text-lg mb-1">
                       {repair.title}
                     </h3>
+                    {/* วันที่แจ้งซ่อม */}
                     <div className="flex items-center gap-3 text-sm text-gray-500">
                       <span className="flex items-center gap-1">
                         <Calendar size={14} />
@@ -209,18 +245,19 @@ const TrackRepairs = () => {
                   </div>
                 </div>
 
+                {/* Badge แสดงสถานะ */}
                 <div className="flex items-center justify-between md:justify-end gap-4 pl-16 md:pl-0">
                   <span
                     className={`px-3 py-1.5 rounded-lg text-sm font-semibold border ${config.bg} ${config.text} ${config.border}`}
                   >
                     {config.label}
                   </span>
-                  {/* Can add detail button here later */}
                 </div>
               </div>
             );
           })}
 
+          {/* กรณีไม่พบข้อมูลในสถานะที่เลือก */}
           {filteredRepairs.length === 0 && (
             <div className="text-center py-16 bg-white rounded-3xl border border-gray-100 shadow-sm">
               <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -234,7 +271,7 @@ const TrackRepairs = () => {
               </p>
               <Link
                 to="/tenant/report-repair"
-                className="inline-flex items-center gap-2 text-purple-600 font-semibold hover:text-purple-700"
+                className="inline-flex items-center gap-2 text-purple-600 font-semibold hover:text-purple-700 cursor-pointer"
               >
                 <Plus size={18} /> แจ้งปัญหาตอนนี้
               </Link>

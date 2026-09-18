@@ -2,15 +2,27 @@ import { useEffect, useState } from "react";
 import { Wrench, Clock, CheckCircle, Calendar, Filter } from "lucide-react";
 import { maintenanceAPI } from "../../api";
 
+/**
+ * คอมโพเนนต์แสดงข้อมูลงานแจ้งซ่อมทั้งหมดสำหรับผู้บริหาร (Executive Repairs - Read Only)
+ * - สรุปสถิติจำนวนงานซ่อม: ทั้งหมด, รอดำเนินการ, กำลังดำเนินการ, และเสร็จสิ้น
+ * - ตารางรายการงานแจ้งซ่อม พร้อมตัวกรองตามสถานะ (ALL, PENDING, IN_PROGRESS, COMPLETED)
+ * - แสดงรายละเอียดหัวข้อ, ล็อค/ศูนย์อาหาร, ผู้แจ้ง, วันที่แจ้ง, ช่างผู้รับผิดชอบ และสถานะ
+ */
 const ExecutiveRepairs = () => {
+  // รายการงานแจ้งซ่อมทั้งหมด
   const [repairs, setRepairs] = useState([]);
   const [loading, setLoading] = useState(true);
+  // ตัวกรองสถานะงานซ่อม
   const [filterStatus, setFilterStatus] = useState("ALL");
 
+  // โหลดข้อมูลงานซ่อมเมื่อเปิดหน้าจอ
   useEffect(() => {
     fetchRepairs();
   }, []);
 
+  /**
+   * ดึงรายการงานแจ้งซ่อมทั้งหมดจาก API
+   */
   const fetchRepairs = async () => {
     try {
       const response = await maintenanceAPI.getAll();
@@ -22,10 +34,15 @@ const ExecutiveRepairs = () => {
     }
   };
 
+  // กรองรายการงานซ่อมตามสถานะที่เลือก
   const filteredRepairs = repairs.filter(
     (repair) => filterStatus === "ALL" || repair.status === filterStatus,
   );
 
+  /**
+   * กำหนดรูปแบบ Badge สถานะงานซ่อม (ไอคอน สี และข้อความภาษาไทย)
+   * @param {string} status - สถานะงานซ่อม (PENDING, IN_PROGRESS, COMPLETED)
+   */
   const getStatusBadge = (status) => {
     const config = {
       PENDING: {
@@ -57,6 +74,7 @@ const ExecutiveRepairs = () => {
     );
   };
 
+  // คำนวณสรุปสถิติจำนวนงานซ่อมในแต่ละสถานะ
   const stats = {
     total: repairs.length,
     pending: repairs.filter((r) => r.status === "PENDING").length,

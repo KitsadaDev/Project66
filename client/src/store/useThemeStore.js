@@ -1,41 +1,14 @@
+// ======================================================
+// store/useThemeStore.js - Store จัดการธีม (Light / Dark Mode)
+// รับผิดชอบ: สลับธีมหน้าจอระหว่างโหมดสว่าง (Light) และโหมดมืด (Dark) พร้อมผูกกับ class ใน <html>
+// ======================================================
+
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-const useThemeStore = create(
-  persist(
-    (set) => ({
-      theme: 'light', // 'light' or 'dark'
-      
-      toggleTheme: () => set((state) => {
-        const newTheme = state.theme === 'light' ? 'dark' : 'light';
-        updateDocumentClass(newTheme);
-        return { theme: newTheme };
-      }),
-      
-      setTheme: (theme) => {
-        updateDocumentClass(theme);
-        set({ theme });
-      },
-      
-      initializeTheme: () => {
-        // Check localStorage or system preference if needed (handled by persist usually, but we need to sync class)
-        // But persist rehydrates asynchronously sometimes or we need to check initial value.
-        // We can use onRehydrateStorage or just rely on the component using it to sync.
-        // Or better: manual init.
-      }
-    }),
-    {
-      name: 'theme-storage',
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          updateDocumentClass(state.theme);
-        }
-      }
-    }
-  )
-);
-
-// Helper to toggle class on html tag
+// -------------------------------------------------------
+// Helper ฟังก์ชัน: ปรับปรุง class บนแท็ก <html> ของ Document
+// -------------------------------------------------------
 const updateDocumentClass = (theme) => {
   const root = window.document.documentElement;
   if (theme === 'dark') {
@@ -44,5 +17,39 @@ const updateDocumentClass = (theme) => {
     root.classList.remove('dark');
   }
 };
+
+const useThemeStore = create(
+  persist(
+    (set) => ({
+      theme: 'light', // ค่าเริ่มต้น: 'light' หรือ 'dark'
+      
+      // สลับธีมไปมาระหว่าง light และ dark
+      toggleTheme: () => set((state) => {
+        const newTheme = state.theme === 'light' ? 'dark' : 'light';
+        updateDocumentClass(newTheme);
+        return { theme: newTheme };
+      }),
+      
+      // กำหนดธีมตามค่าที่ระบุ
+      setTheme: (theme) => {
+        updateDocumentClass(theme);
+        set({ theme });
+      },
+      
+      initializeTheme: () => {
+        // ฟังก์ชันเสริมสำหรับ Sync ค่าธีมเริ่มต้น
+      }
+    }),
+    {
+      name: 'theme-storage',
+      // เมื่อโหลดค่าจาก LocalStorage กลับเข้ามา ให้ Sync class ไปยังแท็ก <html> ทันที
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          updateDocumentClass(state.theme);
+        }
+      }
+    }
+  )
+);
 
 export default useThemeStore;

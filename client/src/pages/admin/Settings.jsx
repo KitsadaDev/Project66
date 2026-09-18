@@ -13,25 +13,38 @@ import {
 import { toast } from "react-toastify";
 import { settingsAPI, foodCourtsAPI } from "../../api";
 
+/**
+ * คอมโพเนนต์หน้าตั้งค่าระบบสำหรับผู้ดูแลระบบ (Admin Settings)
+ * - กำหนดอัตราค่าน้ำประปา (บาท/หน่วย) และค่าไฟฟ้า (บาท/หน่วย)
+ * - กำหนดค่าบริการถังดักไขมันรายเดือน
+ * - กำหนดอัตราค่าปรับชำระล่าช้า (ค่าเช่า และ ค่าน้ำ-ไฟ เป็น บาท/วัน)
+ * - อัปโหลดเปลี่ยนรูปภาพหน้าปกของแต่ละศูนย์อาหาร
+ */
 const Settings = () => {
+  // สถานะเก็บอัตราค่าใช้จ่ายและค่าปรับต่างๆ
   const [waterRate, setWaterRate] = useState("");
   const [electricRate, setElectricRate] = useState("");
   const [greaseTrapFee, setGreaseTrapFee] = useState("");
   const [lateRentFine, setLateRentFine] = useState("");
   const [lateUtilityFine, setLateUtilityFine] = useState("");
+  // สถานะการโหลดและกำลังบันทึกข้อมูล
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   
-  // Food Court Images State
+  // สถานะรายการศูนย์อาหาร และรหัสศูนย์อาหารที่กำลังอัปโหลดรูปภาพ
   const [foodCourts, setFoodCourts] = useState([]);
   const [uploadingImageId, setUploadingImageId] = useState(null);
 
+  // ดึงอัตราค่าบริการและข้อมูลศูนย์อาหารเมื่อเปิดหน้าจอ
   useEffect(() => {
     fetchRates();
     fetchFoodCourts();
   }, []);
 
+  /**
+   * ดึงรายการศูนย์อาหารทั้งหมดพร้อมรูปภาพ
+   */
   const fetchFoodCourts = async () => {
     try {
       const response = await foodCourtsAPI.getAll();
@@ -41,6 +54,9 @@ const Settings = () => {
     }
   };
 
+  /**
+   * ดึงอัตราค่าน้ำ ค่าไฟ ค่าดักไขมัน และค่าปรับจาก API
+   */
   const fetchRates = async () => {
     try {
       const response = await settingsAPI.getUtilityRates();
@@ -59,7 +75,7 @@ const Settings = () => {
       setLateUtilityFine((lateUtilityFine || 50).toString());
     } catch (error) {
       console.error("Error fetching rates:", error);
-      // Use defaults
+      // หากเกิดข้อผิดพลาด ใช้ค่าเริ่มต้นมาตรฐาน
       setWaterRate("14");
       setElectricRate("6");
       setGreaseTrapFee("500");
@@ -70,7 +86,11 @@ const Settings = () => {
     }
   };
 
+  /**
+   * ตรวจสอบความถูกต้องและบันทึกอัตราค่าบริการใหม่ไปยังเซิร์ฟเวอร์
+   */
   const handleSave = async () => {
+    // ตรวจสอบว่ากรอกข้อมูลครบทุกช่องหรือไม่
     if (
       !waterRate ||
       !electricRate ||
@@ -88,6 +108,7 @@ const Settings = () => {
     const lateRentNum = parseFloat(lateRentFine);
     const lateUtilityNum = parseFloat(lateUtilityFine);
 
+    // ตรวจสอบว่าเป็นตัวเลขที่มากกว่าหรือเท่ากับ 0
     if (
       isNaN(waterNum) ||
       isNaN(electricNum) ||
@@ -122,14 +143,21 @@ const Settings = () => {
     }
   };
 
+  /**
+   * อัปโหลดไฟล์รูปภาพหน้าปกศูนย์อาหารใหม่
+   * @param {number} foodCourtId - รหัสศูนย์อาหาร
+   * @param {File} file - ไฟล์ภาพที่เลือก
+   */
   const handleImageUpload = async (foodCourtId, file) => {
     if (!file) return;
     
+    // ตรวจสอบประเภทไฟล์
     if (!file.type.startsWith('image/')) {
       toast.error('กรุณาอัปโหลดไฟล์รูปภาพเท่านั้น');
       return;
     }
     
+    // จำกัดขนาดไฟล์ไม่เกิน 5MB
     if (file.size > 5 * 1024 * 1024) {
       toast.error('ขนาดไฟล์ต้องไม่เกิน 5MB');
       return;

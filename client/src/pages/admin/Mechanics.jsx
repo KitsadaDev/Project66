@@ -15,16 +15,28 @@ import { toast } from "react-toastify";
 import { usersAPI } from "../../api";
 import { formatPhoneNumber } from "../../utils/formatters";
 
+/**
+ * คอมโพเนนต์หน้าจัดการข้อมูลช่างซ่อมบำรุงสำหรับผู้ดูแลระบบ (Admin Mechanics)
+ * - แสดงตารางรายชื่อเจ้าหน้าที่ช่างซ่อมบำรุงทั้งหมดในระบบ
+ * - เพิ่มบัญชีช่างซ่อมบำรุงใหม่ (Add Mechanic) พร้อมอัปโหลดรูปภาพโปรไฟล์
+ * - แก้ไขข้อมูลส่วนตัว (Edit Mechanic) เช่น คำนำหน้า, ชื่อ, นามสกุล, เบอร์โทร, อีเมล
+ * - อัปโหลดรูปภาพโปรไฟล์ด่วนจากตาราง (Quick Photo Upload)
+ * - รีเซ็ตรหัสผ่านสำหรับช่างซ่อมบำรุง (Reset Password)
+ * - ลบบัญชีช่างซ่อมบำรุงออกจากระบบ (Delete)
+ */
 const Mechanics = () => {
+  // รายชื่อช่างซ่อมบำรุงทั้งหมด และสถานะกำลังโหลด
   const [mechanics, setMechanics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
+  // สถานะการเปิด/ปิด Modals ต่างๆ
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
   const [selectedMechanic, setSelectedMechanic] = useState(null);
 
+  // ฟอร์มสำหรับเพิ่มช่างซ่อมบำรุงใหม่
   const [addForm, setAddForm] = useState({
     username: "",
     password: "",
@@ -36,14 +48,19 @@ const Mechanics = () => {
     role: "MAINTENANCE"
   });
 
+  // ฟอร์มสำหรับแก้ไข และรีเซ็ตรหัสผ่าน
   const [editForm, setEditForm] = useState({});
   const [resetPasswordForm, setResetPasswordForm] = useState({ newPassword: "" });
   const [showPassword, setShowPassword] = useState(false);
 
+  // การจัดการไฟล์ภาพโปรไฟล์
   const [profileFile, setProfileFile] = useState(null);
   const [profilePreview, setProfilePreview] = useState(null);
   const [uploadingPhotoId, setUploadingPhotoId] = useState(null);
 
+  /**
+   * ดึงข้อมูลผู้ใช้ที่มีบทบาทเป็น MAINTENANCE (ช่างซ่อมบำรุง)
+   */
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -57,13 +74,20 @@ const Mechanics = () => {
     }
   };
 
+  // ดึงข้อมูลเมื่อโหลดคอมโพเนนต์
   useEffect(() => {
     fetchData();
   }, []);
 
+  /**
+   * จัดการเมื่อผู้ใช้เลือกไฟล์รูปภาพโปรไฟล์
+   * @param {Event} e - อิเวนต์การเลือกไฟล์
+   * @param {boolean} isEdit - อยู่ในโหมดแก้ไขหรือไม่
+   */
   const handleProfileImageChange = (e, isEdit = false) => {
     const file = e.target.files[0];
     if (file) {
+      // ตรวจสอบขนาดไฟล์ไม่เกิน 2MB
       if (file.size > 2 * 1024 * 1024) {
         toast.error("ขนาดไฟล์รูปภาพต้องไม่เกิน 2MB");
         return;
@@ -78,6 +102,9 @@ const Mechanics = () => {
     }
   };
 
+  /**
+   * บันทึกข้อมูลเพิ่มช่างซ่อมบำรุงใหม่
+   */
   const handleAddSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -95,11 +122,12 @@ const Mechanics = () => {
       await usersAPI.create(formData);
       toast.success("เพิ่มข้อมูลช่างซ่อมบำรุงสำเร็จ");
       setIsAddModalOpen(false);
+      // รีเซ็ตฟอร์ม
       setAddForm({
-      username: "",
-      password: "",
-      title: "นาย",
-      first_name: "",
+        username: "",
+        password: "",
+        title: "นาย",
+        first_name: "",
         last_name: "",
         phone: "",
         email: "",
@@ -114,6 +142,10 @@ const Mechanics = () => {
     }
   };
 
+  /**
+   * เปิด Modal แก้ไขข้อมูลช่าง พร้อมเติมข้อมูลเดิมลงในฟอร์ม
+   * @param {Object} mechanic - ข้อมูลช่างที่เลือก
+   */
   const handleEditClick = (mechanic) => {
     setSelectedMechanic(mechanic);
     setEditForm({
@@ -128,6 +160,9 @@ const Mechanics = () => {
     setIsEditModalOpen(true);
   };
 
+  /**
+   * ส่งข้อมูลอัปเดตช่างไปยังเซิร์ฟเวอร์
+   */
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -152,6 +187,10 @@ const Mechanics = () => {
     }
   };
 
+  /**
+   * ลบบัญชีช่างซ่อมบำรุง
+   * @param {number|string} id - รหัสผู้ใช้ช่าง
+   */
   const handleDelete = async (id) => {
     if (window.confirm("คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลช่างซ่อมบำรุงรายนี้?")) {
       try {
@@ -165,6 +204,10 @@ const Mechanics = () => {
     }
   };
 
+  /**
+   * เปิด Modal รีเซ็ตรหัสผ่านสำหรับช่าง
+   * @param {Object} mechanic - ข้อมูลช่างที่เลือก
+   */
   const handleResetPasswordClick = (mechanic) => {
     setSelectedMechanic(mechanic);
     setResetPasswordForm({ newPassword: "" });
@@ -172,6 +215,9 @@ const Mechanics = () => {
     setIsResetPasswordModalOpen(true);
   };
 
+  /**
+   * บันทึกรหัสผ่านใหม่
+   */
   const handleResetPasswordSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -184,6 +230,11 @@ const Mechanics = () => {
     }
   };
 
+  /**
+   * อัปโหลดรูปภาพโปรไฟล์ด่วนจากในตาราง
+   * @param {number|string} user_id - รหัสผู้ใช้ช่าง
+   * @param {File} file - ไฟล์ภาพ
+   */
   const handleQuickPhotoUpload = async (user_id, file) => {
     if (!file) return;
     setUploadingPhotoId(user_id);
@@ -201,6 +252,9 @@ const Mechanics = () => {
     }
   };
 
+  /**
+   * กรองรายชื่อช่างตามคำค้นหา (ชื่อ, อีเมล, username)
+   */
   const filteredMechanics = mechanics.filter(
     (mechanic) =>
       mechanic.first_name?.toLowerCase().includes(search.toLowerCase()) ||

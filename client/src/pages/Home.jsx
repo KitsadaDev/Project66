@@ -3,9 +3,18 @@ import { useEffect, useState } from "react";
 import { LogIn, ArrowRight } from "lucide-react";
 import { foodCourtsAPI } from "../api";
 
+/**
+ * คอมโพเนนต์หน้าแรกของระบบ (Landing Page / Home)
+ * - หน้าต้อนรับผู้ใช้งานเข้าสู่ระบบบริหารจัดการศูนย์อาหาร มหาวิทยาลัยราชภัฏบุรีรัมย์
+ * - ดึงข้อมูลศูนย์อาหารทั้งหมดจาก API และแสดงเป็นการ์ดพร้อมรูปภาพปก
+ * - มีปุ่มนำทางเข้าสู่หน้า Login เพื่อเข้าสู่ระบบตามบทบาท
+ * - ออกแบบด้วย Ambient Lighting, Glassmorphic Header และการเคลื่อนไหวแบบ Micro-animations
+ */
 const Home = () => {
+  // รายการศูนย์อาหารทั้งหมดที่ได้รับจาก API
   const [foodCourts, setFoodCourts] = useState([]);
 
+  // ดึงรายการศูนย์อาหารเมื่อเปิดหน้าเว็บ
   useEffect(() => {
     const fetchFoodCourts = async () => {
       try {

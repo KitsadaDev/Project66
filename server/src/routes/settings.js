@@ -1,3 +1,11 @@
+// ======================================================
+// settings.js - Router จัดการการตั้งค่าระบบ (System Settings)
+// รับผิดชอบ:
+//   - การดึงค่าและอัปเดตการตั้งค่าระบบทั่วไป (Key-Value)
+//   - การดึงและอัปเดตอัตราค่าสาธารณูปโภค (ค่าน้ำ, ค่าไฟ, ค่าดักไขมัน, ค่าปรับจ่ายล่าช้า)
+//   - ป้องกันสิทธิ์การแก้ไข ให้เฉพาะผู้ใช้ระดับ 'ADMIN' เท่านั้น
+// ======================================================
+
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { authenticate, authorize } = require('../middleware/auth');
@@ -5,11 +13,16 @@ const { authenticate, authorize } = require('../middleware/auth');
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Get all settings
+// -------------------------------------------------------
+// Route: GET /api/settings
+// หน้าที่: ดึงการตั้งค่าทั้งหมดในระบบ
+// การเข้าถึง: ผู้ใช้ที่ล็อกอินแล้วทุกคน (authenticate)
+// -------------------------------------------------------
 router.get('/', authenticate, async (req, res) => {
   try {
     const settings = await prisma.systemSetting.findMany();
 
+    // แปลง array ของ settings เป็น object เพื่อให้ frontend เรียกใช้ง่ายผ่าน key
     const settingsObj = {};
     settings.forEach(s => {
       settingsObj[s.setting_key] = {
@@ -25,7 +38,16 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// Get utility rates
+// -------------------------------------------------------
+// Route: GET /api/settings/utility-rates
+// หน้าที่: ดึงอัตราค่าสาธารณูปโภคและค่าปรับล่าช้าปัจจุบัน
+//   - WATER_RATE_PER_UNIT: ค่าน้ำต่อหน่วย (default: 14 บาท)
+//   - ELECTRIC_RATE_PER_UNIT: ค่าไฟต่อหน่วย (default: 6 บาท)
+//   - GREASE_TRAP_FEE: ค่าดักไขมันรายเดือน (default: 500 บาท)
+//   - LATE_RENT_FINE: ค่าปรับจ่ายค่าเช่าล่าช้า (default: 100 บาท/วัน)
+//   - LATE_UTILITY_FINE: ค่าปรับจ่ายค่าน้ำไฟล่าช้า (default: 50 บาท/วัน)
+// การเข้าถึง: ผู้ใช้ที่ล็อกอินแล้วทุกคน (authenticate)
+// -------------------------------------------------------
 router.get('/utility-rates', authenticate, async (req, res) => {
   try {
     const waterRate = await prisma.systemSetting.findUnique({ where: { setting_key: 'WATER_RATE_PER_UNIT' } });
@@ -50,7 +72,11 @@ router.get('/utility-rates', authenticate, async (req, res) => {
   }
 });
 
-// Update settings (Admin only)
+// -------------------------------------------------------
+// Route: PUT /api/settings
+// หน้าที่: ปรับปรุงการตั้งค่าระบบหลายรายการพร้อมกัน
+// การเข้าถึง: เฉพาะผู้ดูแลระบบ (ADMIN)
+// -------------------------------------------------------
 router.put('/', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
     const { settings } = req.body;
@@ -59,6 +85,7 @@ router.put('/', authenticate, authorize('ADMIN'), async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid settings format' });
     }
 
+    // สร้างรายการ query upsert (มีอยู่แล้วให้อัปเดต ถ้ายังไม่มีให้สร้างใหม่)
     const updates = Object.entries(settings).map(([key, data]) =>
       prisma.systemSetting.upsert({
         where: { setting_key: key },
@@ -77,6 +104,7 @@ router.put('/', authenticate, authorize('ADMIN'), async (req, res) => {
       })
     );
 
+    // ทำงานพร้อมกันผ่าน Transaction เพื่อความสมบูรณ์ของข้อมูล
     await prisma.$transaction(updates);
     res.json({ success: true, message: 'Settings updated successfully' });
   } catch (error) {
@@ -84,13 +112,18 @@ router.put('/', authenticate, authorize('ADMIN'), async (req, res) => {
   }
 });
 
-// Update utility rates (Admin only)
+// -------------------------------------------------------
+// Route: PUT /api/settings/utility-rates
+// หน้าที่: บันทึกอัตราค่าสาธารณูปโภคและค่าปรับใหม่
+// การเข้าถึง: เฉพาะผู้ดูแลระบบ (ADMIN)
+// -------------------------------------------------------
 router.put('/utility-rates', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
     const { waterRatePerUnit, electricRatePerUnit, greaseTrapFee, lateRentFine, lateUtilityFine, lateFineDelayDays } = req.body;
 
     const updates = [];
 
+    // อัปเดตค่าน้ำต่อหน่วย
     if (waterRatePerUnit !== undefined) {
       updates.push(
         prisma.systemSetting.upsert({
@@ -107,6 +140,7 @@ router.put('/utility-rates', authenticate, authorize('ADMIN'), async (req, res) 
       );
     }
 
+    // อัปเดตค่าไฟฟ้าต่อหน่วย
     if (electricRatePerUnit !== undefined) {
       updates.push(
         prisma.systemSetting.upsert({
@@ -123,6 +157,7 @@ router.put('/utility-rates', authenticate, authorize('ADMIN'), async (req, res) 
       );
     }
 
+    // อัปเดตค่าดักไขมัน
     if (greaseTrapFee !== undefined) {
       updates.push(
         prisma.systemSetting.upsert({
@@ -139,6 +174,7 @@ router.put('/utility-rates', authenticate, authorize('ADMIN'), async (req, res) 
       );
     }
 
+    // อัปเดตค่าปรับค่าเช่าล่าช้า
     if (lateRentFine !== undefined) {
       updates.push(
         prisma.systemSetting.upsert({
@@ -155,6 +191,7 @@ router.put('/utility-rates', authenticate, authorize('ADMIN'), async (req, res) 
       );
     }
 
+    // อัปเดตค่าปรับค่าน้ำไฟล่าช้า
     if (lateUtilityFine !== undefined) {
       updates.push(
         prisma.systemSetting.upsert({
@@ -171,6 +208,7 @@ router.put('/utility-rates', authenticate, authorize('ADMIN'), async (req, res) 
       );
     }
 
+    // บันทึกทั้งหมดลงฐานข้อมูลพร้อมกัน
     await prisma.$transaction(updates);
     res.json({ success: true, message: 'Utility rates updated successfully', data: { waterRatePerUnit, electricRatePerUnit, greaseTrapFee, lateRentFine, lateUtilityFine } });
   } catch (error) {

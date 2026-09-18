@@ -22,24 +22,36 @@ import {
 } from "lucide-react";
 import { stallsAPI, usersAPI, billsAPI, maintenanceAPI } from "../../api";
 
+/**
+ * คอมโพเนนต์แดชบอร์ดรายงานผลสำหรับผู้บริหารระดับสูง (Executive Dashboard)
+ * - รวบรวมตัวชี้วัดประสิทธิภาพหลัก (KPIs) ของโครงการ:
+ *   1. อัตราการเช่าพื้นที่ (Occupancy Rate) พร้อมการแจกแจงศูนย์อาหาร 1 และ 2
+ *   2. สถานะทางการเงิน: รายได้รวม, ยอดเรียกเก็บ, ยอดค้างชำระ และอัตราการจัดเก็บ (Collection Rate)
+ *   3. แผนภูมิวงแหวน (Donut Chart) แสดงสัดส่วนสถานะแผงค้า (มีผู้เช่า / ว่าง / ซ่อมบำรุง)
+ *   4. รายการเฝ้าระวัง (Watchlist): บิลที่รอชำระ/เกินกำหนด และงานแจ้งซ่อมที่รอดำเนินการ
+ * - ตัวกรองแบบไดนามิก: สลับศูนย์อาหาร (ทั้งหมด, ศูนย์ 1, ศูนย์ 2) และตัวเลือกเดือน (Global Month & Finance Month)
+ */
 const ExecutiveDashboard = () => {
   const [loading, setLoading] = useState(true);
-  const [selectedFoodCourt, setSelectedFoodCourt] = useState("ALL"); // 'ALL' | '1' | '2'
-  const [globalMonth, setGlobalMonth] = useState("ALL"); // 'ALL' | 'YYYY-MM'
-  const [financeMonth, setFinanceMonth] = useState("SYNC"); // 'SYNC' | 'ALL' | 'YYYY-MM'
+  // ตัวกรองศูนย์อาหารที่เลือก ('ALL', '1', '2')
+  const [selectedFoodCourt, setSelectedFoodCourt] = useState("ALL");
+  // ตัวกรองเดือนภาพรวม ('ALL' หรือ 'YYYY-MM')
+  const [globalMonth, setGlobalMonth] = useState("ALL");
+  // ตัวกรองเดือนการเงิน ('SYNC' คือตามภาพรวม, 'ALL', หรือ 'YYYY-MM')
+  const [financeMonth, setFinanceMonth] = useState("SYNC");
 
-  // Month Picker Modal States
+  // สถานะสำหรับหน้าต่างเลือกเดือน (Month Picker Modal)
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [pickerTarget, setPickerTarget] = useState("FINANCE"); // 'FINANCE' | 'GLOBAL'
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
 
-  // Raw fetched data
+  // ข้อมูลดิบจาก API ทั้ง 4 ส่วน
   const [rawStalls, setRawStalls] = useState([]);
   const [rawTenants, setRawTenants] = useState([]);
   const [rawBills, setRawBills] = useState([]);
   const [rawRepairs, setRawRepairs] = useState([]);
 
-  // Filtered / Computed Dashboard Stats
+  // ข้อมูลสถิติและ KPIs ที่ผ่านการประมวลผลแล้ว
   const [dashboardStats, setDashboardStats] = useState({
     totalStalls: 0,
     occupiedStalls: 0,
@@ -58,13 +70,13 @@ const ExecutiveDashboard = () => {
     finPending: 0,
     finRate: 0,
     effectiveFinanceMonth: "ALL",
-    // Food Court 1 Breakdown
+    // สถิติแยกย่อยสำหรับศูนย์อาหาร 1
     fc1Total: 0,
     fc1Occupied: 0,
     fc1Vacant: 0,
     fc1Maint: 0,
     fc1Rate: 0,
-    // Food Court 2 Breakdown
+    // สถิติแยกย่อยสำหรับศูนย์อาหาร 2
     fc2Total: 0,
     fc2Occupied: 0,
     fc2Vacant: 0,
@@ -72,21 +84,31 @@ const ExecutiveDashboard = () => {
     fc2Rate: 0,
   });
 
+  // รายการบิลและงานซ่อมล่าสุด และรายการเฝ้าระวัง
   const [activeBillsList, setActiveBillsList] = useState([]);
   const [activeRepairsList, setActiveRepairsList] = useState([]);
   const [pendingBillsWatchlist, setPendingBillsWatchlist] = useState([]);
   const [pendingRepairsWatchlist, setPendingRepairsWatchlist] = useState([]);
 
+  // โหลดข้อมูลเริ่มต้นเมื่อเปิดหน้าจอ
   useEffect(() => {
     fetchData();
   }, []);
 
+  // คำนวณสถิติใหม่ทุกครั้งที่ผู้บริหารเปลี่ยนตัวกรองศูนย์อาหาร หรือตัวกรองเดือน
   useEffect(() => {
     if (!loading) {
       computeStats(rawStalls, rawTenants, rawBills, rawRepairs, selectedFoodCourt, globalMonth, financeMonth);
     }
   }, [selectedFoodCourt, globalMonth, financeMonth, loading]);
 
+  /**
+   * ดึงข้อมูลพร้อมกัน (Parallel) จาก API 4 แหล่ง:
+   * 1. แผงค้าทั้งหมด
+   * 2. ผู้เช่าทั้งหมด
+   * 3. บิลค่าใช้จ่ายทั้งหมด
+   * 4. งานซ่อมบำรุงทั้งหมด
+   */
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -115,6 +137,10 @@ const ExecutiveDashboard = () => {
     }
   };
 
+  /**
+   * ฟังก์ชันช่วยเหลือในการดึงรหัสศูนย์อาหารจากออบเจกต์บิลหรืองานซ่อม
+   * @param {Object} item - บิลหรืองานซ่อม
+   */
   const getSlotFoodCourtId = (item) => {
     return (
       item.rental_slot?.food_court_id ||
@@ -125,6 +151,7 @@ const ExecutiveDashboard = () => {
     );
   };
 
+  // รวบรวมเดือนที่มีข้อมูลบิลทั้งหมดเรียงลำดับจากใหม่ไปเก่า
   const availableMonths = Array.from(
     new Set(
       rawBills
@@ -140,6 +167,10 @@ const ExecutiveDashboard = () => {
     )
   ).sort().reverse();
 
+  /**
+   * จัดรูปแบบเดือนและปี พ.ศ. ภาษาไทย เช่น "ม.ค. 2567"
+   * @param {string} ym - ปี-เดือน ในรูปแบบ 'YYYY-MM'
+   */
   const formatMonthTH = (ym) => {
     if (ym === "ALL") return "ทุกช่วงเวลา (สะสม)";
     const [y, m] = ym.split("-");
@@ -201,8 +232,16 @@ const ExecutiveDashboard = () => {
     setIsMonthPickerOpen(false);
   };
 
+  /**
+   * คำนวณและประมวลผลตัวชี้วัดสถิติทั้งหมด (KPIs) จากข้อมูลดิบ:
+   * 1. สรุปสถานะแผงค้ารายศูนย์อาหาร (ศูนย์ 1 และ ศูนย์ 2)
+   * 2. กรองข้อมูลตามศูนย์อาหารที่ผู้ใช้เลือก (fcFilter)
+   * 3. คำนวณอัตราการเช่าพื้นที่ (Occupancy Rate)
+   * 4. คำนวณรายได้ทางการเงิน: รายรับที่ชำระแล้ว (Total Revenue), ยอดเรียกเก็บรวม (Total Billed), ยอดค้างชำระ (Pending Amount), และอัตราการจัดเก็บ (Collection Rate)
+   * 5. สรุปรายการเฝ้าระวัง: บิลที่ค้างชำระ และงานแจ้งซ่อมที่ยังไม่แล้วเสร็จ
+   */
   const computeStats = (stalls, tenants, bills, repairs, fcFilter, gMonth = globalMonth, fMonth = financeMonth) => {
-    // 1. Food Court 1 & 2 Static Breakdown
+    // 1. สรุปสถานะแผงค้าของศูนย์อาหาร 1 และ 2 แบบแยกศูนย์
     const fc1Stalls = stalls.filter((s) => s.food_court_id === 1);
     const fc1Occupied = fc1Stalls.filter(
       (s) => (s.status || "").toUpperCase() === "OCCUPIED"
@@ -229,7 +268,7 @@ const ExecutiveDashboard = () => {
     const fc2Rate =
       fc2Stalls.length > 0 ? Math.round((fc2Occupied / fc2Stalls.length) * 100) : 0;
 
-    // 2. Filtered subset according to selectedFoodCourt
+    // 2. กรองข้อมูลแผงค้า บิล และงานซ่อมตามศูนย์อาหารที่ผู้บริหารเลือก
     let currentStalls = stalls;
     let currentBills = bills;
     let currentRepairs = repairs;
@@ -244,7 +283,7 @@ const ExecutiveDashboard = () => {
       currentRepairs = repairs.filter((r) => getSlotFoodCourtId(r) === 2);
     }
 
-    // 3. Stalls Occupancy
+    // 3. สรุปอัตราการเช่าแผงค้า (Occupancy Rate)
     const occupied = currentStalls.filter(
       (s) => (s.status || "").toUpperCase() === "OCCUPIED"
     ).length;
@@ -259,7 +298,7 @@ const ExecutiveDashboard = () => {
         ? Math.round((occupied / currentStalls.length) * 100)
         : 0;
 
-    // Helper for month checking
+    // ฟังก์ชันตรวจสอบว่าบิลอยู่ในเดือนที่เลือกหรือไม่
     const isBillInMonth = (bill, ym) => {
       if (ym === "ALL") return true;
       const dStr = bill.billing_month || bill.created_at;
@@ -269,14 +308,14 @@ const ExecutiveDashboard = () => {
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` === ym;
     };
 
-    // Global bills subset
+    // ชุดข้อมูลบิลตามตัวกรองเดือนภาพรวม (Global Month)
     const globalBills = currentBills.filter((b) => isBillInMonth(b, gMonth));
 
-    // Finance bills subset
+    // ชุดข้อมูลบิลตามตัวกรองเดือนการเงิน (Finance Month)
     const effectiveFinanceMonth = fMonth === "SYNC" ? gMonth : fMonth;
     const financeBills = currentBills.filter((b) => isBillInMonth(b, effectiveFinanceMonth));
 
-    // 4. Financial Calculations for Global (KPI 1)
+    // 4. คำนวณตัวเลขทางการเงินสำหรับภาพรวม (Global Financial KPIs)
     let totalRevenue = 0;
     let totalBilled = 0;
     let pendingAmount = 0;
@@ -298,7 +337,7 @@ const ExecutiveDashboard = () => {
     const collectionRate =
       totalBilled > 0 ? Math.round((totalRevenue / totalBilled) * 100) : 0;
 
-    // Financial Calculations for Finance Card (Card 3)
+    // คำนวณตัวเลขทางการเงินสำหรับการ์ดการเงิน (Finance Card)
     let finRevenue = 0;
     let finBilled = 0;
     let finPending = 0;
@@ -320,7 +359,7 @@ const ExecutiveDashboard = () => {
     const finRate =
       finBilled > 0 ? Math.round((finRevenue / finBilled) * 100) : 0;
 
-    // 5. Pending items
+    // 5. รายการบิลค้างชำระและงานซ่อมที่ต้องเฝ้าระวัง (Watchlist)
     const pendingBills = globalBills.filter(
       (b) =>
         b.status === "PENDING" ||
@@ -367,7 +406,11 @@ const ExecutiveDashboard = () => {
     setPendingRepairsWatchlist(pendingRepairs.slice(0, 4));
   };
 
-  // Conic Gradient for Donut Chart (Matching Admin)
+  /**
+   * คำนวณรหัสสี CSS Conic Gradient เพื่อวาด Donut Chart แสดงสัดส่วนสถานะ
+   * @param {Array} slices - อาร์เรย์ของสัดส่วน { color, value }
+   * @param {number} total - ผลรวมทั้งหมด
+   */
   const getConicGradient = (slices, total) => {
     if (!total || total === 0)
       return "conic-gradient(#E5E7EB 100%, transparent 0)";
@@ -381,8 +424,10 @@ const ExecutiveDashboard = () => {
     return "conic-gradient(" + stops.join(", ") + ")";
   };
 
+  // คำนวณเปอร์เซ็นต์
   const pct = (val, total) => (total > 0 ? Math.round((val / total) * 100) : 0);
 
+  // ข้อมูลสัดส่วนสำหรับแผนภูมิวงแหวนแสดงสถานะแผงค้า (มีผู้เช่า, ว่าง, ซ่อมบำรุง)
   const occupancySlices = [
     { color: "#059669", value: dashboardStats.occupiedStalls },
     { color: "#D1FAE5", value: dashboardStats.vacantStalls },

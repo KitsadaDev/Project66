@@ -1,3 +1,13 @@
+// ======================================================
+// components/Sidebar.jsx - แถบเมนูด้านข้างของระบบ (Sidebar Navigation)
+// รับผิดชอบ:
+//   - แสดงเมนูนำทางตามบทบาทของผู้ใช้ (Role-based Navigation): TENANT, ADMIN, MAINTENANCE, EXECUTIVE
+//   - แสดงตัวเลขแจ้งเตือน (Badges): จำนวนแจ้งเตือนที่ยังไม่ได้อ่านของผู้เช่า และจำนวนงานแจ้งซ่อมค้างของช่าง/Admin
+//   - ระบบ Modal ยืนยันการออกจากระบบ (Logout Modal)
+//   - ระบบ Modal เปลี่ยนรหัสผ่านส่วนตัว (Change Password Modal)
+//   - รองรับการย่อ/ขยาย (Collapsed) บนเดสก์ท็อป และเลื่อนสไลด์บนจอมือถือ
+// ======================================================
+
 import { NavLink, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
@@ -24,20 +34,24 @@ import {
 } from "lucide-react";
 import { useAuthStore, useUIStore } from "../store";
 import { maintenanceAPI, notificationsAPI, authAPI } from "../api";
-
 import { toast } from "react-toastify";
 
 const Sidebar = () => {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+
+  // State สำหรับ Modal ยืนยันออกจากระบบ
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
+  // ฟังก์ชันดำเนินการออกจากระบบ และนำทางกลับไปหน้า Login
   const handleLogout = () => {
     logout();
     navigate("/login");
   };
 
-  // Change Password Modal States
+  // -------------------------------------------------------
+  // State สำหรับ Modal เปลี่ยนรหัสผ่าน
+  // -------------------------------------------------------
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -47,6 +61,7 @@ const Sidebar = () => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // ฟังก์ชันส่งคำขอเปลี่ยนรหัสผ่าน
   const handleChangePassword = async (e) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
@@ -65,7 +80,7 @@ const Sidebar = () => {
       });
       toast.success("เปลี่ยนรหัสผ่านสำเร็จ!");
       setShowChangePasswordModal(false);
-      // Reset form
+      // ล้างค่าในฟอร์ม
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -77,6 +92,7 @@ const Sidebar = () => {
     }
   };
 
+  // ดึงตัวแปรและฟังก์ชันจัดการ UI จาก useUIStore
   const {
     sidebarCollapsed,
     mobileMenuOpen,
@@ -87,11 +103,13 @@ const Sidebar = () => {
     setUnreadNotificationsCount,
   } = useUIStore();
 
-
+  // -------------------------------------------------------
+  // ดึงจำนวนแจ้งเตือนที่ยังไม่ได้อ่าน (เฉพาะผู้เช่า TENANT)
+  // -------------------------------------------------------
   useEffect(() => {
     if (user?.role === "TENANT") {
       fetchUnreadNotifications();
-      // Optional: Refresh count every 5 minutes
+      // ดึงข้อมูลซ้ำทุกๆ 5 นาที
       const interval = setInterval(fetchUnreadNotifications, 5 * 60 * 1000);
       return () => clearInterval(interval);
     }
@@ -110,6 +128,9 @@ const Sidebar = () => {
     }
   };
 
+  // -------------------------------------------------------
+  // ดึงจำนวนงานแจ้งซ่อมที่รอค้างอยู่ (สำหรับ ADMIN, EXECUTIVE, MAINTENANCE)
+  // -------------------------------------------------------
   useEffect(() => {
     if (
       user?.role === "ADMIN" ||
@@ -131,7 +152,11 @@ const Sidebar = () => {
     }
   };
 
+  // -------------------------------------------------------
+  // กำหนดรายการเมนูแยกตามบทบาท (Role-based Navigation Items)
+  // -------------------------------------------------------
   const menuItems = {
+    // เมนูสำหรับผู้เช่า (TENANT)
     TENANT: [
       { to: "/tenant", icon: LayoutDashboard, label: "หน้าหลัก", end: true },
       { to: "/tenant/expenses", icon: Receipt, label: "ค่าใช้จ่าย" },
@@ -148,6 +173,7 @@ const Sidebar = () => {
         badge: unreadNotificationsCount,
       },
     ],
+    // เมนูสำหรับผู้ดูแลระบบ (ADMIN)
     ADMIN: [
       { to: "/admin", icon: LayoutDashboard, label: "หน้าแรก", end: true },
       { to: "/admin/tenants", icon: Users, label: "ข้อมูลผู้เช่า" },
@@ -167,6 +193,7 @@ const Sidebar = () => {
       },
       { to: "/admin/settings", icon: Settings, label: "ตั้งค่าระบบ" },
     ],
+    // เมนูสำหรับช่างซ่อมบำรุง (MAINTENANCE)
     MAINTENANCE: [
       {
         to: "/maintenance",
@@ -181,6 +208,7 @@ const Sidebar = () => {
         badge: pendingRepairsCount,
       },
     ],
+    // เมนูสำหรับผู้บริหาร (EXECUTIVE - ดูข้อมูลได้อย่างเดียว)
     EXECUTIVE: [
       { to: "/executive", icon: LayoutDashboard, label: "ภาพรวม", end: true },
       { to: "/executive/stalls", icon: Building2, label: "ข้อมูลแผงค้า" },
@@ -196,6 +224,7 @@ const Sidebar = () => {
     ],
   };
 
+  // เลือกรายการเมนูตาม role ของ user ปัจจุบัน
   const items = menuItems[user?.role] || [];
 
   return (
@@ -206,7 +235,7 @@ const Sidebar = () => {
         ${sidebarCollapsed ? "md:w-16" : "md:w-56"}
         w-64`}
       >
-        {/* Header */}
+        {/* ส่วนหัวของ Sidebar (โลโก้ BRU และชื่อระบบ) */}
         <div className="p-4 border-b border-purple-100 flex items-center gap-3">
           <img
             src="/bru-logo.png"
@@ -223,7 +252,7 @@ const Sidebar = () => {
           )}
         </div>
 
-        {/* Navigation */}
+        {/* รายการลิงก์เมนูนำทาง (Navigation Links) */}
         <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
           {items.map((item) => (
             <NavLink
@@ -246,6 +275,7 @@ const Sidebar = () => {
                   <span className="text-sm font-medium">{item.label}</span>
                 )}
               </div>
+              {/* ตัวเลข Badge แจ้งเตือน */}
               {item.badge > 0 && (!sidebarCollapsed || mobileMenuOpen) && (
                 <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
                   {item.badge}
@@ -258,8 +288,9 @@ const Sidebar = () => {
           ))}
         </nav>
 
-        {/* Footer - Change Password & Logout */}
+        {/* ส่วนท้ายของ Sidebar - ปุ่มเปลี่ยนรหัสผ่าน และปุ่มออกจากระบบ */}
         <div className="p-3 border-t border-purple-100 flex flex-col gap-2">
+          {/* ปุ่มเปิด Modal เปลี่ยนรหัสผ่าน */}
           <button
             type="button"
             onClick={() => setShowChangePasswordModal(true)}
@@ -276,6 +307,7 @@ const Sidebar = () => {
             )}
           </button>
 
+          {/* ปุ่มเปิด Modal ยืนยันออกจากระบบ */}
           <button
             type="button"
             onClick={() => setShowLogoutModal(true)}
@@ -294,7 +326,9 @@ const Sidebar = () => {
         </div>
       </aside>
 
-      {/* Custom Logout Modal */}
+      {/* ------------------------------------------------------- */}
+      {/* Modal ยืนยันการออกจากระบบ (Logout Confirmation Modal) */}
+      {/* ------------------------------------------------------- */}
       {showLogoutModal && (
         <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity">
           <div className="bg-white rounded-2xl shadow-xl w-[90%] max-w-sm p-6 transform transition-all duration-300 scale-100 relative">
@@ -333,7 +367,9 @@ const Sidebar = () => {
         </div>
       )}
 
-      {/* Custom Change Password Modal */}
+      {/* ------------------------------------------------------- */}
+      {/* Modal เปลี่ยนรหัสผ่าน (Change Password Modal) */}
+      {/* ------------------------------------------------------- */}
       {showChangePasswordModal && (
         <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 transform transition-all duration-300 scale-100 relative border border-gray-100">

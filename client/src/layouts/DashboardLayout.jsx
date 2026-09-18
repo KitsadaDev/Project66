@@ -1,3 +1,12 @@
+// ======================================================
+// layouts/DashboardLayout.jsx - โครงร่างหน้าจอหลักหลังเข้าสู่ระบบ (Main Dashboard Layout)
+// รับผิดชอบ:
+//   - โครงสร้างหน้าจอหลัก: รวม Sidebar ด้านข้าง, Header ด้านบน และ Outlet สำหรับเนื้อหาหน้าย่อย
+//   - Modal บังคับเปลี่ยนรหัสผ่าน (Forced Change Password): แสดงเมื่อ user.must_change_password เป็นจริง
+//   - ฉากหลังมืด (Backdrop) เมื่อเปิดเมนูบนหน้าจอมือถือ
+//   - ปรับระยะเยื้องซ้าย (Margin Left) ตามสถานะ ย่อ/ขยาย ของ Sidebar
+// ======================================================
+
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
@@ -8,18 +17,23 @@ import { toast } from "react-toastify";
 import { Lock, Eye, EyeOff, LogOut } from "lucide-react";
 
 const DashboardLayout = () => {
+  // ดึงสถานะ UI จาก Zustand Store
   const { sidebarCollapsed, mobileMenuOpen, setMobileMenuOpen } = useUIStore();
+  // ดึงข้อมูลผู้ใช้และฟังก์ชันจัดการ Session จาก Auth Store
   const { user, updateUser, logout } = useAuthStore();
 
-  // Password change modal state
+  // -------------------------------------------------------
+  // State สำหรับฟอร์มบังคับเปลี่ยนรหัสผ่านครั้งแรก
+  // -------------------------------------------------------
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showCurrent, setShowCurrent] = useState(false);
-  const [showNew, setShowNew] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [showCurrent, setShowCurrent] = useState(false); // ซ่อน/แสดงรหัสผ่านปัจจุบัน
+  const [showNew, setShowNew] = useState(false);         // ซ่อน/แสดงรหัสผ่านใหม่
+  const [showConfirm, setShowConfirm] = useState(false);     // ซ่อน/แสดงยืนยันรหัสผ่านใหม่
   const [submitting, setSubmitting] = useState(false);
 
+  // ฟังก์ชันบันทึกการเปลี่ยนรหัสผ่านบังคับ
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
@@ -37,6 +51,7 @@ const DashboardLayout = () => {
         newPassword,
       });
       toast.success("เปลี่ยนรหัสผ่านสำเร็จ!");
+      // ปลดล็อคสถานะ must_change_password ใน Store เพื่อปิด Modal
       updateUser({ must_change_password: false });
     } catch (error) {
       console.error(error);
@@ -48,7 +63,9 @@ const DashboardLayout = () => {
 
   return (
     <div className="flex min-h-screen bg-gray-50 transition-colors duration-300 relative">
-      {/* Forced Change Password Modal */}
+      {/* ------------------------------------------------------- */}
+      {/* Modal บังคับเปลี่ยนรหัสผ่าน (แสดงหากผู้ดูแลระบบเพิ่งสร้างบัญชีหรือรีเซ็ตรหัสให้) */}
+      {/* ------------------------------------------------------- */}
       {user?.must_change_password && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 md:p-8 w-full max-w-md shadow-2xl border border-gray-100">
@@ -154,7 +171,7 @@ const DashboardLayout = () => {
         </div>
       )}
 
-      {/* Mobile Backdrop */}
+      {/* ฉากหลังสีทึบเมื่อเปิดเมนู Sidebar บนจอมือถือ (คลิกเพื่อปิดเมนู) */}
       {mobileMenuOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm"
@@ -162,14 +179,19 @@ const DashboardLayout = () => {
         />
       )}
 
+      {/* เมนูด้านข้าง (Sidebar) */}
       <Sidebar />
 
+      {/* พื้นที่หลักของเนื้อหา: ขยับ Margin ซ้ายตามขนาดความกว้างของ Sidebar */}
       <div
         className={`flex-1 transition-all duration-300 w-full ${
           sidebarCollapsed ? "md:ml-16" : "md:ml-56"
         }`}
       >
+        {/* แถบส่วนหัว (Header) */}
         <Header />
+        
+        {/* เนื้อหาหน้าย่อยที่เปลี่ยนไปตาม React Router Outlet */}
         <main className="p-4 md:p-6 pb-20 md:pb-6">
           <Outlet />
         </main>

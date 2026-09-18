@@ -1,18 +1,29 @@
+// ======================================================
+// components/Header.jsx - คอมโพเนนต์แถบส่วนหัวด้านบน (Top Header Bar)
+// รับผิดชอบ:
+//   - แสดงชื่อมหาวิทยาลัยราชภัฏบุรีรัมย์
+//   - ปุ่มแฮมเบอร์เกอร์ (Menu) สำหรับเปิด/ปิดเมนู Sidebar บนจอมือถือ
+//   - แสดงชื่อทักทายผู้ใช้งานที่เข้าสู่ระบบ (สวัสดี, คุณ...) หรือปุ่ม Login
+// ======================================================
+
 import { useNavigate } from "react-router-dom";
 import { Menu } from "lucide-react";
 import { useAuthStore, useUIStore } from "../store";
 
 const Header = () => {
+  // ดึงข้อมูลสถานะผู้ใช้จาก Auth Store
   const { user, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
 
+  // ดึงฟังก์ชันสลับเมนูบนมือถือจาก UI Store
   const { toggleMobileMenu } = useUIStore();
 
   return (
     <header className="sticky top-0 z-40 bg-white shadow-sm transition-colors duration-300">
       <div className="bg-linear-to-r from-purple-200 via-purple-100 to-purple-200 px-4 py-3 flex justify-between items-center transition-all duration-300">
+        {/* ส่วนซ้าย: ปุ่มเมนูมือถือ และชื่อมหาวิทยาลัย */}
         <div className="flex items-center gap-3">
-          {/* Mobile Menu Button */}
+          {/* ปุ่มเปิดปิดเมนูสำหรับหน้าจอมือถือ (แสดงเฉพาะหน้าจอต่ำกว่า md) */}
           <button
             onClick={toggleMobileMenu}
             className="md:hidden p-2 -ml-2 text-purple-700 hover:bg-purple-200/50 rounded-lg transition-colors cursor-pointer"
@@ -32,6 +43,7 @@ const Header = () => {
           </div>
         </div>
 
+        {/* ส่วนขวา: ข้อความต้อนรับผู้ใช้งาน หรือปุ่มเข้าสู่ระบบ */}
         <div className="flex items-center gap-3">
           {isAuthenticated && user ? (
             <span className="hidden md:inline text-sm text-gray-700">
@@ -47,6 +59,7 @@ const Header = () => {
           )}
         </div>
       </div>
+      {/* เส้นแถบสีม่วงตกแต่งด้านล่าง Header */}
       <div className="h-2 bg-linear-to-r from-purple-500 via-purple-400 to-purple-500"></div>
     </header>
   );

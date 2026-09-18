@@ -1,3 +1,11 @@
+// ======================================================
+// pages/tenant/Dashboard.jsx - หน้าแดชบอร์ดหลักของผู้เช่า (Tenant Home / Dashboard)
+// รับผิดชอบ:
+//   - แสดงกล่องแจ้งเตือนบิลที่ใกล้ครบกำหนดชำระภายใน 7 วัน (Due Soon Bills)
+//   - การ์ดทางลัดเลือกดูแผนผังศูนย์อาหาร 1 และ ศูนย์อาหาร 2
+//   - เมนูด่วน (Quick Links): ค่าใช้จ่าย, สัญญาเช่า, ประวัติชำระเงิน, แจ้งซ่อม, ติดตามงานซ่อม
+// ======================================================
+
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -17,16 +25,18 @@ import { stallsAPI, billsAPI } from "../../api";
 
 const TenantDashboard = () => {
   const { user } = useAuthStore();
-  const [stall, setStall] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [dueBills, setDueBills] = useState([]);
+  const [stall, setStall] = useState(null);       // ข้อมูลแผงค้าของผู้เช่า
+  const [loading, setLoading] = useState(true);   // สถานะการโหลดข้อมูล
+  const [dueBills, setDueBills] = useState([]);   // รายการบิลที่ใกล้ถึงกำหนดชำระ (ภายใน 7 วัน)
 
+  // ดึงข้อมูลเมื่อโหลดหน้าจอครั้งแรก
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // ดึงข้อมูลแผงร้านค้า และบิลที่ใกล้ครบกำหนดชำระพร้อมกันแบบขนาน (Promise.all)
         const [stallsRes, billsRes] = await Promise.all([
           stallsAPI.getAll(),
-          billsAPI.getDueBills(), // Fetch bills due in 7 days
+          billsAPI.getDueBills(),
         ]);
         setStall(stallsRes.data.data?.[0]);
         setDueBills(billsRes.data.data || []);
@@ -50,7 +60,9 @@ const TenantDashboard = () => {
 
   return (
     <div className="max-w-7xl mx-auto p-6 md:p-10 pb-20">
-      {/* Notifications */}
+      {/* ------------------------------------------------------- */}
+      {/* กล่องแจ้งเตือนบิลค้างชำระ/ใกล้ครบกำหนดชำระ (แสดงเมื่อมี dueBills) */}
+      {/* ------------------------------------------------------- */}
       {dueBills.length > 0 && (
         <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-4">
           <div className="p-2 bg-red-100 rounded-lg text-red-600">
@@ -102,8 +114,11 @@ const TenantDashboard = () => {
         </div>
       )}
 
-      {/* Food Court Cards */}
+      {/* ------------------------------------------------------- */}
+      {/* การ์ดเลือกดูผังศูนย์อาหาร (ศูนย์อาหาร 1 และ ศูนย์อาหาร 2) */}
+      {/* ------------------------------------------------------- */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto mb-16">
+        {/* การ์ดศูนย์อาหาร 1 */}
         <Link
           to="/tenant/stall-status?foodCourt=1"
           className="group relative block rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 bg-white"
@@ -128,6 +143,7 @@ const TenantDashboard = () => {
           </div>
         </Link>
 
+        {/* การ์ดศูนย์อาหาร 2 */}
         <Link
           to="/tenant/stall-status?foodCourt=2"
           className="group relative block rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 bg-white"
@@ -153,10 +169,13 @@ const TenantDashboard = () => {
         </Link>
       </div>
 
-      {/* Quick Menu Below */}
+      {/* ------------------------------------------------------- */}
+      {/* เมนูด่วนเข้าถึงฟังก์ชันต่างๆ (Quick Action Menus) */}
+      {/* ------------------------------------------------------- */}
       <div className="max-w-4xl mx-auto">
         <h3 className="text-center text-gray-500 mb-8 font-medium">เมนูด่วน</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+          {/* เมนูด่วน: ค่าใช้จ่าย */}
           <Link
             to="/tenant/expenses"
             className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100 group gap-4 hover:-translate-y-1"
@@ -169,6 +188,7 @@ const TenantDashboard = () => {
             </span>
           </Link>
 
+          {/* เมนูด่วน: สัญญาเช่า */}
           <Link
             to="/tenant/contracts"
             className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100 group gap-4 hover:-translate-y-1"
@@ -181,6 +201,7 @@ const TenantDashboard = () => {
             </span>
           </Link>
 
+          {/* เมนูด่วน: ประวัติชำระเงิน */}
           <Link
             to="/tenant/payment-history"
             className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100 group gap-4 hover:-translate-y-1"
@@ -193,6 +214,7 @@ const TenantDashboard = () => {
             </span>
           </Link>
 
+          {/* เมนูด่วน: แจ้งซ่อม */}
           <Link
             to="/tenant/report-repair"
             className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100 group gap-4 hover:-translate-y-1"
@@ -205,6 +227,7 @@ const TenantDashboard = () => {
             </span>
           </Link>
 
+          {/* เมนูด่วน: ติดตามงานซ่อม */}
           <Link
             to="/tenant/track-repairs"
             className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100 group gap-4 hover:-translate-y-1"
@@ -216,8 +239,6 @@ const TenantDashboard = () => {
               ติดตามซ่อม
             </span>
           </Link>
-
-
         </div>
       </div>
     </div>

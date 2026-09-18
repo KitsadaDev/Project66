@@ -8,15 +8,26 @@ import {
 import { useAuthStore } from "../../store";
 import { maintenanceAPI } from "../../api";
 
+/**
+ * คอมโพเนนต์แดชบอร์ดสำหรับช่างซ่อมบำรุง (Maintenance Dashboard)
+ * - สรุปสถานะภาระงาน: รอดำเนินการ (PENDING), กำลังดำเนินการ (IN_PROGRESS), และเสร็จสิ้นแล้ว (COMPLETED)
+ * - แสดงรายการงานซ่อมบำรุงที่ได้รับมอบหมายล่าสุด พร้อมลิงก์ไปยังหน้ารายละเอียดงานแต่ละรายการ
+ */
 const MaintenanceDashboard = () => {
+  // ดึงข้อมูลผู้ใช้ปัจจุบันจาก Auth Store
   const { user } = useAuthStore();
+  // รายการงานแจ้งซ่อมทั้งหมดที่ช่างได้รับมอบหมาย
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // ดึงข้อมูลงานแจ้งซ่อมเมื่อเปิดหน้าจอ
   useEffect(() => {
     fetchJobs();
   }, []);
 
+  /**
+   * ดึงรายการงานซ่อมบำรุงทั้งหมดของช่างซ่อมจาก API
+   */
   const fetchJobs = async () => {
     try {
       const response = await maintenanceAPI.getAll();
@@ -28,14 +39,20 @@ const MaintenanceDashboard = () => {
     }
   };
 
+  // คัดกรองงานตามสถานะต่างๆ เพื่อนำไปแสดงผลบนการ์ดสถิติ (KPI Cards)
   const pendingJobs = jobs.filter((j) => j.status === "PENDING");
   const inProgressJobs = jobs.filter((j) => j.status === "IN_PROGRESS");
   const completedJobs = jobs.filter((j) => j.status === "COMPLETED");
 
+  // งานที่ยังไม่เสร็จสิ้น (รอดำเนินการ หรือ กำลังดำเนินการ)
   const assignedJobs = jobs.filter(
     (j) => j.status === "PENDING" || j.status === "IN_PROGRESS"
   );
 
+  /**
+   * แปลงวันที่เป็นรูปแบบภาษาไทย (วัน/เดือน/ปี พ.ศ.)
+   * @param {string} dateStr - วันที่ในรูปแบบ ISO
+   */
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
     const date = new Date(dateStr);
@@ -43,6 +60,10 @@ const MaintenanceDashboard = () => {
     return date.toLocaleDateString("th-TH");
   };
 
+  /**
+   * กำหนดข้อความภาษาไทยและสไตล์สีของ Badge ตามสถานะงานซ่อม
+   * @param {string} status - รหัสสถานะ (PENDING, IN_PROGRESS, COMPLETED)
+   */
   const getStatusBadge = (status) => {
     switch (status) {
       case "PENDING":
@@ -68,6 +89,7 @@ const MaintenanceDashboard = () => {
     }
   };
 
+  // แสดงตัวโหลดขณะกำลังดึงข้อมูล
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">

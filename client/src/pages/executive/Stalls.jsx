@@ -16,21 +16,36 @@ import {
 import { stallsAPI } from "../../api";
 import { formatPhoneNumber } from "../../utils/formatters";
 
+/**
+ * คอมโพเนนต์แสดงผังและข้อมูลแผงค้าสำหรับผู้บริหาร (Executive Stalls - Read Only)
+ * - แสดงแผนผังแผงค้า 2 มิติ (Interactive 2D Map) ของศูนย์อาหาร 1 และศูนย์อาหาร 2
+ * - แสดงสีระบุสถานะแผงค้าแบบเรียลไทม์ (สีเขียว: ว่าง, สีแดง: มีผู้เช่า, สีเหลือง: ซ่อมบำรุง)
+ * - คลิกที่แผงค้าเพื่อเปิดดูหน้าต่างรายละเอียดผู้เช่า, ข้อมูลสัญญา, และเบอร์โทรติดต่อ (Modal - ดูได้อย่างเดียว)
+ * - ตารางสรุปรายชื่อแผงค้าทั้งหมดด้านล่าง พร้อมระบบค้นหาและตัวกรองศูนย์อาหาร
+ */
 const ExecutiveStalls = () => {
+  // ข้อมูลแผงค้าทั้งหมดที่ดึงมาจาก API
   const [stalls, setStalls] = useState([]);
   const [loading, setLoading] = useState(true);
+  // เลือกศูนย์อาหารที่ต้องการดูผัง ("1" หรือ "2")
   const [selectedFoodCourt, setSelectedFoodCourt] = useState("1");
+  // ตัวค้นหาในตารางแผงค้า
   const [search, setSearch] = useState("");
+  // ตัวกรองศูนย์อาหารสำหรับตารางแผงค้า ("ALL", "1", "2")
   const [filterFoodCourt, setFilterFoodCourt] = useState("ALL");
 
-  // View-Only Modal State
+  // สถานะสำหรับหน้าต่างป๊อปอัปแสดงรายละเอียดแผงค้า (View-Only Modal)
   const [selectedStall, setSelectedStall] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // ดึงข้อมูลแผงค้าเมื่อเปิดหน้าจอ
   useEffect(() => {
     fetchStalls();
   }, []);
 
+  /**
+   * ดึงข้อมูลแผงค้าทั้งหมดจาก API
+   */
   const fetchStalls = async () => {
     try {
       const response = await stallsAPI.getAll();
@@ -42,6 +57,10 @@ const ExecutiveStalls = () => {
     }
   };
 
+  /**
+   * จัดรูปแบบวันที่เป็นภาษาไทย (วัน เดือน ปี พ.ศ.)
+   * @param {string} dateStr - วันที่ในรูปแบบ ISO
+   */
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
     const date = new Date(dateStr);
@@ -53,6 +72,11 @@ const ExecutiveStalls = () => {
     });
   };
 
+  /**
+   * ตรวจสอบสถานะของแผงค้าตามหมายเลขแผงและศูนย์อาหารปัจจุบัน
+   * @param {string} slot_number - หมายเลขแผงค้า
+   * @returns {string} สถานะตัวพิมพ์เล็ก (e.g. 'occupied', 'vacant', 'maintenance')
+   */
   const getStallStatus = (slot_number) => {
     const stall = stalls.find(
       (s) =>
@@ -63,6 +87,11 @@ const ExecutiveStalls = () => {
     return stall.status.toLowerCase();
   };
 
+  /**
+   * จัดการเมื่อคลิกที่แผงค้าบนผัง:
+   * ค้นหาข้อมูลแผงค้าและเปิด Modal รายละเอียด (Read-Only)
+   * @param {string} slot_number - หมายเลขแผงค้า
+   */
   const handleStallClick = (slot_number) => {
     const existingStall = stalls.find(
       (s) =>
@@ -83,6 +112,10 @@ const ExecutiveStalls = () => {
     setIsModalOpen(true);
   };
 
+  /**
+   * กำหนดสไตล์สีและข้อความของ Badge สถานะแผงค้า
+   * @param {string} status - สถานะแผงค้า (OCCUPIED, VACANT, MAINTENANCE)
+   */
   const getStatusBadge = (status) => {
     const config = {
       OCCUPIED: { bg: "bg-red-100", text: "text-red-700", label: "มีผู้เช่า" },
@@ -101,6 +134,10 @@ const ExecutiveStalls = () => {
     );
   };
 
+  /**
+   * คอมโพเนนต์ย่อยแสดงบล็อกแผงค้าแต่ละช่องบนผัง 2 มิติ
+   * กำหนดสีตามสถานะแผงค้า และรองรับการคลิกเพื่อดูรายละเอียด
+   */
   const StallCell = ({ id, small = false, w = 44, h = 44, fixedSize = false }) => {
     const status = getStallStatus(id);
     let colorClass = "";
@@ -133,7 +170,7 @@ const ExecutiveStalls = () => {
     );
   };
 
-  // Filtered stalls for the table below
+  // กรองรายการแผงค้าในตารางตามคำค้นหาและศูนย์อาหารที่เลือก
   const filteredStalls = stalls.filter((stall) => {
     const matchSearch =
       stall.slot_number?.toLowerCase().includes(search.toLowerCase()) ||

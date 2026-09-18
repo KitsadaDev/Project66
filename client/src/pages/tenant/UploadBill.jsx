@@ -11,15 +11,27 @@ import { toast } from "react-toastify";
 import { billsAPI, stallsAPI } from "../../api";
 import { convertHeicToJpeg } from "../../utils/heicConverter";
 
+/**
+ * คอมโพเนนต์หน้าจออัปโหลดหลักฐานการชำระเงิน (สำหรับผู้เช่าแผงค้า)
+ * - เลือกรอบบิลประจำเดือน/ปี
+ * - กรอกจำนวนเงินที่โอน และหมายเหตุเพิ่มเติม
+ * - อัปโหลดไฟล์ภาพสลิป (รองรับ HEIC, JPG, PNG, PDF)
+ * - ตรวจสอบความถูกต้องและส่งข้อมูลหลักฐานไปยังเซิร์ฟเวอร์
+ */
 const UploadBill = () => {
+  // สถานะการจัดเก็บไฟล์หลักฐานและ URL จำลองสำหรับแสดงพรีวิว
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
+  // สถานะการโหลดขณะกำลังส่งข้อมูลไปยังเซิร์ฟเวอร์
   const [uploading, setUploading] = useState(false);
+  // สถานะเดือนและปีที่ต้องการชำระ (ค่าเริ่มต้นเป็นเดือนและปีปัจจุบัน)
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  // จำนวนเงินที่ชำระ และหมายเหตุประกอบ
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
 
+  // รายชื่อเดือนภาษาไทยสำหรับแสดงในเมนู Dropdown
   const thaiMonths = [
     "มกราคม",
     "กุมภาพันธ์",
@@ -35,11 +47,17 @@ const UploadBill = () => {
     "ธันวาคม",
   ];
 
+  /**
+   * จัดการเมื่อผู้ใช้เลือกไฟล์หลักฐานจากเครื่อง
+   * - ตรวจสอบและแปลงไฟล์ภาพฟอร์แมต HEIC (เช่น จาก iPhone) ให้เป็น JPEG อัตโนมัติ
+   * - สร้าง Object URL เพื่อใช้พรีวิวรูปภาพ
+   */
   const handleFileChange = async (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
       const toastId = toast.info("กำลังประมวลผลไฟล์...", { autoClose: false });
       try {
+        // ทำการแปลงไฟล์ภาพ (ถ้าเป็น HEIC)
         const convertedFile = await convertHeicToJpeg(selectedFile);
         setFile(convertedFile);
         setPreview(URL.createObjectURL(convertedFile));
@@ -52,17 +70,30 @@ const UploadBill = () => {
     }
   };
 
+  /**
+   * ล้างไฟล์หลักฐานและพรีวิวที่เลือกไว้ออก
+   */
   const removeFile = () => {
     setFile(null);
     setPreview(null);
   };
 
+  /**
+   * ฟังก์ชันดำเนินการส่งหลักฐานการชำระเงิน
+   * 1. ตรวจสอบข้อมูลนำเข้า (ไฟล์ และ จำนวนเงิน)
+   * 2. ดึงข้อมูลแผงค้าของผู้เช่า (Slot)
+   * 3. ดึงรายการบิลเพื่อค้นหาบิลที่ตรงกับเดือน/ปีที่เลือก
+   * 4. ตรวจสอบสถานะว่ายังค้างชำระหรือไม่
+   * 5. ส่งไฟล์ผ่าน FormData ไปยัง billsAPI.uploadPayment
+   */
   const handleUpload = async () => {
+    // ตรวจสอบว่าเลือกไฟล์หรือยัง
     if (!file) {
       toast.error("กรุณาเลือกไฟล์หลักฐานการชำระ");
       return;
     }
 
+    // ตรวจสอบว่ากรอกจำนวนเงินหรือยัง
     if (!amount) {
       toast.error("กรุณากรอกยอดที่ชำระ");
       return;
@@ -70,7 +101,7 @@ const UploadBill = () => {
 
     setUploading(true);
     try {
-      // 1. Fetch stalls to get the tenant's slot
+      // 1. ดึงข้อมูลแผงค้าของผู้เช่าเพื่อหา slot_id
       const stallsRes = await stallsAPI.getAll();
       const myStall = stallsRes.data.data?.[0];
       if (!myStall) {
@@ -79,11 +110,11 @@ const UploadBill = () => {
         return;
       }
 
-      // 2. Fetch bills for this stall
+      // 2. ดึงรายการบิลทั้งหมดของแผงค้านี้
       const billsRes = await billsAPI.getAll({ slot_id: myStall.slot_id });
       const bills = billsRes.data.data || [];
 
-      // 3. Find the bill matching selectedMonth and selectedYear
+      // 3. ค้นหาบิลที่ตรงกับรอบเดือนและปีที่ระบุ
       const bill = bills.find((b) => {
         const billDate = new Date(b.billing_month);
         return (
@@ -92,19 +123,21 @@ const UploadBill = () => {
         );
       });
 
+      // หากไม่พบบิลในรอบเดือนนั้น แจ้งเตือนผู้ใช้
       if (!bill) {
         toast.error(`ไม่พบข้อมูลบิลสำหรับเดือน ${thaiMonths[selectedMonth - 1]} ${selectedYear + 543}`);
         setUploading(false);
         return;
       }
 
+      // หากบิลชำระแล้ว ไม่ต้องอัปโหลดซ้ำ
       if (bill.status === "PAID") {
         toast.warning("บิลสำหรับเดือนนี้ได้รับการชำระเรียบร้อยแล้ว");
         setUploading(false);
         return;
       }
 
-      // 4. Upload payment slip
+      // 4. บรรจุข้อมูลใส่ FormData สำหรับอัปโหลดไฟล์ Multipart
       const formData = new FormData();
       formData.append("paymentProof", file);
       formData.append("payment_date", new Date().toISOString());
@@ -113,10 +146,11 @@ const UploadBill = () => {
         formData.append("note", note);
       }
 
+      // ยิง API บันทึกหลักฐานการชำระ
       await billsAPI.uploadPayment(bill.expense_id, formData);
       toast.success("อัปโหลดหลักฐานสำเร็จ รอการตรวจสอบ");
 
-      // Reset form
+      // ล้างค่าฟอร์มกลับสู่สถานะเริ่มต้น
       setFile(null);
       setPreview(null);
       setAmount("");
@@ -131,6 +165,7 @@ const UploadBill = () => {
 
   return (
     <div>
+      {/* หัวข้อหน้าจอ */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-800">
           อัปโหลดหลักฐานการชำระ
@@ -141,7 +176,7 @@ const UploadBill = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Left - Upload Area */}
+        {/* ฝั่งซ้าย - พื้นที่สำหรับลากวางหรือเลือกไฟล์ภาพสลิป */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8 order-2 lg:order-1 h-fit">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600">
@@ -151,6 +186,7 @@ const UploadBill = () => {
           </div>
 
           {!preview ? (
+            /* กล่อง Drag-and-Drop หรือคลิกเพื่ออัปโหลด */
             <div
               className="border-2 border-dashed border-gray-300 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer min-h-[300px] flex flex-col items-center justify-center p-8 group"
               onClick={() => document.getElementById("bill-upload").click()}
@@ -173,6 +209,7 @@ const UploadBill = () => {
               />
             </div>
           ) : (
+            /* แสดงภาพตัวอย่างเมื่อเลือกไฟล์แล้ว พร้อมปุ่มยกเลิก */
             <div className="relative rounded-2xl overflow-hidden border border-gray-200">
               <img
                 src={preview}
@@ -189,7 +226,7 @@ const UploadBill = () => {
           )}
         </div>
 
-        {/* Right - Form */}
+        {/* ฝั่งขวา - ฟอร์มระบุรายละเอียดการชำระเงิน */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8 order-1 lg:order-2 h-fit">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center text-green-600">
@@ -201,7 +238,7 @@ const UploadBill = () => {
           </div>
 
           <div className="space-y-6">
-            {/* Month/Year Selection */}
+            {/* เลือกเดือนและปีรอบบิล */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
                 ประจำเดือน
@@ -230,7 +267,7 @@ const UploadBill = () => {
               </div>
             </div>
 
-            {/* Amount */}
+            {/* ช่องกรอกจำนวนเงิน */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
                 ยอดเงินที่ชำระ (บาท)
@@ -249,7 +286,7 @@ const UploadBill = () => {
               </div>
             </div>
 
-            {/* Note */}
+            {/* ช่องกรอกหมายเหตุ */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
                 หมายเหตุ (ถ้ามี)
@@ -262,7 +299,7 @@ const UploadBill = () => {
               />
             </div>
 
-            {/* Submit Button */}
+            {/* ปุ่มกดยืนยันการส่งสลิป */}
             <button
               className="w-full bg-purple-500 hover:bg-purple-600 text-white py-3.5 rounded-xl font-semibold shadow-lg shadow-purple-200 hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
               onClick={handleUpload}

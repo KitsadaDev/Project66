@@ -1,3 +1,12 @@
+// ======================================================
+// pages/tenant/CancelContract.jsx - แบบฟอร์มขอยกเลิกสัญญาเช่าของผู้เช่า (Contract Termination Request)
+// รับผิดชอบ:
+//   - ดึงข้อมูลสัญญาเช่าปัจจุบัน และประวัติคำร้องขอยกเลิกเดิม (contractsAPI.getCancellations)
+//   - แบบฟอร์มเลือกเหตุผลในการยกเลิกสัญญา (ยอดขายไม่ถึงเป้า, ย้ายสถานที่, ปัญหาสุขภาพ ฯลฯ)
+//   - บันทึกคำขอยกเลิกสัญญาผ่าน API (contractsAPI.requestTermination) พร้อมปรับสถานะเป็น PENDING_TERMINATION
+//   - แสดงประวัติและสถานะคำร้องขอยกเลิก (รอการอนุมัติ, อนุมัติแล้ว, ปฏิเสธคำขอ)
+// ======================================================
+
 import { useState, useEffect } from "react";
 import { contractsAPI } from "../../api";
 import { toast } from "react-toastify";
@@ -13,6 +22,7 @@ import {
   Calendar,
 } from "lucide-react";
 
+// รายการตัวเลือกเหตุผลในการขอยกเลิกสัญญาเช่า
 const REASON_OPTIONS = [
   "ยอดขายไม่ตรงตามเป้าหมาย",
   "ต้องการย้ายสถานที่",
@@ -22,15 +32,22 @@ const REASON_OPTIONS = [
 ];
 
 const CancelContract = () => {
-  const [contract, setContract] = useState(null);
-  const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  // -------------------------------------------------------
+  // Component States
+  // -------------------------------------------------------
+  const [contract, setContract] = useState(null);         // ข้อมูลสัญญาเช่าปัจจุบัน
+  const [requests, setRequests] = useState([]);           // รายการประวัติคำร้องขอยกเลิกสัญญาของผู้เช่า
+  const [loading, setLoading] = useState(true);           // สถานะกำลังโหลดข้อมูล
+  const [submitting, setSubmitting] = useState(false);     // สถานะกำลังส่งฟอร์มคำขอ
 
   // Form states
-  const [selectedReason, setSelectedReason] = useState("");
-  const [additionalNote, setAdditionalNote] = useState("");
+  const [selectedReason, setSelectedReason] = useState(""); // เหตุผลที่เลือก
+  const [additionalNote, setAdditionalNote] = useState(""); // รายละเอียดเพิ่มเติม
 
+  // -------------------------------------------------------
+  // ฟังก์ชัน: fetchData
+  // หน้าที่: ดึงข้อมูลสัญญาเช่าของผู้เช่า และประวัติคำร้องขอยกเลิกสัญญาเดิม
+  // -------------------------------------------------------
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -40,7 +57,7 @@ const CancelContract = () => {
       ]);
 
       const contracts = contractsRes.data?.data || [];
-      // Find current active or pending contract
+      // ค้นหาสัญญาที่ ACTIVE หรืออยู่ในสถานะ PENDING_TERMINATION
       const activeContract = contracts.find(
         (c) => c.status === "ACTIVE" || c.status === "PENDING_TERMINATION"
       );
@@ -59,6 +76,10 @@ const CancelContract = () => {
     fetchData();
   }, []);
 
+  // -------------------------------------------------------
+  // ฟังก์ชัน: handleSubmit
+  // หน้าที่: ตรวจสอบความถูกต้อง และส่งคำร้องขอยกเลิกสัญญาไปยัง Server
+  // -------------------------------------------------------
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -91,7 +112,7 @@ const CancelContract = () => {
       toast.success("ส่งคำร้องขอยกเลิกสัญญาเรียบร้อยแล้ว กรุณารอการตรวจสอบ");
       setSelectedReason("");
       setAdditionalNote("");
-      fetchData();
+      fetchData(); // โหลดข้อมูลใหม่เพื่ออัปเดตสถานะเป็นรอดำเนินการ
     } catch (error) {
       console.error("Submit termination error:", error);
       toast.error(
@@ -102,6 +123,7 @@ const CancelContract = () => {
     }
   };
 
+  // จัดรูปแบบวันเวลาภาษาไทย
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
     const date = new Date(dateStr);
@@ -114,6 +136,7 @@ const CancelContract = () => {
     });
   };
 
+  // แสดง Badge สีตามสถานะของคำร้อง
   const getStatusBadge = (status) => {
     switch (status) {
       case "PENDING":
@@ -158,7 +181,7 @@ const CancelContract = () => {
 
   return (
     <div className="max-w-2xl mx-auto space-y-8 pb-12">
-      {/* Form Card */}
+      {/* การ์ดแบบฟอร์มส่งคำร้อง */}
       <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100">
         <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-2">
           แบบฟอร์มขอยกเลิกสัญญาเช่า
@@ -167,7 +190,7 @@ const CancelContract = () => {
           กรอกรายละเอียดและเหตุผลในการขอยกเลิกสัญญาเช่าเพื่อส่งให้ผู้ดูแลระบบพิจารณา
         </p>
 
-        {/* Contract Info Banner */}
+        {/* แถบสรุปข้อมูลสัญญาที่กำลังจะขอยกเลิก */}
         {contract ? (
           <div className="bg-purple-50/70 border border-purple-100 rounded-2xl p-4 mb-6 flex flex-wrap items-center justify-between gap-3 text-sm">
             <div className="flex items-center gap-2">
@@ -210,7 +233,7 @@ const CancelContract = () => {
           </div>
         )}
 
-        {/* Warning if already pending */}
+        {/* แถบเตือนกรณีส่งคำร้องแล้วและอยู่ระหว่างรอ Admin อนุมัติ */}
         {isPending && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex items-start gap-3 text-amber-900 text-sm">
             <Clock size={20} className="shrink-0 text-amber-600 mt-0.5" />
@@ -224,8 +247,9 @@ const CancelContract = () => {
           </div>
         )}
 
+        {/* แบบฟอร์มเลือกเหตุผลและเขียนหมายเหตุ */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Reason Section */}
+          {/* ตัวเลือกเหตุผลยกเลิกสัญญา */}
           <div>
             <label className="block text-sm font-semibold text-gray-800 mb-3">
               เหตุผลที่ขอยกเลิก <span className="text-red-500">*</span>
@@ -251,7 +275,7 @@ const CancelContract = () => {
                       onChange={(e) => setSelectedReason(e.target.value)}
                       className="sr-only"
                     />
-                    {/* Custom Radio Button */}
+                    {/* ปุ่ม Radio วงกลมแบบ Custom */}
                     <div
                       className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all shrink-0 ${
                         isSelected
@@ -270,7 +294,7 @@ const CancelContract = () => {
             </div>
           </div>
 
-          {/* Additional Notes */}
+          {/* ช่องกรอกรายละเอียดเพิ่มเติม */}
           <div>
             <label className="block text-sm font-semibold text-gray-800 mb-2">
               รายละเอียดเพิ่มเติม (ถ้ามี)
@@ -285,7 +309,7 @@ const CancelContract = () => {
             />
           </div>
 
-          {/* Submit Button */}
+          {/* ปุ่มกดยื่นคำร้อง */}
           <button
             type="submit"
             disabled={!canSubmit || !selectedReason || submitting}
@@ -303,7 +327,9 @@ const CancelContract = () => {
         </form>
       </div>
 
-      {/* History Section */}
+      {/* ------------------------------------------------------- */}
+      {/* ส่วนประวัติคำร้องขอยกเลิกสัญญาของผู้เช่า (History Section) */}
+      {/* ------------------------------------------------------- */}
       <div className="space-y-4">
         <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
           <History size={20} className="text-purple-600" />

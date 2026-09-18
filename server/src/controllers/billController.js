@@ -1,14 +1,29 @@
+// ======================================================
+// billController.js - Controller จัดการบิลรายเดือน (Monthly Expenses)
+// รับผิดชอบ: สร้าง/ดู/แก้ไขบิล, อัปโหลด/ตรวจสลิป, คำนวณค่าปรับ
+// ======================================================
+
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 const { sendPushNotifications } = require('../utils/pushNotification');
 
-// Helper to compute late fees dynamically
+// -------------------------------------------------------
+// ฟังก์ชัน Helper: computeLateFees(expenses)
+// หน้าที่: คำนวณค่าปรับล่าช้าแบบ dynamic (ไม่บันทึกใน DB แต่คำนวณ on-the-fly)
+//   Logic:
+//   1. ดึง LATE_RENT_FINE, LATE_UTILITY_FINE, LATE_FINE_DELAY_DAYS จาก SystemSetting
+//   2. คำนวณวันที่เกินกำหนด = วันนี้ - due_date
+//   3. ถ้าเกินกำหนด → คำนวณค่าปรับ = (diffDays - delayDays) × (rentFine + utilityFine)
+//   รับได้ทั้ง array และ single object
+// -------------------------------------------------------
 const computeLateFees = async (expenses) => {
   if (!expenses || expenses.length === 0) return expenses;
 
+  // ดึงตั้งค่าค่าปรับจาก SystemSetting
   const lateRent = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_RENT_FINE' } });
   const lateUtility = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_UTILITY_FINE' } });
+  // จำนวนวันผ่อนที่จะเริ่มคิดค่าปรับ (grace period)
   const delaySetting = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_FINE_DELAY_DAYS' } });
   
   const rentFine = parseFloat(lateRent?.setting_value || '100');
@@ -20,13 +35,16 @@ const computeLateFees = async (expenses) => {
   now.setHours(0, 0, 0, 0);
 
   const processExpense = (expense) => {
+    // เช็คเฉพาะบิลที่ยังไม่ชำระ
     if (expense.status === 'PENDING' || expense.status === 'OVERDUE') {
       const due = new Date(expense.due_date);
       due.setHours(0, 0, 0, 0);
 
+      // ถ้าวันนี้เลย due_date → คำนวณค่าปรับ
       if (now > due) {
         const diffTime = now - due;
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        // คิดค่าปรับเฉพาะเมื่อ diffDays เกิน delayDays (grace period)
         const lateFee = diffDays > delayDays ? (diffDays - delayDays) * totalDailyFine : 0;
         
         return {
@@ -48,14 +66,20 @@ const computeLateFees = async (expenses) => {
 };
 
 
-// Get all monthly expenses (filtered by role)
+// -------------------------------------------------------
+// ฟังก์ชัน: getAllBills
+// หน้าที่: ดึงรายการบิลทั้งหมด (กรองตาม role)
+//   - TENANT: เห็นเฉพาะบิลของสัญญาตัวเอง
+//   - ADMIN/EXECUTIVE: เห็นทั้งหมด, รองรับ filterตาม slot
+//   - คำนวณค่าปรับล่าช้าก่อนส่ง response
+// -------------------------------------------------------
 const getAllBills = async (req, res, next) => {
   try {
     const { status, billing_month, slot_id } = req.query;
     const where = {};
 
     if (req.user.role === 'TENANT') {
-      // Find contracts for this tenant
+      // ดึงสัญญาทั้งหมดของ tenant คนนี้ เพื่อกรอง expense
       const contracts = await prisma.rentalContract.findMany({
         where: { tenant_id: req.user.user_id },
         select: { contract_id: true }
@@ -67,14 +91,16 @@ const getAllBills = async (req, res, next) => {
         where.contract = { slot_id: parseInt(slot_id) };
       }
     } else if (req.user.role === 'EXECUTIVE' || req.user.role === 'ADMIN') {
-      // Admins and Executives see all bills by default, but can filter by slot
+      // Admin และ Executive เห็นบิลทั้งหมด แต่ filter ตาม slot ได้
       if (slot_id) {
         where.contract = { slot_id: parseInt(slot_id) };
       }
     }
 
+    // filter ตาม status ถ้าส่งมา
     if (status) where.status = status;
 
+    // filter ตามเดือน: หาบิลที่อยู่ในช่วงเดือนที่ระบุ
     if (billing_month) {
       const d = new Date(billing_month);
       where.billing_month = {
@@ -104,7 +130,12 @@ const getAllBills = async (req, res, next) => {
   }
 };
 
-// Get expense by ID
+// -------------------------------------------------------
+// ฟังก์ชัน: getBillById
+// หน้าที่: ดึงบิลตาม ID
+//   - ป้องกัน IDOR: TENANT ดูได้เฉพาะบิลของตัวเอง
+//   - คำนวณค่าปรับล่าช้า on-the-fly
+// -------------------------------------------------------
 const getBillById = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -126,7 +157,8 @@ const getBillById = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Expense not found.' });
     }
 
-    // IDOR prevention: TENANT can only view their own bills
+    // IDOR = Insecure Direct Object Reference
+    // ป้องกันไม่ให้ TENANT เดา ID บิลของคนอื่นไปดูได้
     if (req.user.role === 'TENANT') {
       const tenantId = expense.contract?.tenant_id;
       if (tenantId !== req.user.user_id) {
@@ -141,7 +173,16 @@ const getBillById = async (req, res, next) => {
   }
 };
 
-// Create monthly expense (Admin only)
+// -------------------------------------------------------
+// ฟังก์ชัน: createBill
+// หน้าที่: สร้างบิลรายเดือน (Admin เท่านั้น)
+//   ขั้นตอน:
+//   1. ค้นหาสัญญา ACTIVE ของ slot นั้น
+//   2. คำนวณค่าดักไขมัน (จาก menuType หรือ zone สล็อต)
+//   3. คำนวณ due_date จาก BILL_DUE_DAYS setting
+//   4. คำนวณยอดรวม
+//   5. สร้าง notification และ push notification ให้ผู้เช่า
+// -------------------------------------------------------
 const createBill = async (req, res, next) => {
   try {
     const { 
@@ -180,24 +221,26 @@ const createBill = async (req, res, next) => {
 
     const rent_amount = contract.monthly_rent;
     
-    // Fetch global grease trap fee if not provided
+    // คำนวณค่าดักไขมัน (ถ้าไม่กำหนดแบบเฉพาะ → ดึงจาก SystemSetting)
     let greaseTrapFee = custom_grease_trap_fee !== undefined ? parseFloat(custom_grease_trap_fee) : null;
     if (greaseTrapFee === null) {
       const greaseTrapSetting = await prisma.systemSetting.findUnique({ where: { setting_key: 'GREASE_TRAP_FEE' } });
       const baseGreaseTrapFee = parseFloat(greaseTrapSetting?.setting_value || '500');
       
+      // คิดค่าดักไขมันถ้าเป็นร้าน 'ของคาว' หรืออยู่ใน zone A1-A11, B1-B8
       const targetSlots = ['A1','A2','A3','A4','A5','A6','A7','A8','A9','A10','A11','B1','B2','B3','B4','B5','B6','B7','B8'];
       const isTargetSlot = contract.slot && targetSlots.includes(contract.slot.slot_number);
       
       greaseTrapFee = (contract.menuType === 'ของคาว' || isTargetSlot) ? baseGreaseTrapFee : 0;
     }
 
-    // Auto-calculate Due Date based on setting
+    // คำนวณ due_date = billing_month + BILL_DUE_DAYS (default 10 วัน)
     const dueDaysSetting = await prisma.systemSetting.findUnique({ where: { setting_key: 'BILL_DUE_DAYS' } });
     const dueDays = parseInt(dueDaysSetting?.setting_value || '10', 10);
     const calculatedDueDate = new Date(billing_month);
     calculatedDueDate.setDate(calculatedDueDate.getDate() + dueDays);
 
+    // ยอดรวม = ค่าเช่า + น้ำ + ไฟ + ดักไขมัน
     const total_amount = parseFloat(rent_amount) + parseFloat(water_cost) + parseFloat(electricity_cost) + greaseTrapFee;
 
     const expense = await prisma.monthlyExpense.create({
@@ -255,7 +298,12 @@ const createBill = async (req, res, next) => {
   }
 };
 
-// Update expense (Admin only)
+// -------------------------------------------------------
+// ฟังก์ชัน: updateBill
+// หน้าที่: แก้ไขบิล (Admin เท่านั้น)
+//   - partial update เฉพาะ field ที่ส่งมา
+//   - คำนวณ total_amount ใหม่อัตโนมัติถ้ามีการเปลี่ยนค่าน้ำ/ไฟ
+// -------------------------------------------------------
 const updateBill = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -276,6 +324,7 @@ const updateBill = async (req, res, next) => {
     if (due_date) updateData.due_date = new Date(due_date);
     if (status) updateData.status = status;
 
+    // คำนวณ total_amount ใหม่อัตโนมัติถ้ามีการเปลี่ยนค่าน้ำ/ไฟ
     if (water_cost !== undefined || electricity_cost !== undefined) {
       const newWater = water_cost !== undefined ? parseFloat(water_cost) : existing.water_cost;
       const newElec = electricity_cost !== undefined ? parseFloat(electricity_cost) : existing.electricity_cost;
@@ -294,7 +343,13 @@ const updateBill = async (req, res, next) => {
   }
 };
 
-// Upload payment slip (Tenant)
+// -------------------------------------------------------
+// ฟังก์ชัน: uploadPaymentProof
+// หน้าที่: Tenant อัปโหลดสลิปสำหรับบิล
+//   - ป้องกัน IDOR: TENANT อัปโหลดได้เฉพาะบิลของตัวเอง
+//   - สร้าง Payment record พร้อม URL ไฟล์จาก Cloudinary
+//   - ส่ง push notification แจ้ง Admin ว่ามีสลิปใหม่
+// -------------------------------------------------------
 const uploadPaymentProof = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -308,7 +363,7 @@ const uploadPaymentProof = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Expense not found.' });
     }
 
-    // IDOR prevention: Tenant can only upload slips for their own bills
+    // IDOR: TENANT อัปโหลดสลิปได้เฉพาะบิลของตัวเอง
     if (req.user.role === 'TENANT' && expense.contract.tenant_id !== req.user.user_id) {
       return res.status(403).json({ success: false, message: 'Access denied. You can only upload slips for your own bills.' });
     }
@@ -317,7 +372,7 @@ const uploadPaymentProof = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'No file uploaded.' });
     }
 
-    // Using Cloudinary, the full URL is in req.file.path
+    // โดยใช้ Cloudinary → req.file.path คือ URL เต็ม
     const payment_slip_url = req.file.path;
 
     const payment = await prisma.payment.create({
@@ -355,7 +410,13 @@ const uploadPaymentProof = async (req, res, next) => {
   }
 };
 
-// Verify payment (Admin only)
+// -------------------------------------------------------
+// ฟังก์ชัน: verifyPayment
+// หน้าที่: Admin ตรวจสอบสลิปและอนุมัติ/ปฏิเสธการชำระ
+//   - approved = true: อนุมัติ → เปลี่ยน expense status → PAID
+//   - approved = false: ปฏิเสธ → คืนเป็น PENDING เพื่อให้ Tenant ส่งสลิปใหม่
+//   - ส่ง push notification แจ้งผลให้ Tenant ทราบ
+// -------------------------------------------------------
 const verifyPayment = async (req, res, next) => {
   try {
     const { payment_id } = req.params;
@@ -375,14 +436,15 @@ const verifyPayment = async (req, res, next) => {
       }
     });
 
-    // If approved, update expense status to PAID; if rejected, reset to PENDING
+    // เปลี่ยนสถานะ expense ตามผลการตรวจสอบ
     if (approved) {
+      // อนุมัติ → บิลถือว่าชำระแล้ว
       await prisma.monthlyExpense.update({
         where: { expense_id: payment.expense_id },
         data: { status: 'PAID' }
       });
     } else {
-      // Reset bill back to PENDING so tenant can re-upload a new slip
+      // ปฏิเสธ → คืนเป็น PENDING เพื่อให้ Tenant ส่งสลิปใหม่
       await prisma.monthlyExpense.update({
         where: { expense_id: payment.expense_id },
         data: { status: 'PENDING' }
@@ -415,7 +477,12 @@ const verifyPayment = async (req, res, next) => {
   }
 };
 
-// Get payment history (Tenant)
+// -------------------------------------------------------
+// ฟังก์ชัน: getPaymentHistory
+// หน้าที่: ดึงประวัติการชำระของ Tenant ที่ล็อกอินอยู่
+//   - เห็นเฉพาะบิลที่ชำระแล้ว (PAID) เท่านั้น
+//   - เรียงตามเดือนล่าสุดก่อน
+// -------------------------------------------------------
 const getPaymentHistory = async (req, res, next) => {
   try {
     const contracts = await prisma.rentalContract.findMany({
@@ -441,7 +508,13 @@ const getPaymentHistory = async (req, res, next) => {
   }
 };
 
-// Get upcoming due expenses
+// -------------------------------------------------------
+// ฟังก์ชัน: getDueBills
+// หน้าที่: ดึงบิลที่กำลังจะครบกำหนดใน 7 วันข้างหน้า
+//   - TENANT: เห็นเฉพาะบิลของตัวเอง
+//   - ADMIN/EXECUTIVE: เห็นทั้งระบบ
+//   - คำนวณค่าปรับล่าช้าก่อนส่งกลับ
+// -------------------------------------------------------
 const getDueBills = async (req, res, next) => {
   try {
     const today = new Date();
@@ -478,7 +551,13 @@ const getDueBills = async (req, res, next) => {
   }
 };
 
-// Calculate expenses from meter readings
+// -------------------------------------------------------
+// ฟังก์ชัน: calculateAmount
+// หน้าที่: คำนวณยอดใช้จ่ายจากข้อมูลมิเตอร์ (ก่อนสร้างบิลจริง)
+//   - ดึงมิเตอร์น้ำ/ไฟที่จดในช่วงเดือนที่ระบุ + grace period 15 วัน
+//   - คำนวณค่าน้ำ/ไฟ/ดักไขมัน/ค่าเช่า
+//   - คืนให้ frontend แสดผลก่อนสร้างบิลจริง
+// -------------------------------------------------------
 const calculateAmount = async (req, res, next) => {
   try {
     const { slot_id, month } = req.body;
@@ -500,11 +579,11 @@ const calculateAmount = async (req, res, next) => {
     const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
     // End of the billing month
     const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
-    // Grace period: allow readings recorded up to 15 days after the month ends
+    // ช่วง grace period: อนุญาตให้จดมิเตอร์ย้อนหลัง 15 วันหลังจากสิ้นเดือน
     const gracePeriod = new Date(endOfMonth);
     gracePeriod.setDate(gracePeriod.getDate() + 15);
 
-    // Get the latest water meter recorded on or before the grace period
+    // ดึงมิเตอร์น้ำล่าสุดในช่วง [startOfMonth, gracePeriod]
     const waterMeter = await prisma.utilityMeter.findFirst({
       where: { 
         slot_id: parseInt(slot_id), 
@@ -514,7 +593,7 @@ const calculateAmount = async (req, res, next) => {
       orderBy: { created_at: 'desc' }
     });
 
-    // Get the latest electric meter recorded on or before the grace period
+    // ดึงมิเตอร์ไฟล่าสุดในช่วงเดียวกัน
     const electricMeter = await prisma.utilityMeter.findFirst({
       where: { 
         slot_id: parseInt(slot_id), 

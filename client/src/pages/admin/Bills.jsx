@@ -17,18 +17,28 @@ import {
 import { toast } from "react-toastify";
 import { billsAPI, stallsAPI } from "../../api";
 
+/**
+ * คอมโพเนนต์หน้าจัดการบิลค่าใช้จ่ายรายเดือนสำหรับผู้ดูแลระบบ (Admin Bills)
+ * - แสดงตารางบิลค่าใช้จ่ายทั้งหมดในระบบ (รอบเดือน, หมายเลขแผงค้า, ผู้เช่า, ยอดรวม, สถานะ)
+ * - ออกบิลใหม่รายแผงค้า พร้อมระบบคำนวณค่าน้ำ/ค่าไฟอัตโนมัติจากมิเตอร์ที่จดไว้
+ * - ตรวจสอบสลิปหลักฐานการโอนเงินที่ผู้เช่าแนบเข้ามา และกดยืนยันการชำระเงิน
+ * - ปรับเปลี่ยนสถานะบิลได้โดยตรง (รอชำระ, ชำระแล้ว, เกินกำหนด)
+ */
 const Bills = () => {
+  // สถานะรายการบิลทั้งหมด และสถานะการโหลด
   const [bills, setBills] = useState([]);
   const [loading, setLoading] = useState(true);
+  // คำค้นหา และตัวกรองสถานะ
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
 
-  // Create Modal
+  // สถานะสำหรับหน้าต่างป๊อปอัปออกบิลใหม่ (Create Modal)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [stalls, setStalls] = useState([]);
   const [calculating, setCalculating] = useState(false);
   const [creating, setCreating] = useState(false);
 
+  // ข้อมูลฟอร์มสำหรับออกบิล
   const [formData, setFormData] = useState({
     slot_id: "",
     billing_month: new Date().toISOString().slice(0, 7),
@@ -39,18 +49,23 @@ const Bills = () => {
     total_amount: 0,
   });
 
+  // ผลลัพธ์จากการดึงยอดคำนวณอัตโนมัติจากมิเตอร์
   const [calculationResult, setCalculationResult] = useState(null);
 
-  // Slip & Status State
+  // สถานะสำหรับหน้าต่างป๊อปอัปตรวจสอบสลิปการโอนเงิน (Payment Slip Modal)
   const [selectedBill, setSelectedBill] = useState(null);
   const [isSlipModalOpen, setIsSlipModalOpen] = useState(false);
   const [verifying, setVerifying] = useState(false);
 
+  // ดึงรายการบิลและแผงค้าเมื่อเปิดหน้าจอ
   useEffect(() => {
     fetchBills();
     fetchStalls();
   }, []);
 
+  /**
+   * ดึงรายการบิลทั้งหมดจาก API
+   */
   const fetchBills = async () => {
     try {
       const response = await billsAPI.getAll();
@@ -62,6 +77,9 @@ const Bills = () => {
     }
   };
 
+  /**
+   * ดึงข้อมูลแผงค้าและกรองเอาเฉพาะแผงค้าที่มีผู้เช่า (OCCUPIED) เพื่อนำไปแสดงในตัวเลือกออกบิล
+   */
   const fetchStalls = async () => {
     try {
       const response = await stallsAPI.getAll();
@@ -73,6 +91,9 @@ const Bills = () => {
     }
   };
 
+  /**
+   * คำนวณยอดค่าน้ำ ค่าไฟ และค่าเช่าอัตโนมัติจากข้อมูลมิเตอร์ที่จดไว้ในรอบเดือนนั้น
+   */
   const handleCalculate = async () => {
     if (!formData.slot_id || !formData.billing_month) {
       toast.error("กรุณาเลือกล็อคและเดือน");
@@ -89,6 +110,7 @@ const Bills = () => {
 
       const { amounts, units, rates } = response.data.data;
 
+      // นำยอดที่คำนวณได้มาใส่ในฟอร์มอัตโนมัติ
       setFormData((prev) => ({
         ...prev,
         water_cost: amounts.water,
@@ -111,6 +133,9 @@ const Bills = () => {
     }
   };
 
+  /**
+   * ส่งข้อมูลบันทึกสร้างบิลใหม่ไปยังเซิร์ฟเวอร์
+   */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setCreating(true);
@@ -129,6 +154,7 @@ const Bills = () => {
       toast.success("สร้างบิลสำเร็จ");
       setIsModalOpen(false);
       fetchBills();
+      // ล้างค่าฟอร์มกลับสู่ค่าเริ่มต้น
       setFormData({
         slot_id: "",
         billing_month: new Date().toISOString().slice(0, 7),
@@ -146,6 +172,11 @@ const Bills = () => {
     }
   };
 
+  /**
+   * ปรับเปลี่ยนสถานะของบิลโดยตรง (เช่น รอชำระ -> ชำระแล้ว)
+   * @param {number|string} billId - รหัสบิล
+   * @param {string} newStatus - สถานะใหม่
+   */
   const handleStatusUpdate = async (billId, newStatus) => {
     try {
       await billsAPI.update(billId, { status: newStatus });
@@ -156,6 +187,10 @@ const Bills = () => {
     }
   };
 
+  /**
+   * ยืนยันการตรวจสอบสลิปการโอนเงิน (ปรับสถานะการชำระเงินและการเงินของบิลเป็น PAID)
+   * @param {Object} bill - ออบเจกต์ข้อมูลบิล
+   */
   const handleVerifyPayment = async (bill) => {
     const paymentId = bill.payments?.[0]?.payment_id;
     if (!paymentId) {
@@ -176,6 +211,10 @@ const Bills = () => {
     }
   };
 
+  /**
+   * แสดงแท็กสถานะพร้อมไอคอน
+   * @param {string} status - PAID, PENDING, OVERDUE
+   */
   const getStatusBadge = (status) => {
     switch (status) {
       case "PAID":

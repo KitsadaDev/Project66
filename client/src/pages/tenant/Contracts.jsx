@@ -1,3 +1,14 @@
+// ======================================================
+// pages/tenant/Contracts.jsx - หน้ารายละเอียดสัญญาเช่าของผู้เช่า (Tenant Lease Agreement View)
+// รับผิดชอบ:
+//   - ดึงข้อมูลสัญญาเช่าปัจจุบันของผู้เช่า (สถานะ ACTIVE หรือ PENDING_TERMINATION)
+//   - ดึงอัตราค่าสาธารณูปโภค ค่าน้ำ/ค่าไฟ/ค่าปรับ จาก settingsAPI.getUtilityRates
+//   - คำนวณระยะเวลาสัญญาเช่า (จำนวนเดือน) จาก start_date และ end_date
+//   - แสดงข้อมูลสัญญา: ล็อคที่เช่า, วันที่เริ่ม-สิ้นสุด, ข้อมูลผู้เช่า, ใบเสร็จรับเงิน, อัตราค่าใช้จ่าย
+//   - ปุ่มนำทางไปหน้าขอยกเลิกสัญญา (/tenant/cancel-contract)
+//   - Modal ดูเอกสารสัญญาฉบับจริง (ภาพที่อัปโหลดไว้)
+// ======================================================
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -14,22 +25,31 @@ import {
 import { formatPhoneNumber } from "../../utils/formatters";
 import { contractsAPI, stallsAPI, settingsAPI } from "../../api";
 
+// รายชื่อล็อคที่ต้องจ่ายค่าดักไขมัน (แผงขายอาหารปรุงสด / ของคาว)
 const GREASE_TRAP_TARGET_SLOTS = ['A1','A2','A3','A4','A5','A6','A7','A8','A9','A10','A11','B1','B2','B3','B4','B5','B6','B7','B8'];
 
 const Contracts = () => {
   const navigate = useNavigate();
-  const [contract, setContract] = useState(null);
-  const [settings, setSettings] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [showImageModal, setShowImageModal] = useState(false);
+
+  // -------------------------------------------------------
+  // Component States
+  // -------------------------------------------------------
+  const [contract, setContract] = useState(null);           // ข้อมูลสัญญาเช่าของผู้เช่า
+  const [settings, setSettings] = useState(null);           // อัตราค่าน้ำ ค่าไฟ ค่าปรับ จากการตั้งค่าระบบ
+  const [loading, setLoading] = useState(true);             // สถานะกำลังโหลดข้อมูล
+  const [showImageModal, setShowImageModal] = useState(false); // สถานะเปิดดูรูปภาพสัญญาฉบับจริง
 
   useEffect(() => {
     fetchData();
   }, []);
 
+  // -------------------------------------------------------
+  // ฟังก์ชัน: fetchData
+  // หน้าที่: ดึงข้อมูลสัญญาเช่าของผู้เช่าและอัตราค่าบริการจากเซิร์ฟเวอร์
+  // -------------------------------------------------------
   const fetchData = async () => {
     try {
-      // Fetch all contracts and utility rates
+      // ดึงข้อมูลสัญญาเช่าและอัตราค่าบริการพร้อมกัน
       const [response, settingsRes] = await Promise.all([
         contractsAPI.getAll(),
         settingsAPI.getUtilityRates()
@@ -41,11 +61,11 @@ const Contracts = () => {
         setSettings(settingsData);
       }
       
-      // Find the first contract that is ACTIVE or PENDING_TERMINATION
+      // ค้นหาสัญญาที่มีผลใช้งานอยู่ (ACTIVE) หรืออยู่ในระหว่างขอยกเลิก (PENDING_TERMINATION)
       const myContract = contracts.find(c => c.status === "ACTIVE" || c.status === "PENDING_TERMINATION");
 
       if (myContract) {
-        // Calculate duration
+        // คำนวณระยะเวลาสัญญาเช่าเป็นจำนวนเดือน
         const start = new Date(myContract.start_date);
         const end = new Date(myContract.end_date);
         const diffMonths =
@@ -65,6 +85,7 @@ const Contracts = () => {
     }
   };
 
+  // จัดรูปแบบวันที่ให้อ่านง่ายเป็นภาษาไทย เช่น 1 มกราคม 2567
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
     const date = new Date(dateStr);
@@ -75,13 +96,14 @@ const Contracts = () => {
     });
   };
 
+  // ฟังก์ชันส่งคำขอยกเลิกสัญญา (กรณีเรียกตรงจากหน้านี้)
   const handleRequestTermination = async () => {
     if (window.confirm("คุณต้องการส่งคำขอยกเลิกสัญญาเช่าใช่หรือไม่?\nหากยืนยัน แอดมินจะทำการตรวจสอบและอนุมัติ")) {
       try {
         setLoading(true);
         await contractsAPI.requestTermination(contract.contract_id);
         toast.success("ส่งคำขอยกเลิกสัญญาเรียบร้อยแล้ว");
-        fetchData(); // Refresh to get updated status
+        fetchData(); // รีเฟรชข้อมูลเพื่ออัปเดตสถานะ
       } catch (error) {
         toast.error(error.response?.data?.message || "ไม่สามารถส่งคำขอได้");
       } finally {
@@ -100,6 +122,7 @@ const Contracts = () => {
 
   return (
     <div>
+      {/* ส่วนหัวหน้าจอ และป้ายสถานะสัญญา */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-800">
@@ -107,6 +130,8 @@ const Contracts = () => {
           </h1>
           <p className="text-gray-500 text-sm">รายละเอียดสัญญาเช่าล็อคของคุณ</p>
         </div>
+
+        {/* กรณีสัญญามีผลบังคับใช้งาน (ACTIVE) -> แสดงปุ่มขอยกเลิกสัญญา */}
         {contract && contract.status === 'ACTIVE' && (
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
@@ -120,6 +145,8 @@ const Contracts = () => {
             </button>
           </div>
         )}
+
+        {/* กรณีส่งคำขอยกเลิกสัญญาแล้ว รอ Admin อนุมัติ */}
         {contract && contract.status === 'PENDING_TERMINATION' && (
           <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-yellow-100 text-yellow-800 rounded-full text-sm font-bold shadow-sm">
             <Clock size={16} /> รอดำเนินการยกเลิก
@@ -129,7 +156,7 @@ const Contracts = () => {
 
       {contract ? (
         <div className="bg-white rounded-2xl shadow-lg border border-purple-100 overflow-hidden">
-          {/* Header */}
+          {/* Header การ์ดสัญญา: แสดงเลขที่สัญญาและปุ่มดูฉบับจริง */}
           <div className="bg-purple-50 p-6 md:p-8 flex items-center justify-between border-b border-purple-100">
             <div className="flex items-center gap-6">
               <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm text-purple-600">
@@ -142,6 +169,7 @@ const Contracts = () => {
                 <p className="text-gray-500 text-sm">เลขที่สัญญา</p>
               </div>
             </div>
+            {/* ปุ่มเปิดดูรูปถ่ายเอกสารสัญญาฉบับจริง */}
             {contract.contractImage && (
               <button
                 onClick={() => setShowImageModal(true)}
@@ -152,6 +180,7 @@ const Contracts = () => {
             )}
           </div>
 
+          {/* ปุ่มดูสัญญาฉบับจริงบนจอมือถือ */}
           {contract.contractImage && (
             <div className="sm:hidden mx-6 mt-6 p-4 bg-purple-50 rounded-2xl border border-purple-100 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -167,8 +196,9 @@ const Contracts = () => {
             </div>
           )}
 
-          {/* Key Info Grid */}
+          {/* กริดสรุปข้อมูลสำคัญ: ล็อคที่เช่า, วันเริ่ม, วันสิ้นสุด, ระยะเวลา */}
           <div className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {/* ล็อคที่เช่า */}
             <div className="flex gap-4 items-start">
               <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
                 <Home size={20} />
@@ -184,6 +214,7 @@ const Contracts = () => {
               </div>
             </div>
 
+            {/* วันเริ่มสัญญา */}
             <div className="flex gap-4 items-start">
               <div className="w-10 h-10 rounded-xl bg-green-50 text-green-500 flex items-center justify-center shrink-0">
                 <Calendar size={20} />
@@ -196,6 +227,7 @@ const Contracts = () => {
               </div>
             </div>
 
+            {/* วันสิ้นสุดสัญญา */}
             <div className="flex gap-4 items-start">
               <div className="w-10 h-10 rounded-xl bg-red-50 text-red-500 flex items-center justify-center shrink-0">
                 <Calendar size={20} />
@@ -208,6 +240,7 @@ const Contracts = () => {
               </div>
             </div>
 
+            {/* ระยะเวลาสัญญา */}
             <div className="flex gap-4 items-start">
               <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center shrink-0">
                 <Clock size={20} />
@@ -221,9 +254,9 @@ const Contracts = () => {
             </div>
           </div>
 
-          {/* Detailed Info Sections */}
+          {/* รายละเอียดเพิ่มเติม แบ่ง 2 คอลัมน์ */}
           <div className="px-6 pb-6 md:px-8 md:pb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left Col: Tenant Data & Receipt */}
+            {/* คอลัมน์ซ้าย: ข้อมูลผู้เช่า และหลักฐานการชำระเงินค่าประกัน */}
             <div className="space-y-6">
               <div className="bg-gray-50 rounded-xl p-6 border border-gray-100">
                 <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -266,6 +299,7 @@ const Contracts = () => {
                 </div>
               </div>
 
+              {/* ข้อมูลใบเสร็จรับเงินเงินประกันสัญญา */}
               <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
                 <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
                   <FileText size={18} className="text-blue-500" />{" "}
@@ -288,7 +322,7 @@ const Contracts = () => {
               </div>
             </div>
 
-            {/* Right Col: Financials */}
+            {/* คอลัมน์ขวา: รายละเอียดอัตราค่าใช้จ่ายและค่าปรับ */}
             <div className="bg-gray-50 rounded-xl p-6 border border-gray-100 h-fit">
               <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
                 <CreditCard size={18} className="text-green-500" />{" "}
@@ -347,13 +381,16 @@ const Contracts = () => {
           </div>
         </div>
       ) : (
+        // กรณีไม่พบข้อมูลสัญญาเช่า
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
           <FileText size={48} className="mx-auto text-gray-300 mb-4" />
           <p className="text-gray-400">ไม่พบข้อมูลสัญญาเช่า</p>
         </div>
       )}
 
-      {/* Image Modal */}
+      {/* ------------------------------------------------------- */}
+      {/* Modal ดูรูปภาพเอกสารสัญญาเช่าฉบับจริง (Contract Image Viewer) */}
+      {/* ------------------------------------------------------- */}
       {showImageModal && contract?.contractImage && (
         <div 
           className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
@@ -362,7 +399,7 @@ const Contracts = () => {
           <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center">
             <button
               onClick={() => setShowImageModal(false)}
-              className="absolute -top-12 right-0 p-2 text-white/70 hover:text-white transition-colors"
+              className="absolute -top-12 right-0 p-2 text-white/70 hover:text-white transition-colors cursor-pointer"
             >
               <X size={32} />
             </button>

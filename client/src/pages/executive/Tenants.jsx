@@ -3,25 +3,40 @@ import { Search, Phone, Mail, Building2, Utensils } from "lucide-react";
 import { formatPhoneNumber } from "../../utils/formatters";
 import { usersAPI, stallsAPI, contractsAPI } from "../../api";
 
+/**
+ * คอมโพเนนต์แสดงข้อมูลผู้เช่าทั้งหมดสำหรับผู้บริหาร (Executive Tenants - Read Only)
+ * - แสดงตารางรายชื่อผู้เช่า, อีเมล, เบอร์โทร, แผงค้าที่เช่า, ประเภทอาหาร, และศูนย์อาหาร
+ * - ทำการเชื่อมโยง (Match) ข้อมูลระหว่าง Users, Stalls และ Active Contracts
+ * - รองรับการค้นหาตามชื่อ, อีเมล, รหัสแผงค้า, หรือประเภทอาหาร
+ */
 const ExecutiveTenants = () => {
+  // รายการข้อมูลผู้เช่าที่เชื่อมโยงกับแผงค้าและสัญญาแล้ว
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
+  // ดึงข้อมูลเมื่อเปิดหน้าจอ
   useEffect(() => {
     fetchTenants();
   }, []);
 
+  /**
+   * ดึงข้อมูลผู้เช่าและข้อมูลที่เกี่ยวข้อง:
+   * 1. ดึงบัญชีผู้ใช้ที่มี Role เป็น TENANT
+   * 2. ดึงรายการแผงค้าทั้งหมด
+   * 3. ดึงสัญญาเช่าที่เปิดใช้งานอยู่ (ACTIVE) เพื่อนำประเภทอาหาร (menuType) มาแสดง
+   * 4. รวมข้อมูลผู้เช่า เข้ากับแผงค้าและสัญญาเช่า
+   */
   const fetchTenants = async () => {
     try {
-      // Fetch users (Essential)
+      // ดึงรายชื่อผู้เช่าทั้งหมด
       const usersRes = await usersAPI.getAll({ role: "TENANT" });
       const users = usersRes.data.data || [];
 
       let stalls = [];
       let contracts = [];
 
-      // Fetch Stalls (Optional but important)
+      // ดึงข้อมูลแผงค้า
       try {
         const stallsRes = await stallsAPI.getAll();
         stalls = stallsRes.data.data || [];
@@ -29,7 +44,7 @@ const ExecutiveTenants = () => {
         console.error("Error fetching stalls:", error);
       }
 
-      // Fetch Contracts (Optional, for Food Type)
+      // ดึงข้อมูลสัญญาเช่า (เพื่อนำประเภทอาหารมาแสดง)
       try {
         const contractsRes = await contractsAPI.getAll({ active: true });
         contracts = contractsRes.data.data || [];
@@ -37,7 +52,7 @@ const ExecutiveTenants = () => {
         console.error("Error fetching contracts:", error);
       }
 
-      // Match tenants with their stalls and contracts
+      // จับคู่ข้อมูลผู้เช่ากับแผงค้าและสัญญา
       const tenantsWithStalls = users.map((user) => {
         const contract = contracts.find((c) => c.tenant_id === user.user_id);
         const stall = user.stall || (contract ? stalls.find((s) => s.slot_id === contract.slot_id) : null);
@@ -52,6 +67,7 @@ const ExecutiveTenants = () => {
     }
   };
 
+  // คัดกรองรายชื่อผู้เช่าตามข้อความค้นหา (ชื่อ, อีเมล, หมายเลขแผง, หรือประเภทอาหาร)
   const filteredTenants = tenants.filter(
     (tenant) =>
       tenant.first_name?.toLowerCase().includes(search.toLowerCase()) ||

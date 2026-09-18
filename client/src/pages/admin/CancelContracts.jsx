@@ -10,12 +10,25 @@ import {
 } from "lucide-react";
 import { formatPhoneNumber } from "../../utils/formatters";
 
+/**
+ * คอมโพเนนต์หน้าจัดการคำร้องขอยกเลิกสัญญาเช่า (Admin Cancel Contracts)
+ * - แสดงและจัดการคำร้องขอยกเลิกสัญญาที่ผู้เช่าส่งเข้ามา (PENDING_TERMINATION)
+ * - อนุมัติยกเลิกสัญญา (ทำให้สัญญาเป็น TERMINATED และล็อกว่างลง)
+ * - ปฏิเสธคำขอยกเลิกสัญญา (คืนสถานะสัญญากลับเป็น ACTIVE)
+ * - บังคับยกเลิกสัญญา (Force Cancel) สำหรับสัญญาที่ยังเช่าอยู่โดยไม่ต้องรอคำขอ
+ * - ดูประวัติสัญญาเช่าที่ถูกยกเลิกไปแล้ว (HISTORY)
+ */
 const CancelContracts = () => {
+  // สถานะเก็บรายการสัญญาเช่าทั้งหมด และสถานะกำลังโหลด
   const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(true);
+  // แท็บที่เลือกดู: 'PENDING' (รออนุมัติ), 'ACTIVE' (กำลังเช่า), 'HISTORY' (ประวัติยกเลิก)
   const [activeTab, setActiveTab] = useState("PENDING"); // 'PENDING' or 'ACTIVE'
   const [search, setSearch] = useState("");
 
+  /**
+   * ดึงข้อมูลสัญญาเช่าทั้งหมดจาก API
+   */
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -29,10 +42,15 @@ const CancelContracts = () => {
     }
   };
 
+  // โหลดข้อมูลเมื่อเปิดหน้าจอ
   useEffect(() => {
     fetchData();
   }, []);
 
+  /**
+   * อนุมัติคำร้องขอยกเลิกสัญญาเช่า
+   * @param {string|number} id - รหัสสัญญาเช่า
+   */
   const handleApprove = async (id) => {
     if (window.confirm("ยืนยันการอนุมัติยกเลิกสัญญา? สัญญานี้จะถูกยกเลิกทันที")) {
       try {
@@ -45,6 +63,10 @@ const CancelContracts = () => {
     }
   };
 
+  /**
+   * ปฏิเสธคำร้องขอยกเลิกสัญญาเช่า
+   * @param {string|number} id - รหัสสัญญาเช่า
+   */
   const handleReject = async (id) => {
     if (window.confirm("ยืนยันการปฏิเสธคำขอยกเลิกสัญญา? สัญญาจะกลับไปเป็นสถานะปกติ")) {
       try {
@@ -57,6 +79,10 @@ const CancelContracts = () => {
     }
   };
 
+  /**
+   * บังคับยกเลิกสัญญาเช่า (สำหรับกรณีผู้เช่าทำผิดกฎ หรือแอดมินต้องการยกเลิกทันที)
+   * @param {string|number} id - รหัสสัญญาเช่า
+   */
   const handleForceCancel = async (id) => {
     if (window.confirm("คุณต้องการบังคับยกเลิกสัญญานี้ใช่หรือไม่?\nสัญญานี้จะถูกยกเลิกทันทีโดยไม่ต้องรอผู้เช่าส่งคำขอ")) {
       try {
@@ -69,7 +95,9 @@ const CancelContracts = () => {
     }
   };
 
-  // Filter contracts based on tab and search
+  /**
+   * กรองรายการสัญญาตามแท็บที่เลือก (PENDING, ACTIVE, HISTORY) และคำค้นหา
+   */
   const filteredContracts = contracts.filter((c) => {
     let statusMatch = false;
     if (activeTab === "PENDING") statusMatch = c.status === "PENDING_TERMINATION";
@@ -78,6 +106,7 @@ const CancelContracts = () => {
     
     if (!statusMatch) return false;
 
+    // กรองตามคำค้นหา (ชื่อผู้เช่า, เลขที่สัญญา, หมายเลขล็อก)
     if (search) {
       const searchLower = search.toLowerCase();
       const tenantName = `${c.tenant?.first_name || ""} ${c.tenant?.last_name || ""}`.toLowerCase();
@@ -90,12 +119,14 @@ const CancelContracts = () => {
 
   return (
     <div>
+      {/* หัวข้อหน้าจอ */}
       <div className="mb-6">
         <h1 className="text-xl md:text-2xl font-bold text-gray-800">คำร้องขอยกเลิกสัญญา</h1>
         <p className="text-gray-500 text-sm mt-1">จัดการคำขอยกเลิกสัญญาและบังคับยกเลิกสัญญา</p>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+        {/* แถบแท็บเลือกหมวดหมู่สัญญา */}
         <div className="flex border-b border-gray-100">
           <button
             onClick={() => setActiveTab("PENDING")}
@@ -134,6 +165,7 @@ const CancelContracts = () => {
           </button>
         </div>
 
+        {/* กล่องค้นหา */}
         <div className="p-4 border-b border-gray-100 bg-gray-50/50">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
@@ -147,6 +179,7 @@ const CancelContracts = () => {
           </div>
         </div>
 
+        {/* ตารางแสดงรายการสัญญา */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-gray-500 uppercase bg-gray-50/50 border-b border-gray-100">
@@ -176,6 +209,7 @@ const CancelContracts = () => {
               ) : (
                 filteredContracts.map((contract) => (
                   <tr key={contract.contract_id} className="hover:bg-gray-50/50 transition-colors">
+                    {/* ข้อมูลสัญญาและผู้เช่า */}
                     <td className="py-4 px-6">
                       <div className="flex flex-col">
                         <span className="font-semibold text-gray-800">{contract.contract_number}</span>
@@ -187,6 +221,7 @@ const CancelContracts = () => {
                         </span>
                       </div>
                     </td>
+                    {/* หมายเลขล็อกและศูนย์อาหาร */}
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-gray-800">
@@ -197,9 +232,11 @@ const CancelContracts = () => {
                         </span>
                       </div>
                     </td>
+                    {/* วันที่เริ่มสัญญา */}
                     <td className="py-4 px-6 text-gray-600">
                       {new Date(contract.start_date).toLocaleDateString("th-TH")}
                     </td>
+                    {/* ปุ่มจัดการตามแท็บ */}
                     <td className="py-4 px-6 text-right">
                       {activeTab === "PENDING" ? (
                         <div className="flex items-center justify-end gap-2">

@@ -8,7 +8,16 @@ import {
 import { stallsAPI, billsAPI, maintenanceAPI } from "../../api";
 import { exportMaintenanceReportPDF, exportBillsReportPDF } from "../../utils/pdfExport";
 
+/**
+ * คอมโพเนนต์หน้ารายงานสรุปภาพรวมระบบสำหรับผู้ดูแลระบบ (Admin Reports)
+ * 1. สรุปสถานะแผงค้า (Occupancy): จำนวนล็อกทั้งหมด, มีผู้เช่า, ว่าง, ซ่อมบำรุง, คิดเป็นร้อยละอัตราการเช่า
+ * 2. สรุปบิลและการชำระเงิน: บิลที่ชำระแล้ว, รอยืนยันสลิป, รอชำระ, ยังไม่ออกบิล และอัตราการจัดเก็บรายได้
+ * 3. สรุปงานแจ้งซ่อม: จำนวนงานรอดำเนินการ, งานที่เสร็จสิ้น, หมวดหมู่ปัญหาที่พบบ่อย, ล็อกที่แจ้งซ่อมบ่อย
+ * 4. รองรับการกรองตามช่วงเวลา: รายวัน, รายเดือน, รายปี หรือ ทั้งหมด
+ * 5. ส่งออกข้อมูลเป็นรายงานไฟล์ PDF ภาษาไทย (รายงานบิล และ รายงานแจ้งซ่อม)
+ */
 const Reports = () => {
+  // ข้อมูลสถิติประมวลผลสำหรับนำไปแสดงบนหน้าจอและการ์ดต่างๆ
   const [data, setData] = useState({
     totalStalls: 0, occupied: 0, vacant: 0, maintenance: 0, occupancyRate: 0,
     totalBills: 0, paidBills: 0, waitingBills: 0, pendingBills: 0,
@@ -19,20 +28,23 @@ const Reports = () => {
   });
   const [loading, setLoading] = useState(true);
 
-  // Filter States
+  // สถานะตัวกรองช่วงเวลา (ประเภทตัวกรอง, วันที่, เดือน, ปี)
   const [filterType, setFilterType] = useState("MONTH");
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
 
+  // ข้อมูลดิบที่ดึงมาจาก API (สำหรับใช้คำนวณซ้ำเมื่อเปลี่ยนฟิลเตอร์)
   const [rawStalls, setRawStalls] = useState([]);
   const [rawBills, setRawBills] = useState([]);
   const [rawRepairs, setRawRepairs] = useState([]);
 
+  // ดึงข้อมูลทั้งหมดจาก API ครั้งแรกเมื่อเข้าหน้าจอ
   useEffect(() => {
     fetchData();
   }, []);
 
+  // คำนวณสถิติใหม่ทุกครั้งที่มีการเปลี่ยนเงื่อนไขฟิลเตอร์ หรือเมื่อข้อมูลดิบโหลดเสร็จ
   useEffect(() => {
     if (!loading) {
       processData(rawStalls, rawBills, rawRepairs);
@@ -40,6 +52,9 @@ const Reports = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterType, selectedDate, selectedMonth, selectedYear, loading]);
 
+  /**
+   * เรียก API ทั้ง 3 แหล่งข้อมูลแบบขนานกัน (แผงค้า, บิล, แจ้งซ่อม)
+   */
   const fetchData = async () => {
     try {
       const [stallsRes, billsRes, repairsRes] = await Promise.all([
@@ -60,14 +75,20 @@ const Reports = () => {
     }
   };
 
+  /**
+   * ประมวลผลและคำนวณข้อมูลสถิติต่างๆ ตามช่วงเวลาที่ผู้ใช้เลือก
+   * @param {Array} stalls - รายการแผงค้าทั้งหมด
+   * @param {Array} allBills - รายการบิลทั้งหมด
+   * @param {Array} allRepairs - รายการแจ้งซ่อมทั้งหมด
+   */
   const processData = (stalls, allBills, allRepairs) => {
-    // 1. Occupancy
+    // 1. คำนวณอัตราการเช่าพื้นที่ (Occupancy)
     const occ = stalls.filter((s) => s.status === "OCCUPIED").length;
     const vac = stalls.filter((s) => s.status === "VACANT").length;
     const maint = stalls.filter((s) => s.status === "MAINTENANCE").length;
     const occupancyRate = stalls.length > 0 ? Math.round((occ / stalls.length) * 100) : 0;
 
-    // 2. Filter by date range
+    // 2. กรองบิลและงานซ่อมตามช่วงเวลาที่กำหนดในฟิลเตอร์
     let currentBills = allBills;
     let currentRepairs = allRepairs;
 
@@ -82,7 +103,7 @@ const Reports = () => {
       currentRepairs = allRepairs.filter((r) => (r.requested_at || "").startsWith(selectedYear));
     }
 
-    // 3. Bills breakdown
+    // 3. จำแนกสถานะบิลและการคำนวณอัตราการจัดเก็บเงิน
     const paidCount = currentBills.filter((b) => b.status === "PAID").length;
     const waitingCount = currentBills.filter((b) => b.status === "WAITING_VERIFICATION" || b.status === "WAITING").length;
     const pendingCount = currentBills.filter((b) => b.status === "PENDING" || b.status === "OVERDUE").length;
@@ -90,7 +111,7 @@ const Reports = () => {
     const unbilledCount = Math.max(0, targetBase - currentBills.length);
     const paidRate = targetBase > 0 ? Math.round((paidCount / targetBase) * 100) : 0;
 
-    // 4. Repairs breakdown
+    // 4. จำแนกสถานะงานซ่อม และจัดกลุ่มประเภทปัญหา/ล็อกที่พบบ่อย
     const pendingRepairs = currentRepairs.filter((r) => r.status === "PENDING").length;
     const completedRepairs = currentRepairs.filter((r) => r.status === "COMPLETED").length;
 
@@ -136,6 +157,9 @@ const Reports = () => {
     });
   };
 
+  /**
+   * ดึงข้อความแสดงรอบเวลาที่เลือกสำหรับใส่ในหัวรายงาน PDF
+   */
   const getFilterLabel = () => {
     if (filterType === "ALL") return "ทั้งหมด";
     if (filterType === "DAY") return selectedDate;
@@ -143,6 +167,9 @@ const Reports = () => {
     return selectedYear;
   };
 
+  /**
+   * ดำเนินการส่งออกรายงานบิลค่าเช่าเป็นไฟล์ PDF
+   */
   const handleExportBills = () => {
     exportBillsReportPDF(
       data.tableBills, getFilterLabel(),
@@ -151,6 +178,9 @@ const Reports = () => {
     );
   };
 
+  /**
+   * ดำเนินการส่งออกรายงานแจ้งซ่อมเป็นไฟล์ PDF
+   */
   const handleExportRepairs = () => {
     exportMaintenanceReportPDF(
       data.tableRepairs, getFilterLabel(),
@@ -158,7 +188,11 @@ const Reports = () => {
     );
   };
 
-  // CSS Conic Gradient helper (for live UI)
+  /**
+   * ฟังก์ชันสร้างสไตล์พื้นหลัง Conic Gradient จำลอง Donut Chart
+   * @param {Array} slices - ชิ้นส่วนของกราฟ แต่ละชิ้นมี color และ value
+   * @param {number} total - ผลรวมทั้งหมด
+   */
   const getConicGradient = (slices, total) => {
     if (!total || total === 0) return "conic-gradient(#E5E7EB 100%, transparent 0)";
     let cumulative = 0;

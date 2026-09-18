@@ -1,3 +1,14 @@
+// ======================================================
+// pages/tenant/Expenses.jsx - หน้าแสดงค่าใช้จ่ายประจำเดือนของผู้เช่า (Tenant Expenses View)
+// รับผิดชอบ:
+//   - ดึงข้อมูลสัญญาเช่าที่เปิดใช้งานอยู่ (ACTIVE) เพื่อทราบข้อมูลแผงร้านค้าที่เช่า
+//   - ดึงและกรองบิลค่าใช้จ่ายตามเดือนและปีที่ผู้เช่าเลือก (เดือนภาษาไทย, ปี พ.ศ.)
+//   - แสดงการ์ดสรุปค่าใช้จ่ายแต่ละประเภท: ค่าเช่าแผง, ค่าน้ำประปา, ค่าไฟฟ้า, ค่าดักไขมัน, ค่าปรับล่าช้า
+//   - แสดงยอดเงินรวมทั้งหมด และสถานะการชำระเงิน (ชำระแล้ว, รอตรวจสอบสลิป, ยังไม่ออกบิล)
+//   - Modal อัปโหลดสลิปหลักฐานการโอนเงิน (Slip Upload Modal) พร้อมรูปตัวอย่างก่อนส่ง
+//   - ปุ่มดาวน์โหลดเอกสารใบแจ้งหนี้ในรูปแบบไฟล์ PDF (generateBillPDF)
+// ======================================================
+
 import { useEffect, useState } from "react";
 import {
   Receipt,
@@ -17,38 +28,49 @@ import { toast } from "react-toastify";
 
 const Expenses = () => {
   const { user } = useAuthStore();
-  const [expenses, setExpenses] = useState(null);
-  const [stall, setStall] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
-  // Payment states
-  const [isSlipModalOpen, setIsSlipModalOpen] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
+  // -------------------------------------------------------
+  // Component States
+  // -------------------------------------------------------
+  const [expenses, setExpenses] = useState(null);         // ข้อมูลบิลประจำเดือนที่เลือก
+  const [stall, setStall] = useState(null);               // ข้อมูลแผงค้าของผู้เช่า (ดึงจากสัญญาที่ ACTIVE)
+  const [loading, setLoading] = useState(true);           // สถานะกำลังโหลดข้อมูล
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1); // เดือนที่เลือก (1-12)
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());    // ปี ค.ศ. ที่เลือก
 
+  // State สำหรับการอัปโหลดสลิปโอนเงิน
+  const [isSlipModalOpen, setIsSlipModalOpen] = useState(false); // สถานะเปิด/ปิด Modal อัปโหลดสลิป
+  const [uploading, setUploading] = useState(false);             // สถานะกำลังอัปโหลด
+  const [selectedFile, setSelectedFile] = useState(null);        // ไฟล์รูปภาพสลิปที่เลือก
+  const [previewUrl, setPreviewUrl] = useState(null);            // URL สำหรับ Preview รูปสลิป
+
+  // ดึงข้อมูลใหม่ทุกครั้งที่ผู้เช่าเปลี่ยนเดือนหรือปี
   useEffect(() => {
     fetchData();
   }, [selectedMonth, selectedYear]);
 
+  // -------------------------------------------------------
+  // ฟังก์ชัน: fetchData
+  // หน้าที่: 
+  //   1. ดึงสัญญาเช่า ACTIVE ของผู้เช่า เพื่อหา slot_id แผงที่เช่า
+  //   2. ดึงรายการบิลทั้งหมดของแผงค้านั้น
+  //   3. กรองหาบิลที่ตรงกับ selectedMonth และ selectedYear
+  // -------------------------------------------------------
   const fetchData = async () => {
     try {
-      // Fetch tenant's active contract to get their stall
+      // 1. ดึงสัญญาเช่าปัจจุบันของผู้เช่า
       const contractsRes = await contractsAPI.getAll({ status: 'ACTIVE' });
       const activeContract = contractsRes.data.data?.[0];
 
       if (activeContract?.slot) {
-        // Build a stall-like object from the contract's slot data
         const myStall = activeContract.slot;
         setStall(myStall);
 
-        // Use getAll with slot_id filter
+        // 2. ดึงบิลทั้งหมดของแผงนี้
         const billsRes = await billsAPI.getAll({ slot_id: myStall.slot_id });
         const bills = billsRes.data.data || [];
 
-        // Find bill for selected month/year
+        // 3. กรองหาบิลของเดือนและปีที่เลือก
         const monthBill = bills.find((b) => {
           const billDate = new Date(b.billing_month);
           return (
@@ -66,6 +88,10 @@ const Expenses = () => {
     }
   };
 
+  // -------------------------------------------------------
+  // ฟังก์ชัน: handleFileChange
+  // หน้าที่: รับไฟล์รูปภาพสลิปที่เลือก และสร้าง URL ชั่วคราวสำหรับ Preview
+  // -------------------------------------------------------
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -74,6 +100,10 @@ const Expenses = () => {
     }
   };
 
+  // -------------------------------------------------------
+  // ฟังก์ชัน: handleUploadSlip
+  // หน้าที่: ส่งไฟล์รูปภาพสลิปโอนเงินขึ้น Server ผ่าน FormData
+  // -------------------------------------------------------
   const handleUploadSlip = async (e) => {
     e.preventDefault();
     if (!selectedFile || !expenses) return;
@@ -85,12 +115,13 @@ const Expenses = () => {
     formData.append("payment_amount", expenses.total_amount);
 
     try {
+      // เรียก API บันทึกการชำระเงิน
       await billsAPI.uploadPayment(expenses.expense_id, formData);
       toast.success("อัปโหลดหลักฐานการชำระเงินเรียบร้อยแล้ว");
       setIsSlipModalOpen(false);
       setSelectedFile(null);
       setPreviewUrl(null);
-      fetchData(); // Refresh to show pending status
+      fetchData(); // ดึงข้อมูลใหม่เพื่อแสดงสถานะ 'รอตรวจสอบ'
     } catch (error) {
       toast.error(
         error.response?.data?.message || "ไม่สามารถอัปโหลดได้ กรุณาลองใหม่",
@@ -100,6 +131,7 @@ const Expenses = () => {
     }
   };
 
+  // รายชื่อเดือนภาษาไทย
   const thaiMonths = [
     "มกราคม",
     "กุมภาพันธ์",
@@ -125,6 +157,7 @@ const Expenses = () => {
 
   return (
     <div>
+      {/* ส่วนหัวหน้าจอ: ชื่อหน้า, ปุ่มดาวน์โหลด PDF, Dropdown เลือกเดือน/ปี */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-800">
@@ -133,6 +166,7 @@ const Expenses = () => {
           <p className="text-gray-500 text-sm">
             ตรวจสอบค่าน้ำ ค่าไฟ และค่าเช่า
           </p>
+          {/* ปุ่มดาวน์โหลดบิล PDF */}
           {expenses && (
             <button
               onClick={() => generateBillPDF(expenses)}
@@ -142,6 +176,7 @@ const Expenses = () => {
             </button>
           )}
         </div>
+        {/* ตัวเลือกเดือนและปี */}
         <div className="flex gap-2">
           <select
             className="px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-purple-400 bg-white"
@@ -166,7 +201,7 @@ const Expenses = () => {
         </div>
       </div>
 
-      {/* Stall Info */}
+      {/* การ์ดแสดงข้อมูลแผงร้านค้าปัจจุบันของผู้เช่า */}
       {stall && (
         <div className="bg-white rounded-2xl shadow-sm border border-purple-100 p-6 mb-8 flex items-center gap-4">
           <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600">
@@ -183,9 +218,9 @@ const Expenses = () => {
         </div>
       )}
 
-      {/* Expenses Cards */}
+      {/* กริดการ์ดจำแนกค่าใช้จ่าย 4 หมวดหลัก (+ ค่าปรับ) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Rent */}
+        {/* การ์ดที่ 1: ค่าเช่ารายเดือน */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 relative overflow-hidden group hover:shadow-md transition-all">
           <div className="absolute top-0 right-0 w-24 h-24 bg-purple-50 rounded-bl-[4rem] transition-transform group-hover:scale-110"></div>
           <div className="relative">
@@ -201,7 +236,7 @@ const Expenses = () => {
           </div>
         </div>
 
-        {/* Water */}
+        {/* การ์ดที่ 2: ค่าน้ำประปา */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 relative overflow-hidden group hover:shadow-md transition-all">
           <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-[4rem] transition-transform group-hover:scale-110"></div>
           <div className="relative">
@@ -224,7 +259,7 @@ const Expenses = () => {
           </div>
         </div>
 
-        {/* Electric */}
+        {/* การ์ดที่ 3: ค่าไฟฟ้า */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 relative overflow-hidden group hover:shadow-md transition-all">
           <div className="absolute top-0 right-0 w-24 h-24 bg-orange-50 rounded-bl-[4rem] transition-transform group-hover:scale-110"></div>
           <div className="relative">
@@ -247,6 +282,7 @@ const Expenses = () => {
           </div>
         </div>
 
+        {/* การ์ดที่ 4: ค่าถังดักไขมัน */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 relative overflow-hidden group hover:shadow-md transition-all">
           <div className="absolute top-0 right-0 w-24 h-24 bg-green-50 rounded-bl-[4rem] transition-transform group-hover:scale-110"></div>
           <div className="relative">
@@ -262,7 +298,7 @@ const Expenses = () => {
           </div>
         </div>
 
-        {/* Late Fee (Conditional) */}
+        {/* การ์ดพิเศษ: ค่าปรับล่าช้า (แสดงเฉพาะเมื่อมียอดค่าปรับ > 0) */}
         {expenses?.late_fee > 0 && (
           <div className="bg-white rounded-2xl shadow-sm border border-red-100 p-6 relative overflow-hidden group hover:shadow-md transition-all">
             <div className="absolute top-0 right-0 w-24 h-24 bg-red-50 rounded-bl-[4rem] transition-transform group-hover:scale-110"></div>
@@ -281,7 +317,7 @@ const Expenses = () => {
         )}
       </div>
 
-      {/* Total & Action */}
+      {/* แถบสรุปยอดรวมทั้งสิ้นและปุ่มแจ้งชำระเงิน */}
       <div className="mt-8 bg-linear-to-r from-purple-500 to-indigo-600 rounded-3xl shadow-xl p-8 text-white relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-full bg-[url('/pattern.png')] opacity-10"></div>
         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
@@ -303,9 +339,11 @@ const Expenses = () => {
             </p>
           </div>
 
+          {/* ป้ายแสดงสถานะการชำระ หรือ ปุ่มกดแจ้งชำระเงิน */}
           <div className="flex flex-col gap-3 min-w-[200px]">
             {expenses ? (
               expenses.status === "PAID" ? (
+                // กรณีชำระเงินเรียบร้อยแล้ว
                 <div className="bg-white/20 backdrop-blur-md px-6 py-4 rounded-2xl flex items-center gap-3 border border-white/30">
                   <CheckCircle size={24} className="text-green-300" />
                   <span className="font-bold text-lg">
@@ -313,14 +351,16 @@ const Expenses = () => {
                   </span>
                 </div>
               ) : expenses.payments?.length > 0 ? (
+                // กรณีส่งสลิปแล้ว กำลังรอ Admin ตรวจสอบ
                 <div className="bg-white/20 backdrop-blur-md px-6 py-4 rounded-2xl flex items-center gap-3 border border-white/30">
                   <Receipt size={24} className="text-yellow-300" />
                   <span className="font-bold text-lg">รอตรวจสอบ</span>
                 </div>
               ) : (
+                // กรณียังไม่ได้ชำระเงิน -> ปุ่มเปิด Modal อัปโหลดสลิป
                 <button
                   onClick={() => setIsSlipModalOpen(true)}
-                  className="bg-white text-purple-600 hover:bg-purple-50 px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg hover:scale-105 active:scale-95"
+                  className="bg-white text-purple-600 hover:bg-purple-50 px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer"
                 >
                   แจ้งชำระเงิน
                 </button>
@@ -334,23 +374,28 @@ const Expenses = () => {
         </div>
       </div>
 
-      {/* Slip Upload Modal */}
+      {/* ------------------------------------------------------- */}
+      {/* Modal อัปโหลดหลักฐานสลิปการโอนเงิน (Slip Upload Modal) */}
+      {/* ------------------------------------------------------- */}
       {isSlipModalOpen && expenses && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+            {/* ส่วนหัว Modal */}
             <div className="p-6 border-b border-gray-100 flex items-center justify-between">
               <h2 className="text-xl font-bold text-gray-800">
                 อัปโหลดหลักฐานการชำระเงิน
               </h2>
               <button
                 onClick={() => setIsSlipModalOpen(false)}
-                className="p-2 hover:bg-gray-100 rounded-full text-gray-400"
+                className="p-2 hover:bg-gray-100 rounded-full text-gray-400 cursor-pointer"
               >
                 <X size={24} />
               </button>
             </div>
 
+            {/* แบบฟอร์มอัปโหลดสลิป */}
             <form onSubmit={handleUploadSlip} className="p-6 space-y-6">
+              {/* ข้อมูลสรุปยอดที่ต้องโอน */}
               <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100">
                 <div className="flex justify-between text-sm mb-1">
                   <span className="text-gray-500">ยอดเงินที่ต้องชำระ:</span>
@@ -366,6 +411,7 @@ const Expenses = () => {
                 </div>
               </div>
 
+              {/* กล่องเลือกไฟล์รูปภาพสลิป หรือ แสดงรูป Preview */}
               <div className="space-y-4">
                 <label className="block text-sm font-semibold text-gray-700">
                   เลือกรูปภาพสลิป *
@@ -393,13 +439,14 @@ const Expenses = () => {
                       alt="Preview"
                       className="w-full h-auto max-h-64 object-contain"
                     />
+                    {/* ปุ่มลบรูปภาพที่เลือก เพื่อเลือกใหม่ */}
                     <button
                       type="button"
                       onClick={() => {
                         setSelectedFile(null);
                         setPreviewUrl(null);
                       }}
-                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                     >
                       <X size={16} />
                     </button>
@@ -407,10 +454,11 @@ const Expenses = () => {
                 )}
               </div>
 
+              {/* ปุ่มบันทึกส่งหลักฐาน */}
               <button
                 type="submit"
                 disabled={uploading || !selectedFile}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-2xl shadow-lg shadow-purple-200 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-2xl shadow-lg shadow-purple-200 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
               >
                 {uploading ? (
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>

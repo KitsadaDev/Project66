@@ -50,10 +50,17 @@ import ExecutiveTenants from "./pages/executive/Tenants";
 import ExecutiveBills from "./pages/executive/Bills";
 import ExecutiveRepairs from "./pages/executive/Repairs";
 
-// Protected Route Component
+/**
+ * คอมโพเนนต์ป้องกันการเข้าถึงหน้าเว็บ (Protected Route Guard)
+ * - ตรวจสอบว่าผู้ใช้ผ่านการเข้าสู่ระบบแล้วหรือไม่ (isAuthenticated)
+ * - ตรวจสอบว่าบทบาทของผู้ใช้ (user.role) มีสิทธิ์เข้าถึงหน้านี้หรือไม่ (allowedRoles)
+ * - หากยังไม่เข้าสู่ระบบ จะ Redirect ไปยังหน้า /login
+ * - หากสิทธิ์ไม่ถูกต้อง จะ Redirect ไปยังหน้า Dashboard ที่ตรงกับบทบาทของผู้ใช้
+ */
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { isAuthenticated, user, isLoading } = useAuthStore();
 
+  // แสดงหน้าโหลดขณะกำลังตรวจสอบสถานะการเข้าสู่ระบบ
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -62,10 +69,12 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     );
   }
 
+  // หากไม่มีการเข้าสู่ระบบ ให้นำทางไปยังหน้า Login
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
+  // หากบทบาทไม่ตรงกับหน้าที่อนุญาต ให้นำทางไปยังหน้า Dashboard ของบทบาทตนเอง
   if (allowedRoles && !allowedRoles.includes(user?.role)) {
     const dashboardRoutes = {
       ADMIN: "/admin",
@@ -79,18 +88,28 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   return children;
 };
 
+/**
+ * คอมโพเนนต์หลักของแอปพลิเคชัน (Root Application Component)
+ * - ตรวจสอบ Token ที่บันทึกไว้ใน LocalStorage เมื่อเริ่มต้นแอป
+ * - ดึงข้อมูลโปรไฟล์ผู้ใช้ล่าสุดเพื่อยืนยันความถูกต้องของ Token
+ * - กำหนดการกำหนดเส้นทาง (Routing) ของทั้ง 4 บทบาท: Tenant, Admin, Maintenance, Executive
+ * - ติดตั้ง ToastContainer สำหรับแสดงการแจ้งเตือน Pop-up ทั่วทั้งระบบ
+ */
 function App() {
   const { setAuth, setLoading, logout, token } = useAuthStore();
 
+  // ตรวจสอบความถูกต้องของ Token เมื่อแอปพลิเคชันเริ่มต้นทำงาน
   useEffect(() => {
     const initAuth = async () => {
       if (token) {
         try {
+          // ยืนยัน Token กับเซิร์ฟเวอร์
           const response = await authAPI.getProfile();
           setAuth(response.data.data, token);
         } catch (error) {
           console.error("Auth init error:", error);
-          logout(); // clear invalid/expired token ออกจาก store
+          // หาก Token หมดอายุหรือไม่ถูกต้อง ให้ล้างออกจาก Store
+          logout();
         }
       } else {
         setLoading(false);

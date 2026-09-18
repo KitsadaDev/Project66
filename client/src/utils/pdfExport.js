@@ -1,7 +1,18 @@
-// ─── PDF Export Utilities ───────────────────────────────────────────────────
+// ======================================================
+// utils/pdfExport.js - เครื่องมือส่งออกรายงาน PDF ภาษาไทย (PDF Export Utilities)
+// รับผิดชอบ:
+//   - สร้างหน้าต่างพิมพ์ (Print Window) พร้อมฟอนต์ 'Sarabun' ภาษาไทยเพื่อบันทึกเป็น PDF สวยงาม
+//   - คำนวณกราฟวงกลม Donut Chart ด้วย CSS conic-gradient
+//   - exportMaintenanceReportPDF: ส่งออกรายงานสรุปงานแจ้งซ่อมบำรุง
+//   - exportBillsReportPDF: ส่งออกรายงานสรุปบิลและการจัดเก็บค่าเช่า
+// ======================================================
 
 /**
- * Generates a conic-gradient CSS string for a donut chart
+ * ฟังก์ชัน: getConicStyle
+ * หน้าที่: สร้างคำสั่ง CSS background: conic-gradient(...) สำหรับแสดงผลกราฟ Donut Chart
+ * @param {Array<{color: string, value: number}>} slices - ชิ้นส่วนของกราฟพร้อมสีและค่าตัวเลข
+ * @param {number} total - ผลรวมทั้งหมด (100%)
+ * @returns {string} รูปแบบ CSS background
  */
 function getConicStyle(slices, total) {
   if (!total || total === 0) return 'background: #E5E7EB;';
@@ -16,7 +27,9 @@ function getConicStyle(slices, total) {
 }
 
 /**
- * Open an HTML string in a new window and trigger print dialog
+ * ฟังก์ชัน: openPrintWindow
+ * หน้าที่: เปิดหน้าต่างใหม่ เขียน HTML และสั่งเปิดหน้าต่าง Print Preview ของเบราว์เซอร์อัตโนมัติ
+ * @param {string} html - ข้อความ HTML รายงานที่จะพิมพ์
  */
 function openPrintWindow(html) {
   var w = window.open('', '_blank');
@@ -31,7 +44,9 @@ function openPrintWindow(html) {
   };
 }
 
-// ─── Common CSS ─────────────────────────────────────────────────────────────
+// -------------------------------------------------------
+// CSS พื้นฐานสำหรับหน้าพิมพ์รายงาน (ใช้ฟอนต์ Sarabun รองรับภาษาไทย 100%)
+// -------------------------------------------------------
 var BASE_CSS = [
   "@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;700&display=swap');",
   "body { font-family: 'Sarabun', Arial, sans-serif; padding: 24px; color: #1F2937; }",
@@ -47,8 +62,13 @@ var BASE_CSS = [
   '@media print { body { padding: 0; } }',
 ].join('\n');
 
-// ─── Maintenance Report ──────────────────────────────────────────────────────
-
+// -------------------------------------------------------
+// ฟังก์ชัน: exportMaintenanceReportPDF
+// หน้าที่: สร้างและพิมพ์รายงานสรุปงานแจ้งซ่อมบำรุง
+//   - แสดงกล่องสรุปจำนวนงาน (รอดำเนินการ, กำลังทำ, เสร็จสิ้น)
+//   - แสดงกราฟแท่งเปอร์เซ็นต์หมวดหมู่ที่ซ่อมบ่อย และล็อคที่แจ้งซ่อมบ่อย
+//   - แสดงตารางรายการแจ้งซ่อมอย่างละเอียด
+// -------------------------------------------------------
 export function exportMaintenanceReportPDF(repairs, titleExtra, categoryList, slotList, maxSlotCount) {
   titleExtra = titleExtra || '';
   categoryList = categoryList || [];
@@ -60,7 +80,7 @@ export function exportMaintenanceReportPDF(repairs, titleExtra, categoryList, sl
   var inProgressCount = repairs.filter(function(r) { return r.status === 'IN_PROGRESS'; }).length;
   var completedCount = repairs.filter(function(r) { return r.status === 'COMPLETED'; }).length;
 
-  // Build category bars
+  // สร้างกราฟแท่งหมวดหมู่ที่ซ่อมบ่อย
   var catBarsHtml = '';
   categoryList.forEach(function(item) {
     catBarsHtml += '<div style="margin-bottom:8px;">';
@@ -73,7 +93,7 @@ export function exportMaintenanceReportPDF(repairs, titleExtra, categoryList, sl
     catBarsHtml += '</div></div>';
   });
 
-  // Build slot bars
+  // สร้างกราฟแท่งล็อคที่แจ้งซ่อมบ่อยสุด
   var slotBarsHtml = '';
   slotList.forEach(function(item, index) {
     var pct = maxSlotCount > 0 ? Math.round((item.count / maxSlotCount) * 100) : 0;
@@ -88,7 +108,7 @@ export function exportMaintenanceReportPDF(repairs, titleExtra, categoryList, sl
     slotBarsHtml += '</div></div>';
   });
 
-  // Build charts section
+  // รวมส่วนของแผนภูมิสรุป
   var chartsSection = '';
   if (categoryList.length > 0 || slotList.length > 0) {
     chartsSection = '<div style="display:flex;gap:20px;margin-bottom:20px;">';
@@ -105,7 +125,7 @@ export function exportMaintenanceReportPDF(repairs, titleExtra, categoryList, sl
     chartsSection += '</div>';
   }
 
-  // Build rows
+  // สร้างแถวข้อมูลในตาราง
   var rowsHtml = '';
   if (repairs.length === 0) {
     rowsHtml = '<tr><td colspan="5" style="text-align:center;color:#9CA3AF;">ไม่มีข้อมูลการแจ้งซ่อม</td></tr>';
@@ -165,8 +185,13 @@ export function exportMaintenanceReportPDF(repairs, titleExtra, categoryList, sl
   openPrintWindow(html);
 }
 
-// ─── Bills Report ────────────────────────────────────────────────────────────
-
+// -------------------------------------------------------
+// ฟังก์ชัน: exportBillsReportPDF
+// หน้าที่: สร้างและพิมพ์รายงานสรุปบิลและการจัดเก็บค่าเช่า
+//   - แสดงกราฟ Donut อัตราการจัดเก็บค่าเช่าสำเร็จ (%)
+//   - แสดงกล่องสรุปยอดเงินค้างชำระทั้งหมด
+//   - แสดงตารางรายการบิลค้างชำระและเกินกำหนด
+// -------------------------------------------------------
 export function exportBillsReportPDF(bills, titleExtra, paidBills, waitingBills, pendingBills, unbilledBills, targetBase, paidRate) {
   titleExtra = titleExtra || '';
   paidBills = paidBills || 0;
@@ -178,11 +203,12 @@ export function exportBillsReportPDF(bills, titleExtra, paidBills, waitingBills,
 
   var today = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
 
+  // กรองเฉพาะบิลที่รอชำระ หรือเกินกำหนด
   var tableBills = bills.filter(function(b) { return b.status === 'PENDING' || b.status === 'OVERDUE'; });
   var overdueCount = tableBills.filter(function(b) { return b.status === 'OVERDUE'; }).length;
   var totalAmount = tableBills.reduce(function(sum, b) { return sum + Number(b.total_amount || 0); }, 0);
 
-  // Donut using CSS conic-gradient
+  // กำหนดข้อมูลกราฟ Donut Chart
   var slices = [
     { color: '#10B981', value: paidBills },
     { color: '#F59E0B', value: waitingBills },
@@ -191,7 +217,7 @@ export function exportBillsReportPDF(bills, titleExtra, paidBills, waitingBills,
   ];
   var conicStyle = getConicStyle(slices, targetBase);
 
-  // Build rows
+  // สร้างแถวข้อมูลตาราง
   var rowsHtml = '';
   if (tableBills.length === 0) {
     rowsHtml = '<tr><td colspan="5" style="text-align:center;color:#9CA3AF;">ไม่มีบิลค้างชำระ</td></tr>';
@@ -237,9 +263,9 @@ export function exportBillsReportPDF(bills, titleExtra, paidBills, waitingBills,
   html += '<div class="header"><h1>รายงานบิลค่าเช่า</h1>';
   html += '<p>ระบบจัดการศูนย์อาหาร Food Court System ' + titleExtraText + '</p></div>';
 
-  // Top Section: donut + summary
+  // ส่วนบน: กราฟ Donut + กล่องสรุป
   html += '<div style="display:flex;gap:24px;align-items:flex-start;margin-bottom:20px;">';
-  // Left: donut
+  // ซ้าย: กราฟ Donut
   html += '<div style="flex:0 0 180px;text-align:center;">';
   html += '<div class="donut-wrap">';
   html += '<div class="donut-hole"><div style="font-size:18px;font-weight:bold;color:#1F2937;">' + paidRate + '%</div><div style="font-size:10px;color:#6B7280;">อัตราจัดเก็บ</div></div>';
@@ -249,7 +275,7 @@ export function exportBillsReportPDF(bills, titleExtra, paidBills, waitingBills,
   html += '<div class="legend-row"><div class="legend-dot" style="background:#EF4444;"></div><div class="legend-label">รอชำระ/เกินกำหนด</div><div class="legend-val">' + pendingBills + '</div></div>';
   html += '<div class="legend-row"><div class="legend-dot" style="background:#9CA3AF;"></div><div class="legend-label">ยังไม่ออกบิล</div><div class="legend-val">' + unbilledBills + '</div></div>';
   html += '</div>';
-  // Right: summary
+  // ขวา: กล่องสรุปยอดเงิน
   html += '<div style="flex:1;">';
   html += '<h3 style="font-size:14px;margin:0 0 10px;color:#374151;">สรุปยอดค้างชำระทั้งหมด</h3>';
   html += '<div class="summary-box">';

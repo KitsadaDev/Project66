@@ -1,19 +1,32 @@
+// ======================================================
+// userController.js - Controller จัดการผู้ใช้งาน (Users)
+// รับผิดชอบ: CRUD ผู้ใช้งาน, reset password (Admin เท่านั้น)
+// ======================================================
+
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 
 const prisma = new PrismaClient();
 
-// Get all users (Admin only)
+// -------------------------------------------------------
+// ฟังก์ชัน: getAllUsers
+// หน้าที่: ดึงผู้ใช้งานทั้งหมด (Admin เท่านั้น)
+//   - รองรับ filter: ?role=TENANT
+//   - รองรับค้นหา: ?search=ชื่อ/อีเมล/username (ไม่คำนึงถึงตัวพิมพ์)
+//   - map ข้อมูลสัญญาเช่า → แผงที่เช่าอยู่ปัจจุบัน (stall)
+// -------------------------------------------------------
 const getAllUsers = async (req, res, next) => {
   try {
     const { role, search } = req.query;
 
     const where = {};
 
+    // filter ตาม role
     if (role) {
       where.role = role;
     }
 
+    // ค้นหาไม่คำนึงตัวพิมพ์ใน first_name, last_name, email หรือ username
     if (search) {
       where.OR = [
         { first_name: { contains: search, mode: 'insensitive' } },
@@ -58,8 +71,10 @@ const getAllUsers = async (req, res, next) => {
       orderBy: { first_name: 'asc' }
     });
 
+    // map ข้อมูล: แปลง rental_contracts → stall (แผงที่เช่าปัจจุบัน)
     const formattedUsers = users.map(user => {
       const { rental_contracts, ...rest } = user;
+      // เอาเฉพาะสัญญา ACTIVE แรก → slot ที่เช่าอยู่
       const stall = rental_contracts?.length > 0 ? rental_contracts[0].slot : null;
       return { ...rest, stall };
     });
@@ -70,7 +85,13 @@ const getAllUsers = async (req, res, next) => {
   }
 };
 
-// Create user (Admin only)
+// -------------------------------------------------------
+// ฟังก์ชัน: createUser
+// หน้าที่: Admin สร้างผู้ใช้งานใหม่ (ต่างจาก register ตรงที่ Admin กำหนด role ได้)
+//   - ตรวจสอบชื่อ username และ email ซ้ำ
+//   - Hash รหัสผ่านก่อนบันทึก
+//   - บังคับให้เปลี่ยนรหัสผ่านครั้งแรก (must_change_password = true)
+// -------------------------------------------------------
 const createUser = async (req, res, next) => {
   try {
     const {
@@ -94,12 +115,12 @@ const createUser = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน' });
     }
 
-    // Check if user exists
+    // ตรวจสอบ username หรือ email ซ้ำในระบบ
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
           { username },
-          { email: email || undefined }
+          { email: email || undefined } // undefined ทำให้ Prisma ไม่ filter email ถ้าไม่ส่งมา
         ]
       }
     });
@@ -158,7 +179,11 @@ const createUser = async (req, res, next) => {
   }
 };
 
-// Get user by ID
+// -------------------------------------------------------
+// ฟังก์ชัน: getUserById
+// หน้าที่: ดึงข้อมูลผู้ใช้งานตาม ID
+//   - ดึงสัญญา ACTIVE ที่เชื่อมกับผู้ใช้งานมาด้วย
+// -------------------------------------------------------
 const getUserById = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -210,7 +235,12 @@ const getUserById = async (req, res, next) => {
   }
 };
 
-// Update user (Admin only)
+// -------------------------------------------------------
+// ฟังก์ชัน: updateUser
+// หน้าที่: Admin แก้ไขข้อมูลผู้ใช้งาน
+//   - ตรวจสอบ role ว่าอยู่ในลิสต์ที่อนุญาต
+//   - partial update โดยใช้ spread operator (...condition && {key: value})
+// -------------------------------------------------------
 const updateUser = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -222,7 +252,7 @@ const updateUser = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'User not found.' });
     }
 
-    // Validate role if provided — only allow known roles
+    // ตรวจสอบว่า role ที่ส่งมาอยู่ในรายการที่อนุญาต
     const ALLOWED_ROLES = ['TENANT', 'ADMIN', 'EXECUTIVE', 'MAINTENANCE'];
     if (role && !ALLOWED_ROLES.includes(role)) {
       return res.status(400).json({ success: false, message: 'Invalid role specified.' });
@@ -269,7 +299,11 @@ const updateUser = async (req, res, next) => {
   }
 };
 
-// Delete user (Admin only)
+// -------------------------------------------------------
+// ฟังก์ชัน: deleteUser
+// หน้าที่: Admin ลบผู้ใช้งาน
+//   - ป้องกันไม่ให้ลบ ADMIN accounts (เพื่อป้องกัน Admin ลบตัวเอง)
+// -------------------------------------------------------
 const deleteUser = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -279,6 +313,7 @@ const deleteUser = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'User not found.' });
     }
 
+    // ป้องกันไม่ให้ Admin ลบ account Admin ด้วยกัน
     if (existingUser.role === 'ADMIN') {
       return res.status(400).json({ success: false, message: 'Cannot delete admin users.' });
     }
@@ -290,7 +325,12 @@ const deleteUser = async (req, res, next) => {
   }
 };
 
-// Reset user password (Admin only)
+// -------------------------------------------------------
+// ฟังก์ชัน: resetPassword
+// หน้าที่: Admin รีเซ็ตรหัสผ่านได้ (Admin เท่านั้น)
+//   - Hash รหัสผ่านใหม่ปัอนเอา
+//   - บังคับให้ user เปลี่ยนรหัสผ่านเมื่อ login ครั้งถัดไป
+// -------------------------------------------------------
 const resetPassword = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -305,14 +345,16 @@ const resetPassword = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Password must be at least 8 characters long.' });
     }
 
+    // Hash รหัสผ่านใหม่ก่อนบันทึก
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(newPassword, salt);
 
+    // อัปเดต hash ใหม่ + บังคับเปลี่ยนรหัสผ่านเมื่อ login ครั้งถัดไป
     await prisma.user.update({
       where: { user_id: parseInt(id) },
       data: {
         password_hash,
-        must_change_password: true
+        must_change_password: true // บังคับเปลี่ยนรหัสผ่านเมื่อ login ครั้งถัดไป
       }
     });
 

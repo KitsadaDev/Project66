@@ -6,18 +6,41 @@ import { Eye, EyeOff, Lock, User } from "lucide-react";
 import { authAPI } from "../../api";
 import { useAuthStore } from "../../store";
 
+/**
+ * คอมโพเนนต์หน้าเข้าสู่ระบบ (Login)
+ * - รองรับการตรวจสอบสิทธิ์การเข้าใช้งานผ่าน Username และ Password
+ * - ใช้ React Hook Form ในการตรวจสอบความถูกต้องของข้อมูล (Form Validation)
+ * - เรียกใช้ `authAPI.login` และบันทึก Token และข้อมูลผู้ใช้ลงใน `useAuthStore`
+ * - นำทางผู้ใช้ไปยังหน้า Dashboard ตามบทบาท (Role-based redirection):
+ *   - ADMIN -> /admin
+ *   - TENANT -> /tenant
+ *   - MAINTENANCE -> /maintenance
+ *   - EXECUTIVE -> /executive
+ * - ออกแบบด้วย Glassmorphism และ Gradient สีม่วง-คราม พร้อมเอฟเฟกต์แสงรอบทิศทาง
+ */
 const Login = () => {
+  // ควบคุมการแสดงผล/ซ่อนรหัสผ่านในช่อง Input
   const [showPassword, setShowPassword] = useState(false);
+  // สถานะขณะกำลังส่งคำขอเข้าสู่ระบบไปยังเซิร์ฟเวอร์
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  // เมธอดสำหรับบันทึกข้อมูลผู้ใช้และ Token ลงใน Zustand Auth Store
   const { setAuth } = useAuthStore();
 
+  // กำหนดค่า React Hook Form สำหรับจัดการฟอร์มและข้อผิดพลาด
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm();
 
+  /**
+   * ฟังก์ชันประมวลผลการเข้าสู่ระบบ:
+   * 1. ส่งข้อมูล username และ password ไปยัง API
+   * 2. หากสำเร็จ บันทึก auth state และนำทางไปยัง Dashboard ของบทบาทนั้นๆ
+   * 3. หากล้มเหลว แสดงข้อความแจ้งเตือนข้อผิดพลาดผ่าน Toast
+   * @param {Object} data - ข้อมูลฟอร์ม ({ login, password })
+   */
   const onSubmit = async (data) => {
     setLoading(true);
     try {
@@ -26,6 +49,7 @@ const Login = () => {
       setAuth(user, token);
       toast.success("เข้าสู่ระบบสำเร็จ");
 
+      // แผนที่เส้นทางหน้าหลักตามสิทธิ์การใช้งาน
       const dashboardRoutes = {
         ADMIN: "/admin",
         TENANT: "/tenant",

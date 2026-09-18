@@ -29,34 +29,47 @@ import {
   shopTypesAPI,
 } from "../../api";
 
+/**
+ * คอมโพเนนต์หน้าสร้างสัญญาเช่าแผงค้าใหม่ (Admin Create Contract)
+ * - เลือกศูนย์อาหาร และเลือกแผงค้าที่สถานะว่าง (VACANT)
+ * - คำนวณเงินประกันสัญญาอัตโนมัติ (ค่าเช่า x 3 เดือน)
+ * - เลือกผู้เช่า (TENANT) ดึงข้อมูลบัตร ปชช., เบอร์โทร, ที่อยู่เดิมมาให้อัตโนมัติ
+ * - ระบบเลือกที่อยู่แบบ Cascading Dropdowns ตามฐานข้อมูลประเทศไทย (จังหวัด -> อำเภอ -> ตำบล -> รหัสไปรษณีย์)
+ * - กำหนดระยะเวลาสัญญา (สูงสุดไม่เกิน 3 ปี ตามกฎหมาย)
+ * - แนบไฟล์สัญญาเช่าฉบับจริง (รองรับไฟล์ PDF และรูปภาพ)
+ * - ส่งข้อมูลสร้างสัญญาในรูปแบบ Multipart FormData
+ */
 const CreateContract = () => {
   const navigate = useNavigate();
 
-  // Loading states
+  // สถานะการโหลดข้อมูล (โหลดครั้งแรก, โหลดแผงค้าว่าง, และกำลังส่งข้อมูล)
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingStalls, setLoadingStalls] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Master Data
+  // ข้อมูลหลัก: ศูนย์อาหาร และแผงค้าว่าง
   const [foodCourts, setFoodCourts] = useState([]);
   const [selectedFoodCourtId, setSelectedFoodCourtId] = useState("");
   const [vacantStalls, setVacantStalls] = useState([]);
   const [selectedStall, setSelectedStall] = useState(null);
 
+  // ข้อมูลผู้เช่า และสัญญาเช่าทั้งหมดในระบบ
   const [tenants, setTenants] = useState([]);
   const [allContracts, setAllContracts] = useState([]);
   const [activeContracts, setActiveContracts] = useState([]);
   const [selectedTenant, setSelectedTenant] = useState(null);
   const [tenantSearch, setTenantSearch] = useState("");
 
+  // ประเภทอาหาร (Shop Types)
   const [shopTypes, setShopTypes] = useState([]);
 
-  // Address Data (Thailand)
+  // ข้อมูลที่อยู่ประเทศไทยแบบ Cascading Dropdown
   const [addressData, setAddressData] = useState([]);
   const [provinces, setProvinces] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [subdistricts, setSubdistricts] = useState([]);
 
+  // ฟอร์มข้อมูลที่อยู่
   const [addressForm, setAddressForm] = useState({
     houseNoMoo: "",
     province: "",
@@ -65,12 +78,13 @@ const CreateContract = () => {
     zipCode: "",
   });
 
-  // Contract Form State
+  // วันที่ปัจจุบัน และวันสิ้นสุดค่าเริ่มต้น (1 ปีถัดไป)
   const todayStr = new Date().toISOString().split("T")[0];
   const nextYearDate = new Date();
   nextYearDate.setFullYear(nextYearDate.getFullYear() + 1);
   const nextYearStr = nextYearDate.toISOString().split("T")[0];
 
+  // ฟอร์มข้อมูลสัญญาเช่า
   const [formData, setFormData] = useState({
     contract_number: "",
     startDate: todayStr,
@@ -85,12 +99,14 @@ const CreateContract = () => {
     lateUtilityFine: "",
   });
 
-  // File Upload State
+  // ไฟล์เอกสารสัญญาแนบ
   const [contractFile, setContractFile] = useState(null);
   const [contractFilePreview, setContractFilePreview] = useState(null);
   const [isPdf, setIsPdf] = useState(false);
 
-  // 1. Initial Load: Food courts, tenants, active contracts, shop types, address data
+  /**
+   * 1. โหลดข้อมูลเริ่มต้น: ศูนย์อาหาร, รายชื่อผู้เช่า, สัญญาเช่าทั้งหมด, ประเภทอาหาร และข้อมูลที่อยู่ประเทศไทย
+   */
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
@@ -114,7 +130,7 @@ const CreateContract = () => {
         setAllContracts(contractsList);
         setActiveContracts(contractsList.filter((c) => c.status === "ACTIVE"));
 
-        // Fetch Shop types from API (เหมือนเวอร์ชันแอป)
+        // โหลดหมวดหมู่อาหารจาก shopTypesAPI
         try {
           const typesRes = await shopTypesAPI.getAll();
           setShopTypes(typesRes.data?.data || typesRes.data || []);
@@ -122,7 +138,7 @@ const CreateContract = () => {
           console.error("Failed to load shop types:", e);
         }
 
-        // Fetch Thailand Address JSON
+        // โหลดข้อมูลจังหวัด/อำเภอ/ตำบลประเทศไทยจากไฟล์ JSON
         try {
           const addressRes = await fetch("/thailand-address.json");
           const addrData = await addressRes.json();
@@ -145,7 +161,9 @@ const CreateContract = () => {
     fetchInitialData();
   }, []);
 
-  // 2. Load Vacant Stalls whenever selectedFoodCourtId changes
+  /**
+   * 2. โหลดรายการแผงค้าที่สถานะว่าง (VACANT) เมื่อมีการเปลี่ยนศูนย์อาหารที่เลือก
+   */
   useEffect(() => {
     if (!selectedFoodCourtId) {
       setVacantStalls([]);
@@ -162,7 +180,6 @@ const CreateContract = () => {
         });
         const stalls = res.data?.data || res.data || [];
         setVacantStalls(stalls);
-        // Reset selected stall if not in new list
         setSelectedStall(null);
       } catch (err) {
         console.error("Error loading vacant stalls:", err);
@@ -175,7 +192,10 @@ const CreateContract = () => {
     fetchVacantStalls();
   }, [selectedFoodCourtId]);
 
-  // Handle Stall selection: auto calculate deposit (rent * 3)
+  /**
+   * จัดการเมื่อผู้ใช้เลือกแผงค้า: คำนวณเงินประกันสัญญาอัตโนมัติ (ค่าเช่า x 3 เดือน)
+   * @param {string|number} stallId - รหัสแผงค้า
+   */
   const handleStallChange = (stallId) => {
     if (!stallId) {
       setSelectedStall(null);
@@ -195,7 +215,7 @@ const CreateContract = () => {
     }
   };
 
-  // Auto calculate deposit_amount = rent * 3 whenever selectedStall changes
+  // คำนวณยอดเงินประกันสัญญาใหม่ทุกครั้งที่แผงค้าที่เลือกเปลี่ยนแปลง
   useEffect(() => {
     if (selectedStall?.rent) {
       const calculated = parseFloat(selectedStall.rent) * 3;

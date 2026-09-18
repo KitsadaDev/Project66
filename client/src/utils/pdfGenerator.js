@@ -1,41 +1,45 @@
+// ======================================================
+// utils/pdfGenerator.js - ตัวสร้างไฟล์ PDF ใบแจ้งหนี้/ใบเสร็จรับเงิน (Invoice PDF Generator)
+// รับผิดชอบ: สร้างไฟล์ PDF ใบแจ้งหนี้ค่าใช้จ่ายรายเดือนของผู้เช่าด้วย jsPDF และ jsPDF-AutoTable
+// ======================================================
+
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
-// NOTE: To support Thai language, we need a Thai font in Base64 format.
-// Since providing a large Base64 string here is impractical, 
-// we will use a standard font for now. Thai characters may appear as garbled text.
-// To fix this, you need to convert a .ttf file (e.g., THSarabunNew) to Base64 
-// and add it using doc.addFileToVFS and doc.addFont.
-
+/**
+ * ฟังก์ชัน: generateBillPDF
+ * หน้าที่: สร้างและดาวน์โหลดไฟล์เอกสาร PDF ใบแจ้งหนี้ของบิลรายเดือน
+ * @param {object} bill - ข้อมูลบิลรายเดือน (ค่าเช่า, ค่าน้ำ, ค่าไฟ, ค่าดักไขมัน, ค่าปรับ, ข้อมูลผู้เช่า, ข้อมูลแผง)
+ */
 export const generateBillPDF = (bill) => {
   const doc = new jsPDF();
 
-  // Branding Colors
-  const primaryColor = [147, 51, 234]; // Purple (9333EA)
-  const secondaryColor = [107, 114, 128]; // Gray (6B7280)
-  const successColor = [34, 197, 94]; // Green (22C55E)
-  const warningColor = [245, 158, 11]; // Orange (F59E0B)
-  const errorColor = [239, 68, 68]; // Red (EF4444)
+  // กำหนดชุดสีหลักสำหรับแบรนด์และสถานะ (RGB)
+  const primaryColor = [147, 51, 234]; // สีม่วงหลัก (9333EA)
+  const secondaryColor = [107, 114, 128]; // สีเทาข้อความรอง (6B7280)
+  const successColor = [34, 197, 94]; // สีเขียวสำหรับสถานะชำระแล้ว (22C55E)
+  const warningColor = [245, 158, 11]; // สีส้มสำหรับสถานะรอชำระ (F59E0B)
+  const errorColor = [239, 68, 68]; // สีแดงสำหรับสถานะค้างชำระ (EF4444)
 
   doc.setFont("helvetica");
 
-  // Header Background
+  // 1. วาดแถบพื้นหลังส่วนหัว (Header Bar)
   doc.setFillColor(...primaryColor);
   doc.rect(0, 0, 210, 40, "F");
 
-  // Invoice Title
+  // 2. ชื่อหัวเอกสาร (INVOICE)
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(28);
   doc.setFont("helvetica", "bold");
   doc.text("INVOICE", 15, 25);
 
-  // Bill ID & Date in Header
+  // 3. เลขที่เอกสารและวันที่ออกเอกสาร (มุมขวาบน)
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.text(`NO: ${bill.contract_number || bill.expense_id || bill.id}`, 195, 20, { align: "right" });
   doc.text(`DATE: ${new Date().toLocaleDateString('en-GB')}`, 195, 26, { align: "right" });
 
-  // Company Info (Vendor)
+  // 4. ข้อมูลผู้ออกเอกสาร (ผู้ให้เช่า: ศูนย์อาหาร มรภ.บุรีรัมย์)
   doc.setTextColor(50, 50, 50);
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
@@ -49,7 +53,7 @@ export const generateBillPDF = (bill) => {
   doc.text("Buriram, 31000", 15, 71);
   doc.text("Phone: 044-611-221", 15, 76);
 
-  // Billing To (Customer Info)
+  // 5. ข้อมูลผู้รับบิล (ข้อมูลผู้เช่าและแผงค้า)
   doc.setTextColor(50, 50, 50);
   doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
@@ -71,11 +75,11 @@ export const generateBillPDF = (bill) => {
   doc.text(`Location: ${foodCourtName}`, 120, 73);
   doc.text(`Billing Month: ${new Date(bill.billing_month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`, 120, 78);
 
-  // Table Data Preparation
+  // 6. เตรียมข้อมูลรายการค่าใช้จ่ายลงในตาราง (Table Rows)
   const tableColumn = ["Description", "Quantity/Units", "Rate", "Amount"];
   const tableRows = [];
 
-  // Rent
+  // ค่าเช่าแผง
   tableRows.push([
     { content: "Rental Fee", styles: { fontStyle: 'bold' } },
     "1 Month",
@@ -83,7 +87,7 @@ export const generateBillPDF = (bill) => {
     (bill.rent_amount || 0).toLocaleString()
   ]);
 
-  // Water
+  // ค่าน้ำประปา
   if (bill.water_cost > 0) {
     tableRows.push([
       "Water Usage",
@@ -93,7 +97,7 @@ export const generateBillPDF = (bill) => {
     ]);
   }
 
-  // Electric
+  // ค่าไฟฟ้า
   if (bill.electricity_cost > 0) {
     tableRows.push([
       "Electricity Usage",
@@ -103,7 +107,7 @@ export const generateBillPDF = (bill) => {
     ]);
   }
 
-  // Grease Trap
+  // ค่าบริการถังดักไขมัน
   if (bill.grease_trap_fee > 0) {
     tableRows.push([
       "Grease Trap Service",
@@ -113,7 +117,7 @@ export const generateBillPDF = (bill) => {
     ]);
   }
 
-  // Late Fee
+  // ค่าปรับชำระล่าช้า (ถ้ามี)
   if (bill.late_fee > 0) {
     tableRows.push([
       { content: "Late Payment Penalty", styles: { textColor: errorColor } },
@@ -123,7 +127,7 @@ export const generateBillPDF = (bill) => {
     ]);
   }
 
-  // Draw Table
+  // 7. วาดตารางด้วย autoTable
   doc.autoTable({
     startY: 90,
     head: [tableColumn],
@@ -147,14 +151,14 @@ export const generateBillPDF = (bill) => {
     margin: { left: 15, right: 15 }
   });
 
-  // Summary Area
+  // 8. ส่วนสรุปยอดเงินรวม (Summary Area)
   const finalY = doc.lastAutoTable.finalY + 15;
   
-  // Draw light gray line
+  // วาดเส้นคั่นบางๆ
   doc.setDrawColor(230, 230, 230);
   doc.line(120, finalY - 5, 195, finalY - 5);
 
-  // Total
+  // ยอดรวมทั้งสิ้น
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(0, 0, 0);
@@ -162,7 +166,7 @@ export const generateBillPDF = (bill) => {
   doc.setTextColor(...primaryColor);
   doc.text(`THB ${parseFloat(bill.total_amount || 0).toLocaleString()}`, 195, finalY, { align: "right" });
 
-  // Due Date
+  // วันครบกำหนดชำระ
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...secondaryColor);
@@ -171,7 +175,7 @@ export const generateBillPDF = (bill) => {
   doc.setTextColor(100, 100, 100);
   doc.text(dueDate ? new Date(dueDate).toLocaleDateString('en-GB') : '-', 195, finalY + 8, { align: "right" });
 
-  // Status Badge
+  // 9. ป้ายสถานะการชำระเงิน (Status Badge)
   const statusX = 15;
   const statusY = finalY - 5;
   doc.setFontSize(10);
@@ -193,14 +197,14 @@ export const generateBillPDF = (bill) => {
   doc.setTextColor(255, 255, 255);
   doc.text(statusText, statusX + 22.5, statusY + 6.5, { align: "center" });
 
-  // Footer
+  // 10. ส่วนท้ายของเอกสาร (Footer)
   const pageHeight = doc.internal.pageSize.height;
   doc.setFontSize(9);
   doc.setTextColor(...secondaryColor);
   doc.text("Thank you for your business!", 105, pageHeight - 20, { align: "center" });
   doc.text("Buriram Rajabhat University Food Court Management System", 105, pageHeight - 15, { align: "center" });
 
-  // Save PDF
+  // 11. สั่งบันทึกและดาวน์โหลดไฟล์ PDF
   const fileName = `Invoice_${stallNumber}_${new Date(bill.billing_month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}.pdf`;
   doc.save(fileName);
 };

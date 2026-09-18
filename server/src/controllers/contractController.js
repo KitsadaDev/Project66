@@ -1,17 +1,34 @@
+// ======================================================
+// contractController.js - Controller จัดการสัญญาเช่า
+// รับผิดชอบ: ดู/สร้าง/แก้ไข/ยกเลิก สัญญา และจัดการคำขอยกเลิก
+// ======================================================
+
+// Prisma Client สำหรับติดต่อฐานข้อมูล
 const { PrismaClient } = require('@prisma/client');
+
+// ฟังก์ชันส่ง Push Notification ไปยังอุปกรณ์ mobile ผ่าน Expo
 const { sendPushNotifications } = require('../utils/pushNotification');
 
 const prisma = new PrismaClient();
 
-// Get all contracts
+// -------------------------------------------------------
+// ฟังก์ชัน: getAllContracts
+// หน้าที่: ดึงรายการสัญญาทั้งหมด
+//   - ADMIN/EXECUTIVE: เห็นสัญญาทั้งหมดในระบบ
+//   - TENANT: เห็นเฉพาะสัญญาของตัวเอง (กรอง tenant_id)
+//   - รองรับ filter ตาม status ผ่าน query string: ?status=ACTIVE
+// -------------------------------------------------------
 const getAllContracts = async (req, res, next) => {
   try {
+    // รับ query parameter ?status=ACTIVE/TERMINATED/EXPIRED ฯลฯ
     const { status } = req.query;
-    const where = {};
+    const where = {}; // object เงื่อนไขสำหรับ query
 
+    // ถ้าเป็น TENANT → จำกัดให้เห็นเฉพาะสัญญาของตัวเอง
     if (req.user.role === 'TENANT') {
       where.tenant_id = req.user.user_id;
     }
+    // ถ้ามีการส่ง ?status มา → เพิ่มเงื่อนไขกรองตาม status
     if (status) where.status = status;
 
     const contracts = await prisma.rentalContract.findMany({
@@ -35,7 +52,11 @@ const getAllContracts = async (req, res, next) => {
   }
 };
 
-// Get contract by ID
+// -------------------------------------------------------
+// ฟังก์ชัน: getContractById
+// หน้าที่: ดึงข้อมูลสัญญาตาม ID
+//   - ตรวจสอบ TENANT ว่าเป็นเจ้าของสัญญาหรือไม่ก่อนคืนข้อมูล
+// -------------------------------------------------------
 const getContractById = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -54,10 +75,12 @@ const getContractById = async (req, res, next) => {
       }
     });
 
+    // ถ้าไม่พบสัญญาตาม ID → คืน 404
     if (!contract) {
       return res.status(404).json({ success: false, message: 'Contract not found.' });
     }
 
+    // ถ้าเป็น TENANT แต่พยายามดูสัญญาของคนอื่น → ปฏิเสธ
     if (req.user.role === 'TENANT' && contract.tenant_id !== req.user.user_id) {
       return res.status(403).json({ success: false, message: 'Access denied.' });
     }
@@ -68,6 +91,17 @@ const getContractById = async (req, res, next) => {
   }
 };
 
+// -------------------------------------------------------
+// ฟังก์ชัน: createContract
+// หน้าที่: สร้างสัญญาเช่าใหม่ (Admin เท่านั้น)
+//   ขั้นตอน:
+//   1. ตรวจสอบว่า slot และ tenant มีอยู่จริง
+//   2. ตรวจสอบว่า tenant ยังไม่มีสัญญา ACTIVE อยู่
+//   3. ตรวจสอบระยะเวลาสัญญาไม่เกิน 3 ปี
+//   4. ยกเลิกสัญญาเก่าของ slot นั้น (ถ้ามี)
+//   5. สร้างสัญญาใหม่ + อัปเดตสถานะ slot → OCCUPIED
+//   (ใช้ Transaction เพื่อความปลอดภัย)
+// -------------------------------------------------------
 const createContract = async (req, res, next) => {
   try {
     const { 
@@ -76,16 +110,20 @@ const createContract = async (req, res, next) => {
       lateRentFine, lateUtilityFine, menuType, contract_number, contractNumber
     } = req.body;
 
+    // ตรวจสอบว่า slot มีอยู่ในระบบหรือไม่
     const slot = await prisma.rentalSlot.findUnique({ where: { slot_id: parseInt(slot_id) } });
     if (!slot) {
       return res.status(404).json({ success: false, message: 'Slot not found.' });
     }
 
+    // ตรวจสอบว่า tenant มีอยู่ และเป็น role TENANT จริง
     const tenant = await prisma.user.findUnique({ where: { user_id: parseInt(tenant_id) } });
     if (!tenant || tenant.role !== 'TENANT') {
       return res.status(400).json({ success: false, message: 'Invalid tenant.' });
     }
 
+    // ตรวจสอบว่า tenant มีสัญญา ACTIVE อยู่แล้วหรือไม่
+    // 1 คนมีได้แค่ 1 สัญญาที่ active ในเวลาเดียวกัน
     const existingActiveTenantContract = await prisma.rentalContract.findFirst({
       where: { tenant_id: parseInt(tenant_id), status: 'ACTIVE' }
     });
@@ -93,6 +131,7 @@ const createContract = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'ผู้เช่ารายนี้มีสัญญาที่กำลังดำเนินการอยู่แล้ว ไม่สามารถเพิ่มสัญญาซ้อนได้' });
     }
 
+    // ตรวจสอบระยะเวลาสัญญา: ต้องไม่เกิน 3 ปีนับจากวันเริ่ม
     const start = new Date(startDate);
     const end = new Date(endDate);
     const maxEnd = new Date(start);
@@ -102,14 +141,18 @@ const createContract = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'ระยะเวลาสัญญาเช่าสูงสุดคือ 3 ปี' });
     }
 
-    // Terminate existing active contracts for this slot
+    // ยกเลิกสัญญาเก่าที่ยังมีสถานะ ACTIVE สำหรับ slot นี้
+    // (กรณีสร้างสัญญาใหม่ทับสัญญาเก่า)
     await prisma.rentalContract.updateMany({
       where: { slot_id: parseInt(slot_id), status: 'ACTIVE' },
       data: { status: 'TERMINATED' }
     });
 
+    // รองรับทั้ง contract_number และ contractNumber (ชื่อ field ที่แตกต่างกัน)
     const customContractNum = contract_number || contractNumber;
 
+    // Transaction: สร้างสัญญาและอัปเดต slot พร้อมกัน
+    // ถ้าอันใดอันหนึ่งล้มเหลว → rollback ทั้งหมด
     const [contract] = await prisma.$transaction([
       prisma.rentalContract.create({
         data: {
@@ -137,6 +180,7 @@ const createContract = async (req, res, next) => {
           tenant: { select: { first_name: true, last_name: true, email: true } }
         }
       }),
+      // อัปเดตสถานะ slot → OCCUPIED (ไม่ว่าง)
       prisma.rentalSlot.update({
         where: { slot_id: parseInt(slot_id) },
         data: { status: 'OCCUPIED' }
@@ -150,7 +194,12 @@ const createContract = async (req, res, next) => {
   }
 };
 
-// Update contract (Admin only)
+// -------------------------------------------------------
+// ฟังก์ชัน: updateContract
+// หน้าที่: แก้ไขข้อมูลสัญญาตาม ID (Admin เท่านั้น)
+//   - ใส่เฉพาะ field ที่ส่งมาใน updateData (partial update)
+//   - ถ้าเปลี่ยน status → TERMINATED/EXPIRED → คืน slot เป็น VACANT
+// -------------------------------------------------------
 const updateContract = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -174,6 +223,7 @@ const updateContract = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'ระยะเวลาสัญญาเช่าสูงสุดคือ 3 ปี' });
     }
 
+    // สร้าง object เปล่า เพื่อใส่เฉพาะ field ที่ส่งมาจริง ๆ
     const updateData = {};
     if (startDate && startDate !== '') updateData.start_date = new Date(startDate);
     if (endDate && endDate !== '') updateData.end_date = new Date(endDate);
@@ -205,7 +255,7 @@ const updateContract = async (req, res, next) => {
       data: updateData
     });
 
-    // If terminated, set slot back to VACANT
+    // ถ้าเปลี่ยนสถานะเป็น TERMINATED หรือ EXPIRED → คืนแผงให้ว่าง
     if (status === 'TERMINATED' || status === 'EXPIRED') {
       await prisma.rentalSlot.update({
         where: { slot_id: existing.slot_id },
@@ -219,7 +269,14 @@ const updateContract = async (req, res, next) => {
   }
 };
 
-// Terminate contract (Admin only)
+// -------------------------------------------------------
+// ฟังก์ชัน: terminateContract
+// หน้าที่: Admin ยกเลิกสัญญาทันที (Forced Termination)
+//   ใช้ Transaction:
+//   1. เปลี่ยนสถานะสัญญา → TERMINATED
+//   2. คืนแผง → VACANT
+//   3. ส่ง Push Notification ให้ผู้เช่าทราบ
+// -------------------------------------------------------
 const terminateContract = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -254,7 +311,15 @@ const terminateContract = async (req, res, next) => {
   }
 };
 
-// Request Termination (Tenant only)
+// -------------------------------------------------------
+// ฟังก์ชัน: requestTermination
+// หน้าที่: Tenant ส่งคำขอยกเลิกสัญญา
+//   ขั้นตอน:
+//   1. ตรวจสอบว่าสัญญาเป็นของตัวเอง
+//   2. ตรวจสอบว่าสัญญาสถานะ ACTIVE (ยกเลิกได้)
+//   3. ใช้ Transaction: เปลี่ยน status → PENDING_TERMINATION + สร้าง CancellationRequest
+//   4. ส่ง Push Notification ไปแจ้ง Admin ทุกคน
+// -------------------------------------------------------
 const requestTermination = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -265,11 +330,12 @@ const requestTermination = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'ไม่พบสัญญาเช่า' });
     }
 
-    // Verify ownership
+    // ตรวจสอบว่า tenant เป็นเจ้าของสัญญานี้จริง ๆ
     if (contract.tenant_id !== req.user.user_id) {
       return res.status(403).json({ success: false, message: 'ไม่มีสิทธิ์ดำเนินการกับสัญญานี้' });
     }
 
+    // ยกเลิกได้เฉพาะสัญญาที่ ACTIVE เท่านั้น
     if (contract.status !== 'ACTIVE') {
       return res.status(400).json({ success: false, message: 'สัญญาไม่ได้อยู่ในสถานะที่สามารถยกเลิกได้' });
     }
@@ -294,12 +360,16 @@ const requestTermination = async (req, res, next) => {
     ]);
 
     try {
+        // ดึง push_token ของ Admin ทุกคนที่ลงทะเบียนอุปกรณ์ไว้
         const admins = await prisma.user.findMany({ where: { role: 'ADMIN', push_token: { not: null } } });
         const tokens = admins.map(a => a.push_token).filter(Boolean);
+        // ส่ง push notification หา Admin ทุกคนพร้อมกัน
         if (tokens.length > 0) {
           await sendPushNotifications(tokens, { title: 'มีคำขอยกเลิกสัญญาใหม่', body: 'มีการส่งคำขอยกเลิกสัญญาเช่าเข้ามาใหม่ กรุณาตรวจสอบ' });
         }
       } catch (err) {
+        // ถ้าส่ง notification ล้มเหลว → log error แต่ไม่ throw
+        // เพราะ notification ไม่ใช่ขั้นตอนหลัก ไม่ควรทำให้ request ล้มเหลว
         console.error('Notification Error:', err);
       }
       res.json({ success: true, message: 'ส่งคำขอยกเลิกสัญญาเรียบร้อยแล้ว กรุณารอการอนุมัติ' });
@@ -308,7 +378,14 @@ const requestTermination = async (req, res, next) => {
   }
 };
 
-// Reject Termination (Admin only)
+// -------------------------------------------------------
+// ฟังก์ชัน: rejectTermination
+// หน้าที่: Admin ปฏิเสธคำขอยกเลิกสัญญา
+//   ใช้ async Transaction:
+//   1. เปลี่ยนสัญญากลับเป็น ACTIVE
+//   2. อัปเดต CancellationRequest ล่าสุด → REJECTED
+//   3. ส่ง Push Notification แจ้ง Tenant
+// -------------------------------------------------------
 const rejectTermination = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -318,21 +395,26 @@ const rejectTermination = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'ไม่พบสัญญาเช่า' });
     }
 
+    // ปฏิเสธได้เฉพาะสัญญาที่รอการยกเลิก (PENDING_TERMINATION) เท่านั้น
     if (contract.status !== 'PENDING_TERMINATION') {
       return res.status(400).json({ success: false, message: 'สัญญาไม่ได้อยู่ในสถานะรอยกเลิก' });
     }
 
+    // ใช้ async transaction (รับ tx เพื่อทำ query หลายขั้นตอนในนั้น)
     await prisma.$transaction(async (tx) => {
+      // 1. คืนสถานะสัญญากลับเป็น ACTIVE (สัญญายังมีผล)
       await tx.rentalContract.update({
         where: { contract_id: parseInt(id) },
         data: { status: 'ACTIVE' }
       });
       
+      // 2. ค้นหา CancellationRequest ล่าสุดของสัญญานี้ที่ยัง PENDING
       const pendingReq = await tx.cancellationRequest.findFirst({
         where: { contract_id: parseInt(id), status: 'PENDING' },
-        orderBy: { requested_at: 'desc' }
+        orderBy: { requested_at: 'desc' } // เอาล่าสุด
       });
       
+      // 3. ถ้าพบ → เปลี่ยนสถานะเป็น REJECTED พร้อมบันทึกเวลาที่ตรวจสอบ
       if (pendingReq) {
         await tx.cancellationRequest.update({
           where: { request_id: pendingReq.request_id },
@@ -356,7 +438,13 @@ const rejectTermination = async (req, res, next) => {
 };
 
 
-// Get Cancellation Requests (Admin only)
+// -------------------------------------------------------
+// ฟังก์ชัน: getCancellationRequests
+// หน้าที่: ดึงรายการคำขอยกเลิกสัญญาทั้งหมด
+//   - ADMIN/EXECUTIVE: เห็นทุกคำขอ
+//   - TENANT: เห็นเฉพาะคำขอที่เชื่อมกับสัญญาของตัวเอง
+//   - ทำ data mapping เพื่อให้ format ตรงกับที่ frontend คาดหวัง
+// -------------------------------------------------------
 const getCancellationRequests = async (req, res, next) => {
   try {
     
@@ -371,7 +459,9 @@ const getCancellationRequests = async (req, res, next) => {
       orderBy: { requested_at: 'desc' }
     });
     
-    // Map to old format for frontend compatibility (mostly)
+    // แปลง (map) ข้อมูลให้อยู่ในรูปแบบที่ frontend ต้องการ
+    // เนื่องจาก DB schema ใช้ CancellationRequest แยกต่างหาก
+    // แต่ frontend คาดหวัง field ชื่อเดิม เช่น cancellation_reason, tenant_id
     const mapped = requests.map(r => ({
       id: r.request_id,
       contract_id: r.contract_id,
@@ -379,6 +469,7 @@ const getCancellationRequests = async (req, res, next) => {
       cancellation_reason: r.reason,
       cancellation_note: r.note,
       cancellation_requested_at: r.requested_at,
+      // แปลง 'PENDING' → 'PENDING_TERMINATION' ให้ตรงกับ status ของ contract
       status: r.status === 'PENDING' ? 'PENDING_TERMINATION' : r.status,
       tenant: r.contract.tenant,
       slot: r.contract.slot

@@ -1,27 +1,56 @@
+// ======================================================
+// pages/tenant/StallStatus.jsx - หน้าแสดงแผนผังสถานะแผงร้านค้าสำหรับผู้เช่า (Tenant Stall Map View)
+// รับผิดชอบ:
+//   - การเลือกศูนย์อาหาร (ศูนย์อาหาร 1 หรือ ศูนย์อาหาร 2)
+//   - ดึงข้อมูลสถานะแผงร้านค้าทั้งหมดจาก Backend API (stallsAPI.getAll)
+//   - วาดแผนผังร้านค้า 2 มิติ (2D Map Layout) พร้อมกำหนดสีตามสถานะแผง:
+//       * สีเขียว (VACANT) = ว่าง (พร้อมเช่า)
+//       * สีแดง (OCCUPIED) = มีผู้เช่าแล้ว
+//       * สีเหลือง (MAINTENANCE) = ปิดปรับปรุง
+//       * สีเทา (EMPTY/UNAVAILABLE) = ยังไม่เปิดบริการ
+//   - Modal แสดงรายละเอียดสถานะของแผงเมื่อผู้เช่าคลิกเลือกล็อค
+// ======================================================
+
 import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Store, X } from "lucide-react";
 import { stallsAPI } from "../../api";
 
 const StallStatus = () => {
+  // ดึงค่า foodCourt จาก URL Query Parameter (เช่น ?foodCourt=1 หรือ 2)
   const [searchParams] = useSearchParams();
   const foodCourt = searchParams.get("foodCourt") || "1";
-  const [stalls, setStalls] = useState([]);
-  const [selectedStall, setSelectedStall] = useState(null);
-  const [loading, setLoading] = useState(true);
 
+  // -------------------------------------------------------
+  // Component States
+  // -------------------------------------------------------
+  const [stalls, setStalls] = useState([]);              // รายการข้อมูลแผงร้านค้าทั้งหมดในศูนย์อาหารนี้
+  const [selectedStall, setSelectedStall] = useState(null); // แผงร้านค้าที่กำลังคลิกดูรายละเอียด (เปิด Modal)
+  const [loading, setLoading] = useState(true);            // สถานะกำลังโหลดข้อมูล
+
+  // ดึงข้อมูลแผงใหม่ทุกครั้งที่ค่า foodCourt เปลี่ยน
   useEffect(() => { fetchStalls(); }, [foodCourt]);
 
+  // -------------------------------------------------------
+  // ฟังก์ชัน: fetchStalls
+  // หน้าที่: เรียก API ดึงแผงร้านค้าทั้งหมด และคัดกรองเฉพาะ food_court_id ปัจจุบัน
+  // -------------------------------------------------------
   const fetchStalls = async () => {
     try {
       const res = await stallsAPI.getAll();
       let data = res.data.data || [];
       const fcId = parseInt(foodCourt);
+      // กรองเฉพาะแผงที่อยู่ในศูนย์อาหารที่เลือก
       data = data.filter((s) => s.food_court_id === fcId);
       setStalls(data);
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
+  // -------------------------------------------------------
+  // ฟังก์ชัน: getStatus
+  // หน้าที่: ค้นหาสถานะของแผงตามรหัสล็อค (เช่น 'A1', 'B2')
+  // คืนค่า: 'occupied', 'vacant', 'maintenance', หรือ 'empty'
+  // -------------------------------------------------------
   const getStatus = (id) => {
     const fcId = parseInt(foodCourt);
     const s = stalls.find((s) => s.slot_number === id && s.food_court_id === fcId);
@@ -29,13 +58,20 @@ const StallStatus = () => {
     return s.status.toLowerCase();
   };
 
+  // -------------------------------------------------------
+  // ฟังก์ชัน: handleClick
+  // หน้าที่: จัดการเมื่อผู้ใช้คลิกเลือกล็อคแผงค้า เพื่อเปิด Modal แสดงรายละเอียด
+  // -------------------------------------------------------
   const handleClick = (id) => {
     const fcId = parseInt(foodCourt);
     const s = stalls.find((s) => s.slot_number === id && s.food_court_id === fcId);
     setSelectedStall(s ?? { slot_number: id, status: "EMPTY" });
   };
 
-  // ── Stall cell ──
+  // -------------------------------------------------------
+  // ซับคอมโพเนนต์: Cell
+  // หน้าที่: กล่องสี่เหลี่ยมแสดงแผงค้าแต่ละล็อคบนแผนผัง พร้อมสีตามสถานะและ Effect ตอนคลิก
+  // -------------------------------------------------------
   const Cell = ({ id, w = 44, h = 44 }) => {
     const status = getStatus(id);
     const sel = selectedStall?.slot_number === id;
@@ -55,7 +91,10 @@ const StallStatus = () => {
     );
   };
 
-  // ── Horizontal row of cells ──
+  // -------------------------------------------------------
+  // ซับคอมโพเนนต์: Row
+  // หน้าที่: จัดแถวของ Cell แนวนอน
+  // -------------------------------------------------------
   const Row = ({ ids, cellW = 44, cellH = 44, gap = 5 }) => (
     <div style={{ display: "flex", gap }}>
       {ids.map((id) => <Cell key={id} id={id} w={cellW} h={cellH} />)}
@@ -63,45 +102,44 @@ const StallStatus = () => {
   );
 
 
-  // ─────────────────────────────────
-  // FC1 layout — pixel-perfect map
-  // Container: 920 × 640  (ml-10 for left door labels)
-  // Cell: 44×44, gap: 5
-  // ─────────────────────────────────
+  // ───────────────────────────────────────────────────────
+  // ผังศูนย์อาหาร 1 (FC1 Map Layout)
+  // กำหนดพิกัดและตำแหน่งแผงตามขนาดจริง (A, B, C, D, E)
+  // ───────────────────────────────────────────────────────
   const W = 920, H_ROOM = 660;
-  const WALL = "3px solid #4B5563";
+  const WALL = "3px solid #4B5563"; // สีกำแพงห้อง
 
   const FC1Map = () => (
     <div className="min-w-[920px] w-[920px] mx-auto">
 
-      {/* ═══ ROOM (bordered) ═══ */}
+      {/* ═══ ROOM (bordered) - โซนภายในห้องศูนย์อาหาร ═══ */}
       <div style={{ position: "relative", width: W, height: H_ROOM }}>
 
-        {/* ── Room walls ── */}
+        {/* ── Room walls: เส้นกำแพงห้อง ── */}
         <div style={{ position:"absolute", left:0, top:0, bottom:0, borderLeft: WALL }} />
-        {/* Bottom wall */}
+        {/* กำแพงด้านล่าง */}
         <div style={{ position:"absolute", left:0, right:0, bottom:0, borderBottom: WALL }} />
-        {/* Top wall (stops at x=810) */}
+        {/* กำแพงด้านบน (เว้นช่วงรอยต่อ x=810) */}
         <div style={{ position:"absolute", top:0, left:0, width:810, borderTop: WALL }} />
-        {/* Notch vertical (drops down at x=810) */}
+        {/* กำแพงแนวดิ่งรอยเว้า */}
         <div style={{ position:"absolute", left:810, top:0, height:100, borderLeft: WALL }} />
-        {/* Notch bottom horizontal (x=810 to right) */}
+        {/* กำแพงแนวนอนรอยเว้า */}
         <div style={{ position:"absolute", top:100, left:810, right:0, borderTop: WALL }} />
-        {/* Right wall */}
+        {/* กำแพงด้านขวา */}
         <div style={{ position:"absolute", right:0, top:100, bottom:0, borderRight: WALL }} />
 
 
-        {/* ── B row ── */}
+        {/* ── แถว B (ล็อค B1-B8 ด้านบน) ── */}
         <div style={{ position:"absolute", top:10, left:330, display:"flex", gap:5 }}>
           {["B1","B2","B3","B4","B5","B6","B7","B8"].map((id) => <Cell key={id} id={id} />)}
         </div>
 
-        {/* ── C row ── */}
+        {/* ── แถว C (ล็อค C1-C6) ── */}
         <div style={{ position:"absolute", top:115, left:134, display:"flex", gap:5 }}>
           {["C1","C2","C3","C4","C5","C6"].map((id) => <Cell key={id} id={id} />)}
         </div>
 
-        {/* ── Dining zone ── */}
+        {/* ── โซนโต๊ะรับประทานอาหารตรงกลาง ── */}
         <div
           className="absolute flex items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 text-gray-500 text-sm font-medium"
           style={{ top:175, left:100, width:640, height:315 }}
@@ -109,28 +147,28 @@ const StallStatus = () => {
           โซนโต๊ะนั่งทานอาหาร
         </div>
 
-        {/* ── A column (right wall, A1-A11) ── */}
+        {/* ── แถวแนวตั้ง A (กำแพงขวา A1-A11) ── */}
         <div style={{ position:"absolute", top:110, right:10, display:"flex", flexDirection:"column", gap:5 }}>
           {["A1","A2","A3","A4","A5","A6","A7","A8","A9","A10","A11"].map((id) => <Cell key={id} id={id} />)}
         </div>
 
-        {/* ── D row ── */}
+        {/* ── แถว D (ล็อค D1-D6 ด้านล่างติดกำแพง) ── */}
         <div style={{ position:"absolute", top:606, left:294, display:"flex", gap:5 }}>
           {["D1","D2","D3","D4","D5","D6"].map((id) => <Cell key={id} id={id} />)}
         </div>
 
-
       </div>
 
-      {/* ═══ E row — OUTSIDE the room (below bottom wall) ═══ */}
+      {/* ═══ แถว E (ล็อค E1-E12 อยู่นอกห้อง ใต้กำแพงล่าง) ═══ */}
       <div style={{ marginTop: 10, display:"flex", gap:5 }}>
         {["E1","E2","E3","E4","E5","E6","E7","E8","E9","E10","E11","E12"].map((id) => <Cell key={id} id={id} />)}
       </div>
     </div>
   );
 
-  /* ── Selector page ── */
-
+  // -------------------------------------------------------
+  // กรณีไม่มี foodCourt ใน URL ให้แสดงหน้าเลือกศูนย์อาหาร
+  // -------------------------------------------------------
   if (!foodCourt) {
     return (
       <div className="max-w-7xl mx-auto p-6 md:p-10">
@@ -139,6 +177,7 @@ const StallStatus = () => {
           <p className="text-gray-500">เลือกศูนย์อาหารเพื่อดูสถานะการเช่าล็อค</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+          {/* การ์ดเลือกศูนย์อาหาร 1 */}
           <Link to="/tenant/stall-status?foodCourt=1"
             className="group block rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 bg-white">
             <div className="h-48 bg-gradient-to-br from-purple-100 to-purple-50 flex items-center justify-center p-8">
@@ -151,6 +190,7 @@ const StallStatus = () => {
               <ArrowRight size={20} className="text-gray-300 group-hover:text-purple-500 group-hover:translate-x-1 transition-all" />
             </div>
           </Link>
+          {/* การ์ดเลือกศูนย์อาหาร 2 */}
           <Link to="/tenant/stall-status?foodCourt=2"
             className="group block rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 bg-white">
             <div className="h-48 bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center p-8">
@@ -171,16 +211,19 @@ const StallStatus = () => {
     );
   }
 
+  // กำลังโหลดข้อมูล
   if (loading) return (
     <div className="flex items-center justify-center h-screen">
       <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
-  /* ── Map page ── */
+  // -------------------------------------------------------
+  // หน้าจอแสดงแผนผังศูนย์อาหาร (Map Page View)
+  // -------------------------------------------------------
   return (
     <div className="min-h-screen bg-gray-50/50">
-      {/* Mobile header */}
+      {/* ส่วนหัวบนจอมือถือ (Mobile Header) */}
       <div className="lg:hidden p-4 bg-white shadow-sm flex items-center gap-4">
         <Link to="/tenant/stall-status" className="p-2 -ml-2 text-gray-500"><ArrowLeft size={24} /></Link>
         <div>
@@ -189,7 +232,7 @@ const StallStatus = () => {
         </div>
       </div>
 
-      {/* Desktop back */}
+      {/* ปุ่มย้อนกลับบนจอคอมพิวเตอร์ (Desktop Back Button) */}
       <div className="hidden lg:block pt-6 pl-6">
         <Link to="/tenant/stall-status"
           className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-xl shadow-sm text-gray-600 hover:text-purple-600 transition-colors">
@@ -197,33 +240,34 @@ const StallStatus = () => {
         </Link>
       </div>
 
-      {/* Map card */}
+      {/* การ์ดครอบแผนผัง (Map Container Card) */}
       <div className="p-2 sm:p-4 lg:p-8">
         <div className="bg-white p-3 sm:p-6 md:p-10 rounded-2xl md:rounded-[2.5rem] shadow-xl w-full">
           <h2 className="text-2xl font-bold text-gray-800 mb-8 hidden lg:block text-center">
             ผังศูนย์อาหาร {foodCourt}
           </h2>
 
-          {/* Mobile scroll hint */}
+          {/* ข้อความแนะนำการเลื่อนแผนผังบนมือถือ */}
           <div className="lg:hidden text-center text-xs text-purple-600 font-semibold mb-3 flex items-center justify-center gap-1.5 bg-purple-50/80 py-2 px-3 rounded-xl border border-purple-100 shadow-sm">
             <span>👈</span> เลื่อน ซ้าย-ขวา เพื่อดูผังทั้งหมด <span>👉</span>
           </div>
 
+          {/* กล่องบรรจุแผนผังที่สามารถ Scroll แนวนอนได้ */}
           <div className="w-full overflow-x-auto pb-4 pt-1">
             {foodCourt === "1" ? (
               <FC1Map />
             ) : (
-              /* FC2 */
+              /* ผังศูนย์อาหาร 2 (FC2 Layout) */
               <div className="min-w-[650px] w-[650px] mx-auto">
                 <div style={{ position: "relative", width: 650, height: 540, border: "3px solid #4B5563" }}>
-                  {/* ── Stall Column F (F10 down to F1) ── */}
+                  {/* ── เสาล็อค F (F10 ลงมา F1 ด้านซ้าย) ── */}
                   <div style={{ position: "absolute", top: 24, left: 24, display: "flex", flexDirection: "column", gap: 5 }}>
                     {["F10", "F9", "F8", "F7", "F6", "F5", "F4", "F3", "F2", "F1"].map((id) => (
                       <Cell key={id} id={id} />
                     ))}
                   </div>
 
-                  {/* ── Dining zone ── */}
+                  {/* ── โซนโต๊ะรับประทานอาหารตรงกลาง ── */}
                   <div
                     className="absolute flex items-center justify-center rounded-xl bg-gray-200/80 border border-gray-300 text-gray-700 text-base font-semibold shadow-inner"
                     style={{ top: 24, left: 120, width: 495, height: 485 }}
@@ -235,7 +279,7 @@ const StallStatus = () => {
             )}
           </div>
 
-          {/* Legend */}
+          {/* คำอธิบายสัญลักษณ์สีสถานะ (Legend) */}
           <div className="mt-6 flex flex-wrap gap-4 sm:gap-6 border-t border-gray-100 pt-4 sm:pt-6">
             {[["border-green-300 bg-green-100","ว่าง (พร้อมเช่า)"],["border-red-300 bg-red-100","มีผู้เช่าแล้ว"],["border-yellow-300 bg-yellow-100","ปิดปรับปรุง"],["border-dashed border-gray-300 bg-gray-50","ยังไม่เปิดบริการ"]].map(([c,l]) => (
               <div key={l} className="flex items-center gap-2">
@@ -247,17 +291,21 @@ const StallStatus = () => {
         </div>
       </div>
 
-      {/* Modal */}
+      {/* ------------------------------------------------------- */}
+      {/* Modal แสดงรายละเอียดล็อคที่เลือก (Stall Details Popup) */}
+      {/* ------------------------------------------------------- */}
       {selectedStall && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
              onClick={() => setSelectedStall(null)}>
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8 relative"
                onClick={(e) => e.stopPropagation()}>
+            {/* ปุ่มปิด Modal */}
             <button onClick={() => setSelectedStall(null)}
               className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 transition-colors">
               <X size={16} />
             </button>
             <div className="flex flex-col items-center mb-6">
+              {/* วงกลมแสดงหมายเลขล็อค */}
               <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-4 text-3xl font-bold shadow-lg
                 ${selectedStall.status==="OCCUPIED"?"bg-red-100 text-red-600":selectedStall.status==="MAINTENANCE"?"bg-yellow-100 text-yellow-600":selectedStall.status==="VACANT"?"bg-green-100 text-green-600":"bg-gray-100 text-gray-400"}`}>
                 {selectedStall.slot_number}
@@ -270,6 +318,8 @@ const StallStatus = () => {
                 {selectedStall.status==="OCCUPIED"?"สถานะปกติ":selectedStall.status==="MAINTENANCE"?"ปิดชั่วคราว":selectedStall.status==="VACANT"?"พร้อมเช่า":"ยังไม่เปิด"}
               </span>
             </div>
+            
+            {/* กล่องคำอธิบายเพิ่มเติมตามสถานะของล็อค */}
             {selectedStall.status==="OCCUPIED"?(
               <div className="text-center p-5 bg-gray-50 rounded-2xl border border-gray-100">
                 <p className="text-gray-600 font-medium">ล็อกนี้มีผู้เช่าแล้ว</p>

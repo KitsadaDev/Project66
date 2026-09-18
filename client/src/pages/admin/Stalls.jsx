@@ -13,15 +13,23 @@ import {
 import { toast } from "react-toastify";
 import { stallsAPI } from "../../api";
 
+/**
+ * คอมโพเนนต์หน้าจัดการสถานะและข้อมูลแผงค้า (Admin Stall Management)
+ * - แสดงผังจำลองตำแหน่งแผงค้าของศูนย์อาหาร 1 และ 2
+ * - คลิกที่แผงค้าเพื่อสร้างข้อมูลแผงค้าใหม่ (Create) หรือแก้ไขข้อมูลเดิม (Edit)
+ * - กำหนดขนาดพื้นที่ (ตร.ม.), ค่าเช่ารายเดือน (บาท), และสถานะ (ว่าง, มีผู้เช่า, ปิดปรับปรุง)
+ */
 const Stalls = () => {
+  // สถานะข้อมูลแผงค้าทั้งหมด และสถานะการโหลด
   const [stalls, setStalls] = useState([]);
   const [loading, setLoading] = useState(true);
+  // ศูนย์อาหารที่เลือกดูผัง (ค่าเริ่มต้นคือศูนย์อาหาร 1)
   const [selectedFoodCourt, setSelectedFoodCourt] = useState("1");
   const [search, setSearch] = useState("");
 
-  // Modal States
+  // สถานะสำหรับควบคุมหน้าต่างป๊อปอัป (Modal) สร้าง/แก้ไขข้อมูลแผงค้า
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState("create"); // 'create' or 'edit'
+  const [modalMode, setModalMode] = useState("create"); // 'create' หรือ 'edit'
   const [formData, setFormData] = useState({
     slot_id: "",
     slot_number: "",
@@ -31,10 +39,14 @@ const Stalls = () => {
     status: "VACANT",
   });
 
+  // ดึงข้อมูลแผงค้าทั้งหมดเมื่อเริ่มต้นหน้าจอ
   useEffect(() => {
     fetchStalls();
   }, []);
 
+  /**
+   * ดึงข้อมูลแผงค้าทั้งหมดจาก API
+   */
   const fetchStalls = async () => {
     try {
       const response = await stallsAPI.getAll();
@@ -46,6 +58,12 @@ const Stalls = () => {
     }
   };
 
+  /**
+   * จัดการเมื่อผู้ใช้คลิกล็อกแผงค้าบนผัง
+   * - หากมีข้อมูลแผงค้าอยู่แล้วในระบบ -> เปิด Modal ในโหมด "แก้ไข" (Edit) พร้อมดึงข้อมูลเดิมมาแสดง
+   * - หากยังไม่มีข้อมูล -> เปิด Modal ในโหมด "สร้างใหม่" (Create)
+   * @param {string} slot_number - หมายเลขล็อก เช่น 'A1', 'B2', 'F1'
+   */
   const handleStallClick = (slot_number) => {
     const existingStall = stalls.find(
       (s) =>
@@ -54,7 +72,7 @@ const Stalls = () => {
     );
 
     if (existingStall) {
-      // Edit Mode
+      // โหมดแก้ไขข้อมูลเดิม
       setModalMode("edit");
       setFormData({
         slot_id: existingStall.slot_id,
@@ -65,7 +83,7 @@ const Stalls = () => {
         status: existingStall.status,
       });
     } else {
-      // Create Mode
+      // โหมดสร้างข้อมูลล็อกใหม่
       setModalMode("create");
       setFormData({
         slot_id: "",
@@ -79,6 +97,9 @@ const Stalls = () => {
     setIsModalOpen(true);
   };
 
+  /**
+   * ส่งข้อมูลบันทึกแผงค้าไปยังเซิร์ฟเวอร์ (สร้างใหม่ หรือ อัปเดต)
+   */
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -108,6 +129,10 @@ const Stalls = () => {
     }
   };
 
+  /**
+   * ตรวจสอบสถานะของแผงค้าเพื่อใช้กำหนดสี
+   * @param {string} slot_number - หมายเลขล็อก
+   */
   const getStallStatus = (slot_number) => {
     const stall = stalls.find(
       (s) =>
@@ -118,6 +143,9 @@ const Stalls = () => {
     return stall.status.toLowerCase();
   };
 
+  /**
+   * คอมโพเนนต์ย่อยแสดงช่องเซลล์แผงค้าแต่ละช่องในผัง
+   */
   const StallCell = ({ id, small = false, w = 44, h = 44, fixedSize = false }) => {
     const status = getStallStatus(id);
     let colorClass = "";
@@ -287,10 +315,11 @@ const Stalls = () => {
         </div>
       )}
 
-      {/* Create/Edit Modal */}
+      {/* หน้าต่าง Modal สำหรับเพิ่มล็อกใหม่ หรือ แก้ไขข้อมูลล็อกเดิม */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            {/* ส่วนหัว Modal */}
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-gray-800">
                 {modalMode === "create" ? "เพิ่มล็อกใหม่" : "แก้ไขข้อมูลล็อก"}
@@ -303,7 +332,9 @@ const Stalls = () => {
               </button>
             </div>
 
+            {/* ฟอร์มกรอกข้อมูล */}
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* ช่องแสดงหมายเลขแผงค้า (Readonly) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   หมายเลขแผงค้า
@@ -316,9 +347,10 @@ const Stalls = () => {
                 />
               </div>
 
-              {/* Food Court Selector Removed as per request */}
+              {/* ซ่อนค่า foodCourt เพื่อรักษาความเข้ากันได้ */}
               <input type="hidden" value={formData.foodCourt} />
 
+              {/* ช่องกรอกขนาดและค่าเช่า */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -353,6 +385,7 @@ const Stalls = () => {
                 </div>
               </div>
 
+              {/* ตัวเลือกสถานะ (แสดงเฉพาะในโหมดแก้ไข) */}
               {modalMode === "edit" && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -374,6 +407,7 @@ const Stalls = () => {
                 </div>
               )}
 
+              {/* ปุ่มยกเลิก และบันทึก */}
               <div className="pt-4 flex gap-3">
                 <button
                   type="button"
