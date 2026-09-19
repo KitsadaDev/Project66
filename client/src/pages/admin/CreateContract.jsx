@@ -751,7 +751,7 @@ const CreateContract = () => {
                 </div>
                 <div className="text-right border-l border-purple-100 pl-6">
                   <span className="text-xs text-purple-600 font-medium block">
-                    เงินประกันสัญญาแนะนำ (x3)
+                    เงินประกันสัญญา
                   </span>
                   <span className="text-lg font-bold text-purple-700">
                     {(parseFloat(selectedStall.rent || 0) * 3).toLocaleString()}{" "}

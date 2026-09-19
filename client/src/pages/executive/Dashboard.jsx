@@ -24,8 +24,10 @@ import {
   Zap,
   Search,
   Store,
+  FileText,
 } from "lucide-react";
 import { stallsAPI, usersAPI, billsAPI, maintenanceAPI } from "../../api";
+import { exportSlotIncomeReportPDF } from "../../utils/pdfExport";
 
 /**
  * คอมโพเนนต์แดชบอร์ดรายงานผลสำหรับผู้บริหารระดับสูง (Executive Dashboard)
@@ -473,16 +475,49 @@ const ExecutiveDashboard = () => {
     const stallPaymentList = [];
     const processedSlotNumbers = new Set();
 
+    const resolveTenantName = (slot, bills = []) => {
+      const activeContract =
+        slot?.rental_contracts?.find((c) => c.status === "ACTIVE") ||
+        slot?.rental_contracts?.[0];
+      const contractTenant = activeContract?.tenant;
+      const firstBill = bills[0];
+      const billTenant = firstBill?.contract?.tenant || firstBill?.tenant;
+
+      let anyBillTenant = null;
+      if (!contractTenant && !billTenant) {
+        const anyBill = (rawBills || []).find(
+          (b) =>
+            (slot?.slot_id &&
+              (b.contract?.slot?.slot_id === slot.slot_id ||
+                b.contract?.slot_id === slot.slot_id ||
+                b.slot_id === slot.slot_id)) ||
+            (slot?.slot_number &&
+              (b.contract?.slot?.slot_number === slot.slot_number ||
+                b.slot?.slot_number === slot.slot_number))
+        );
+        anyBillTenant = anyBill?.contract?.tenant || anyBill?.tenant;
+      }
+
+      const candidate = contractTenant || billTenant || anyBillTenant || slot?.tenant;
+      if (candidate) {
+        if (typeof candidate === "string") return candidate;
+        if (candidate.first_name) {
+          return `${candidate.first_name} ${candidate.last_name || ""}`.trim();
+        }
+        if (candidate.name) return candidate.name;
+      }
+      if (slot?.tenant_name) return slot.tenant_name;
+      if (firstBill?.tenant_name) return firstBill.tenant_name;
+      return "-";
+    };
+
     occupiedSlotsList.forEach((slot) => {
       const sIdKey = slot.slot_id ? String(slot.slot_id) : null;
       const sNumKey = slot.slot_number;
       const slotBills = (sIdKey && slotBillsMap.get(sIdKey)) || (sNumKey && slotBillsMap.get(sNumKey)) || [];
       processedSlotNumbers.add(slot.slot_number);
 
-      const firstBill = slotBills[0];
-      const tenantName = firstBill?.contract?.tenant?.first_name
-        ? `${firstBill.contract.tenant.first_name} ${firstBill.contract.tenant.last_name || ""}`.trim()
-        : slot.tenant?.name || slot.tenant_name || "-";
+      const tenantName = resolveTenantName(slot, slotBills);
 
       if (slotBills.length === 0) {
         unbilledSlotsCount++;
@@ -493,9 +528,11 @@ const ExecutiveDashboard = () => {
           tenantName,
           status: "UNBILLED",
           statusText: "ยังไม่ออกบิล",
+          billStatus: "UNBILLED",
           rent: Number(slot.rent || 0),
           water: 0,
           electricity: 0,
+          grease: 0,
           total: Number(slot.rent || 0),
           paid: 0,
           pending: 0,
@@ -503,10 +540,13 @@ const ExecutiveDashboard = () => {
       } else {
         const hasPending = slotBills.some((b) => b.status !== "PAID");
         const allPaid = slotBills.every((b) => b.status === "PAID");
+        const hasOverdue = slotBills.some((b) => b.status === "OVERDUE");
+        const hasWaiting = slotBills.some((b) => b.status === "WAITING_VERIFICATION" || b.status === "WAITING");
 
         const slotRent = slotBills.reduce((acc, b) => acc + Number(b.rent_amount || 0), 0);
         const slotWater = slotBills.reduce((acc, b) => acc + Number(b.water_cost || 0), 0);
         const slotElec = slotBills.reduce((acc, b) => acc + Number(b.electricity_cost || 0), 0);
+        const slotGrease = slotBills.reduce((acc, b) => acc + Number(b.grease_trap_fee || 0), 0);
         const slotTotal = slotBills.reduce((acc, b) => acc + Number(b.total_amount || 0), 0);
         const slotPaid = slotBills
           .filter((b) => b.status === "PAID")
@@ -514,6 +554,13 @@ const ExecutiveDashboard = () => {
         const slotPending = slotBills
           .filter((b) => b.status !== "PAID")
           .reduce((acc, b) => acc + Number(b.total_amount || 0), 0);
+
+        let billStatus = "PAID";
+        if (!allPaid) {
+          if (hasOverdue) billStatus = "OVERDUE";
+          else if (hasWaiting) billStatus = "WAITING_VERIFICATION";
+          else billStatus = "PENDING";
+        }
 
         if (allPaid) {
           paidSlotsCount++;
@@ -524,9 +571,11 @@ const ExecutiveDashboard = () => {
             tenantName,
             status: "PAID",
             statusText: "จ่ายแล้ว",
+            billStatus: "PAID",
             rent: slotRent,
             water: slotWater,
             electricity: slotElec,
+            grease: slotGrease,
             total: slotTotal,
             paid: slotPaid,
             pending: 0,
@@ -540,9 +589,11 @@ const ExecutiveDashboard = () => {
             tenantName,
             status: "PENDING",
             statusText: "ติดค้าง",
+            billStatus,
             rent: slotRent,
             water: slotWater,
             electricity: slotElec,
+            grease: slotGrease,
             total: slotTotal,
             paid: slotPaid,
             pending: slotPending,
@@ -560,17 +611,31 @@ const ExecutiveDashboard = () => {
         const sFcId = getSlotFoodCourtId(b);
         const hasPending = billsList.some((item) => item.status !== "PAID");
         const allPaid = billsList.every((item) => item.status === "PAID");
+        const hasOverdue = billsList.some((item) => item.status === "OVERDUE");
+        const hasWaiting = billsList.some((item) => item.status === "WAITING_VERIFICATION" || item.status === "WAITING");
 
         const slotRent = billsList.reduce((acc, item) => acc + Number(item.rent_amount || 0), 0);
         const slotWater = billsList.reduce((acc, item) => acc + Number(item.water_cost || 0), 0);
         const slotElec = billsList.reduce((acc, item) => acc + Number(item.electricity_cost || 0), 0);
+        const slotGrease = billsList.reduce((acc, item) => acc + Number(item.grease_trap_fee || 0), 0);
         const slotTotal = billsList.reduce((acc, item) => acc + Number(item.total_amount || 0), 0);
         const slotPaid = billsList.filter((item) => item.status === "PAID").reduce((acc, item) => acc + Number(item.total_amount || 0), 0);
         const slotPending = billsList.filter((item) => item.status !== "PAID").reduce((acc, item) => acc + Number(item.total_amount || 0), 0);
 
-        const tenantName = b.contract?.tenant?.first_name
-          ? `${b.contract.tenant.first_name} ${b.contract.tenant.last_name || ""}`.trim()
-          : b.tenant_name || "-";
+        let billStatus = "PAID";
+        if (!allPaid) {
+          if (hasOverdue) billStatus = "OVERDUE";
+          else if (hasWaiting) billStatus = "WAITING_VERIFICATION";
+          else billStatus = "PENDING";
+        }
+
+        const matchedSlot = (rawStalls || []).find(
+          (s) =>
+            (b.contract?.slot?.slot_id && s.slot_id === b.contract.slot.slot_id) ||
+            (b.slot_id && s.slot_id === b.slot_id) ||
+            s.slot_number === sNum
+        );
+        const tenantName = resolveTenantName(matchedSlot, billsList);
 
         if (allPaid) {
           paidSlotsCount++;
@@ -581,9 +646,11 @@ const ExecutiveDashboard = () => {
             tenantName,
             status: "PAID",
             statusText: "จ่ายแล้ว",
+            billStatus: "PAID",
             rent: slotRent,
             water: slotWater,
             electricity: slotElec,
+            grease: slotGrease,
             total: slotTotal,
             paid: slotPaid,
             pending: 0,
@@ -597,9 +664,11 @@ const ExecutiveDashboard = () => {
             tenantName,
             status: "PENDING",
             statusText: "ติดค้าง",
+            billStatus,
             rent: slotRent,
             water: slotWater,
             electricity: slotElec,
+            grease: slotGrease,
             total: slotTotal,
             paid: slotPaid,
             pending: slotPending,
@@ -669,6 +738,35 @@ const ExecutiveDashboard = () => {
     setActiveRepairsList(currentRepairs.slice(0, 5));
     setPendingBillsWatchlist(pendingBills.slice(0, 4));
     setPendingRepairsWatchlist(pendingRepairs.slice(0, 4));
+  };
+
+  /**
+   * ดำเนินการส่งออกรายงานรายได้แยกค่าน้ำ ค่าไฟ ค่าเช่า และสถานะรายล็อคเป็นไฟล์ PDF
+   */
+  const handleExportSlotIncome = () => {
+    const list = dashboardStats.stallPaymentList || [];
+    const reportRows = list.map((item) => ({
+      slot_number: item.slot_number,
+      tenant_name: item.tenantName,
+      rent_amount: item.rent != null ? Number(item.rent) : null,
+      water_cost: item.status === "UNBILLED" ? null : Number(item.water || 0),
+      electricity_cost: item.status === "UNBILLED" ? null : Number(item.electricity || 0),
+      grease_trap_fee: item.grease && Number(item.grease) > 0 ? Number(item.grease) : null,
+      pending_amount: Number(item.pending || 0),
+      status: item.billStatus || item.status,
+    }));
+
+    let titleExtra = globalMonth === "ALL" ? "ยอดสะสมทุกช่วงเวลา" : formatMonthTH(globalMonth);
+    if (selectedFoodCourt !== "ALL") {
+      titleExtra += ` (ศูนย์อาหาร ${selectedFoodCourt})`;
+    }
+
+    exportSlotIncomeReportPDF(reportRows, titleExtra, {
+      totalOccupied: dashboardStats.occupiedSlotsCount || list.length,
+      paidSlots: dashboardStats.paidSlotsCount,
+      pendingSlots: dashboardStats.pendingSlotsCount,
+      unbilledSlots: dashboardStats.unbilledSlotsCount,
+    });
   };
 
   /**
@@ -1165,10 +1263,17 @@ const ExecutiveDashboard = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold text-purple-700 bg-purple-50 px-3 py-1.5 rounded-xl border border-purple-100">
               {globalMonth === "ALL" ? "ข้อมูลทั้งหมด" : formatButtonMonth(globalMonth)}
             </span>
+            <button
+              type="button"
+              onClick={handleExportSlotIncome}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+            >
+              <FileText size={14} /> ส่งออก PDF
+            </button>
           </div>
         </div>
 

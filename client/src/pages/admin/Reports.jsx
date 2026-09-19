@@ -13,7 +13,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { stallsAPI, billsAPI, maintenanceAPI } from "../../api";
-import { exportMaintenanceReportPDF, exportBillsReportPDF } from "../../utils/pdfExport";
+import { exportMaintenanceReportPDF, exportBillsReportPDF, exportSlotIncomeReportPDF } from "../../utils/pdfExport";
 
 /**
  * คอมโพเนนต์หน้ารายงานสรุปภาพรวมระบบสำหรับผู้ดูแลระบบ (Admin Reports)
@@ -234,10 +234,10 @@ const Reports = () => {
       const cat = r.category || "อื่นๆ";
       categoryMap[cat] = (categoryMap[cat] || 0) + 1;
       const slotNum = (r.rental_slot && r.rental_slot.slot_number)
-        ? "ล็อก " + r.rental_slot.slot_number
+        ? "ล็อค " + r.rental_slot.slot_number
         : (r.slot && r.slot.slot_number)
-        ? "ล็อก " + r.slot.slot_number
-        : "ไม่ระบุล็อก";
+        ? "ล็อค " + r.slot.slot_number
+        : "ไม่ระบุล็อค";
       slotMap[slotNum] = (slotMap[slotNum] || 0) + 1;
     });
 
@@ -303,6 +303,129 @@ const Reports = () => {
       data.tableRepairs, getFilterLabel(),
       data.categoryList, data.slotList, data.maxSlotCount
     );
+  };
+
+  /**
+   * ดำเนินการส่งออกรายงานรายได้แยกค่าน้ำ ค่าไฟ ค่าเช่า และสถานะรายล็อคเป็นไฟล์ PDF
+   */
+  const handleExportSlotIncome = () => {
+    const occupiedSlots = rawStalls
+      .filter((s) => (s.status || "").toUpperCase() === "OCCUPIED")
+      .sort((a, b) => (a.slot_number || "").localeCompare(b.slot_number || "", undefined, { numeric: true }));
+
+    const slotBillsMap = new Map();
+    (data.tableBills || []).forEach((b) => {
+      const sId = b.contract?.slot?.slot_id || b.contract?.slot_id || b.slot_id;
+      const sNum = b.contract?.slot?.slot_number || b.slot?.slot_number;
+      const key = sId ? String(sId) : sNum;
+      if (key) {
+        if (!slotBillsMap.has(key)) slotBillsMap.set(key, []);
+        slotBillsMap.get(key).push(b);
+      }
+    });
+
+    const reportRows = occupiedSlots.map((slot) => {
+      const sIdKey = slot.slot_id ? String(slot.slot_id) : null;
+      const sNumKey = slot.slot_number;
+      const bills = (sIdKey && slotBillsMap.get(sIdKey)) || (sNumKey && slotBillsMap.get(sNumKey)) || [];
+
+      // ดึงข้อมูลผู้เช่าจากสัญญาเช่าที่เปิดใช้งานอยู่ หรือจากบิล
+      const activeContract =
+        slot.rental_contracts?.find((c) => c.status === "ACTIVE") ||
+        slot.rental_contracts?.[0];
+      const contractTenant = activeContract?.tenant;
+      const billTenant = bills[0]?.contract?.tenant || bills[0]?.tenant;
+      let anyBillTenant = null;
+      if (!contractTenant && !billTenant) {
+        const anyBill = (rawBills || []).find(
+          (b) =>
+            (slot.slot_id &&
+              (b.contract?.slot?.slot_id === slot.slot_id ||
+                b.contract?.slot_id === slot.slot_id ||
+                b.slot_id === slot.slot_id)) ||
+            (slot.slot_number &&
+              (b.contract?.slot?.slot_number === slot.slot_number ||
+                b.slot?.slot_number === slot.slot_number))
+        );
+        anyBillTenant = anyBill?.contract?.tenant || anyBill?.tenant;
+      }
+      const tenant = contractTenant || billTenant || anyBillTenant || slot.tenant;
+      let tenantName = "-";
+      if (tenant) {
+        if (typeof tenant === "string") {
+          tenantName = tenant;
+        } else if (tenant.first_name) {
+          tenantName = `${tenant.first_name} ${tenant.last_name || ""}`.trim();
+        } else if (tenant.name) {
+          tenantName = tenant.name;
+        }
+      } else if (slot.tenant_name) {
+        tenantName = slot.tenant_name;
+      }
+
+      if (bills.length === 0) {
+        return {
+          slot_number: slot.slot_number,
+          tenant_name: tenantName,
+          rent_amount: slot.rent != null ? Number(slot.rent) : null,
+          water_cost: null,
+          electricity_cost: null,
+          grease_trap_fee: null,
+          pending_amount: 0,
+          status: "UNBILLED",
+        };
+      }
+
+      let rent = 0;
+      let water = 0;
+      let elec = 0;
+      let grease = 0;
+      let pending = 0;
+      let hasOverdue = false;
+      let hasPending = false;
+      let hasWaiting = false;
+      let allPaid = true;
+
+      bills.forEach((b) => {
+        rent += Number(b.rent_amount || 0);
+        water += Number(b.water_cost || 0);
+        elec += Number(b.electricity_cost || 0);
+        grease += Number(b.grease_trap_fee || 0);
+
+        if (b.status !== "PAID") {
+          allPaid = false;
+          pending += Number(b.total_amount || 0);
+          if (b.status === "OVERDUE") hasOverdue = true;
+          else if (b.status === "WAITING_VERIFICATION" || b.status === "WAITING") hasWaiting = true;
+          else hasPending = true;
+        }
+      });
+
+      let status = "PAID";
+      if (!allPaid) {
+        if (hasOverdue) status = "OVERDUE";
+        else if (hasWaiting) status = "WAITING_VERIFICATION";
+        else if (hasPending) status = "PENDING";
+      }
+
+      return {
+        slot_number: slot.slot_number,
+        tenant_name: tenantName,
+        rent_amount: rent,
+        water_cost: water,
+        electricity_cost: elec,
+        grease_trap_fee: grease > 0 ? grease : null,
+        pending_amount: pending,
+        status,
+      };
+    });
+
+    exportSlotIncomeReportPDF(reportRows, getFilterLabel(), {
+      totalOccupied: occupiedSlots.length,
+      paidSlots: data.paidSlotsCount,
+      pendingSlots: data.pendingSlotsCount,
+      unbilledSlots: data.unbilledSlotsCount,
+    });
   };
 
   /**
@@ -389,7 +512,7 @@ const Reports = () => {
         {/* ─── Card 1: สถานะล็อก ─── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-base font-bold text-gray-800 mb-5 flex items-center gap-2">
-            <Building2 size={18} className="text-gray-500" /> สถานะล็อก (Occupancy)
+            <Building2 size={18} className="text-gray-500" /> สถานะล็อค (Occupancy)
           </h2>
           <div className="flex justify-center mb-6">
             <div
@@ -420,7 +543,7 @@ const Reports = () => {
               </div>
             ))}
             <div className="pt-3 mt-1 border-t border-gray-100 flex justify-between items-center text-sm">
-              <span className="text-gray-500">ล็อกทั้งหมด</span>
+              <span className="text-gray-500">ล็อคทั้งหมด</span>
               <span className="font-bold text-gray-800">{data.totalStalls}</span>
             </div>
           </div>
@@ -513,7 +636,7 @@ const Reports = () => {
             )}
             {data.slotList.length > 0 && (
               <div>
-                <h3 className="text-sm font-bold text-gray-700 mb-3">ล็อกที่แจ้งซ่อมบ่อยที่สุด</h3>
+                <h3 className="text-sm font-bold text-gray-700 mb-3">ล็อคที่แจ้งซ่อมบ่อยที่สุด</h3>
                 {data.slotList.map((item, index) => (
                   <div key={item.slot_number} className="mb-3">
                     <div className="flex justify-between text-xs mb-1">
@@ -546,22 +669,30 @@ const Reports = () => {
           <div>
             <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
               <Receipt size={20} className="text-purple-600" />
-              รายงานรายได้แยกค่าน้ำ ค่าไฟ ค่าเช่า และสถานะรายล็อก
+              รายงานรายได้แยกค่าน้ำ ค่าไฟ ค่าเช่า และสถานะรายล็อค
             </h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              สรุปภาพรวมรายรับตามประเภทค่าใช้จ่ายและจำนวนล็อกตามสถานะการชำระเงิน
+              สรุปภาพรวมรายรับตามประเภทค่าใช้จ่ายและจำนวนล็อคตามสถานะการชำระเงิน
             </p>
           </div>
-          <span className="text-xs font-semibold text-purple-700 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-100">
-            รอบเวลา: {getFilterLabel()}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-purple-700 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-100">
+              รอบเวลา: {getFilterLabel()}
+            </span>
+            <button
+              onClick={handleExportSlotIncome}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
+            >
+              <FileText size={14} /> ส่งออก PDF
+            </button>
+          </div>
         </div>
 
         {/* สรุปสถานะรายล็อก */}
         <div>
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
             <Store size={14} className="text-purple-600" />
-            <span>สถานะการชำระเงินรายล็อก</span>
+            <span>สถานะการชำระเงินรายล็อค</span>
           </h3>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
@@ -605,7 +736,7 @@ const Reports = () => {
           {/* Progress bar */}
           <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
             <div className="flex items-center justify-between text-xs font-semibold text-gray-600 mb-1.5">
-              <span>สัดส่วนล็อกที่มีผู้เช่า ({data.occupiedSlotsCount} ล็อค)</span>
+              <span>สัดส่วนล็อคที่มีผู้เช่า ({data.occupiedSlotsCount} ล็อค)</span>
               <div className="flex items-center gap-3 text-[11px]">
                 <span className="flex items-center gap-1 text-emerald-700">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> จ่ายแล้ว ({data.paidSlotsCount})
@@ -659,7 +790,7 @@ const Reports = () => {
                     <Store size={18} />
                   </div>
                   <div>
-                    <h4 className="font-bold text-gray-800 text-sm">ค่าเช่าแผง</h4>
+                    <h4 className="font-bold text-gray-800 text-sm">ค่าเช่าล็อค</h4>
                     <span className="text-[11px] text-gray-400">Stall Rent</span>
                   </div>
                 </div>

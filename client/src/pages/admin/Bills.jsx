@@ -233,7 +233,11 @@ const Bills = () => {
    */
   const handleStatusUpdate = async (billId, newStatus) => {
     try {
-      await billsAPI.update(billId, { status: newStatus });
+      const currentBill = bills.find((b) => b.expense_id === billId);
+      await billsAPI.update(billId, {
+        status: newStatus,
+        total_amount: currentBill?.total_amount,
+      });
       toast.success("อัปเดตสถานะสำเร็จ");
       fetchBills();
     } catch (error) {
@@ -908,6 +912,14 @@ const Bills = () => {
                     <span className="text-gray-600">ค่าบำบัดน้ำเสีย / ดักไขมัน</span>
                     <span className="font-semibold text-gray-800">
                       ฿{Number(selectedBillDetail.grease_trap_fee).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+                {selectedBillDetail.late_fee > 0 && (
+                  <div className="p-3.5 flex justify-between">
+                    <span className="text-gray-600">ค่าปรับชำระล่าช้า</span>
+                    <span className="font-semibold text-red-600">
+                      ฿{Number(selectedBillDetail.late_fee).toLocaleString()}
                     </span>
                   </div>
                 )}

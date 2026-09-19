@@ -286,6 +286,11 @@ const Stalls = () => {
     const isHovered = hoveredStall === id;
     const isEditing = editingStall === id;
     const statusInfo = stallInfo ? getStatusLabel(stallInfo.status) : null;
+    const contract = stallInfo?.rental_contracts?.[0];
+    const tenant = contract?.tenant;
+    const tenantName = tenant
+      ? `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim()
+      : "-";
 
     // สำหรับแถวด้านล่าง ให้เปิดป๊อปอัปขึ้นด้านบน เพื่อไม่ให้ล้นตกขอบล่าง
     const isBottomStall = id.startsWith("D") || id.startsWith("E") || id === "F1" || id === "F2" || id === "F3" || id === "A10" || id === "A11";
@@ -327,6 +332,15 @@ const Stalls = () => {
               {/* ── โหมดดูข้อมูล ── */}
               {!isEditing && stallInfo && (
                 <>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-500">ผู้เช่า</span>
+                    <span
+                      className="font-medium text-gray-900 truncate max-w-[130px]"
+                      title={tenantName !== "-" ? tenantName : undefined}
+                    >
+                      {tenantName}
+                    </span>
+                  </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-gray-500">สถานะ</span>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusInfo.color}`}>

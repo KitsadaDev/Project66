@@ -37,6 +37,11 @@ const computeLateFees = async (expenses) => {
   now.setHours(0, 0, 0, 0);
 
   const processExpense = (expense) => {
+    const baseAmount = (Number(expense.rent_amount) || 0) + 
+                       (Number(expense.water_cost) || 0) + 
+                       (Number(expense.electricity_cost) || 0) + 
+                       (Number(expense.grease_trap_fee) || 0);
+
     // เช็คเฉพาะบิลที่ยังไม่ชำระ
     if (expense.status === 'PENDING' || expense.status === 'OVERDUE') {
       const due = new Date(expense.due_date);
@@ -53,12 +58,25 @@ const computeLateFees = async (expenses) => {
           ...expense,
           status: 'OVERDUE', // dynamically reflect overdue
           late_fee: lateFee,
-          total_amount: expense.total_amount + lateFee,
-          original_total_amount: expense.total_amount
+          total_amount: Math.max(Number(expense.total_amount) || 0, baseAmount + lateFee),
+          original_total_amount: baseAmount
         };
       }
+      return {
+        ...expense,
+        late_fee: 0,
+        total_amount: expense.total_amount || baseAmount,
+        original_total_amount: baseAmount
+      };
     }
-    return expense;
+
+    // กรณีบิลที่ชำระแล้ว (PAID) หรือสถานะอื่นๆ
+    const lateFee = Math.max(0, (Number(expense.total_amount) || 0) - baseAmount);
+    return {
+      ...expense,
+      late_fee: lateFee,
+      original_total_amount: baseAmount
+    };
   };
 
   if (Array.isArray(expenses)) {
@@ -332,7 +350,7 @@ const createBill = async (req, res, next) => {
 const updateBill = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { water_cost, electricity_cost, due_date, status } = req.body;
+    const { water_cost, electricity_cost, due_date, status, total_amount } = req.body;
 
     if (due_date && isNaN(new Date(due_date).getTime())) {
       return res.status(400).json({ success: false, message: 'Invalid date format.' });
@@ -349,12 +367,46 @@ const updateBill = async (req, res, next) => {
     if (due_date) updateData.due_date = new Date(due_date);
     if (status) updateData.status = status;
 
-    // คำนวณ total_amount ใหม่อัตโนมัติถ้ามีการเปลี่ยนค่าน้ำ/ไฟ
+    // คำนวณ total_amount ใหม่อัตโนมัติถ้ามีการเปลี่ยนค่าน้ำ/ไฟ หรือส่ง total_amount มาโดยตรง
     if (water_cost !== undefined || electricity_cost !== undefined) {
       const newWater = water_cost !== undefined ? parseFloat(water_cost) : existing.water_cost;
       const newElec = electricity_cost !== undefined ? parseFloat(electricity_cost) : existing.electricity_cost;
       const existingGreaseTrap = existing.grease_trap_fee || 0;
       updateData.total_amount = existing.rent_amount + newWater + newElec + existingGreaseTrap;
+    } else if (total_amount !== undefined) {
+      updateData.total_amount = parseFloat(total_amount);
+    }
+
+    // หากมีการเปลี่ยนสถานะเป็น PAID และไม่ได้ส่ง total_amount มา ให้คำนวณค่าปรับเกินกำหนดและบันทึกยอดรวม
+    if (status === 'PAID' && updateData.total_amount === undefined) {
+      const due = new Date(updateData.due_date || existing.due_date);
+      due.setHours(0, 0, 0, 0);
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+
+      if (now > due || existing.status === 'OVERDUE') {
+        const lateRent = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_RENT_FINE' } });
+        const lateUtility = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_UTILITY_FINE' } });
+        const delaySetting = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_FINE_DELAY_DAYS' } });
+
+        const rentFine = parseFloat(lateRent?.setting_value || '100');
+        const utilityFine = parseFloat(lateUtility?.setting_value || '50');
+        const delayDays = parseInt(delaySetting?.setting_value || '0', 10);
+        const totalDailyFine = rentFine + utilityFine;
+
+        const diffTime = now - due;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const lateFee = diffDays > delayDays ? (diffDays - delayDays) * totalDailyFine : 0;
+
+        const baseAmount = (Number(existing.rent_amount) || 0) + 
+                           (Number(updateData.water_cost ?? existing.water_cost) || 0) + 
+                           (Number(updateData.electricity_cost ?? existing.electricity_cost) || 0) + 
+                           (Number(existing.grease_trap_fee) || 0);
+
+        if (lateFee > 0) {
+          updateData.total_amount = Math.max(existing.total_amount, baseAmount + lateFee);
+        }
+      }
     }
 
     const updated = await prisma.monthlyExpense.update({
@@ -400,11 +452,41 @@ const uploadPaymentProof = async (req, res, next) => {
     // โดยใช้ Cloudinary → req.file.path คือ URL เต็ม
     const payment_slip_url = req.file.path;
 
+    // คำนวณยอดเงินรวมค่าปรับหากเลยกำหนดชำระแล้ว
+    const due = new Date(expense.due_date);
+    due.setHours(0, 0, 0, 0);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    let paymentAmount = expense.total_amount;
+
+    if (now > due) {
+      const lateRent = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_RENT_FINE' } });
+      const lateUtility = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_UTILITY_FINE' } });
+      const delaySetting = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_FINE_DELAY_DAYS' } });
+
+      const rentFine = parseFloat(lateRent?.setting_value || '100');
+      const utilityFine = parseFloat(lateUtility?.setting_value || '50');
+      const delayDays = parseInt(delaySetting?.setting_value || '0', 10);
+      const totalDailyFine = rentFine + utilityFine;
+
+      const diffTime = now - due;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const lateFee = diffDays > delayDays ? (diffDays - delayDays) * totalDailyFine : 0;
+
+      const baseAmount = (Number(expense.rent_amount) || 0) + 
+                         (Number(expense.water_cost) || 0) + 
+                         (Number(expense.electricity_cost) || 0) + 
+                         (Number(expense.grease_trap_fee) || 0);
+      if (lateFee > 0) {
+        paymentAmount = Math.max(expense.total_amount, baseAmount + lateFee);
+      }
+    }
+
     const payment = await prisma.payment.create({
       data: {
         expense_id: parseInt(id),
         payment_date: new Date(),
-        payment_amount: expense.total_amount,
+        payment_amount: paymentAmount,
         payment_slip_url
       }
     });
@@ -438,7 +520,7 @@ const uploadPaymentProof = async (req, res, next) => {
 // -------------------------------------------------------
 // ฟังก์ชัน: verifyPayment
 // หน้าที่: Admin ตรวจสอบสลิปและอนุมัติ/ปฏิเสธการชำระ
-//   - approved = true: อนุมัติ → เปลี่ยน expense status → PAID
+//   - approved = true: อนุมัติ → เปลี่ยน expense status → PAID (พร้อมคำนวณและบันทึกค่าปรับถ้าเกินกำหนด)
 //   - approved = false: ปฏิเสธ → คืนเป็น PENDING เพื่อให้ Tenant ส่งสลิปใหม่
 //   - ส่ง push notification แจ้งผลให้ Tenant ทราบ
 // -------------------------------------------------------
@@ -463,10 +545,50 @@ const verifyPayment = async (req, res, next) => {
 
     // เปลี่ยนสถานะ expense ตามผลการตรวจสอบ
     if (approved) {
-      // อนุมัติ → บิลถือว่าชำระแล้ว
+      // อนุมัติ → บิลถือว่าชำระแล้ว และบันทึกยอดรวมที่รวมค่าปรับหากเกินกำหนด
+      const expense = await prisma.monthlyExpense.findUnique({
+        where: { expense_id: payment.expense_id }
+      });
+
+      let finalTotal = expense ? expense.total_amount : undefined;
+
+      if (expense) {
+        const due = new Date(expense.due_date);
+        due.setHours(0, 0, 0, 0);
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+
+        if (now > due || expense.status === 'OVERDUE') {
+          const lateRent = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_RENT_FINE' } });
+          const lateUtility = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_UTILITY_FINE' } });
+          const delaySetting = await prisma.systemSetting.findUnique({ where: { setting_key: 'LATE_FINE_DELAY_DAYS' } });
+
+          const rentFine = parseFloat(lateRent?.setting_value || '100');
+          const utilityFine = parseFloat(lateUtility?.setting_value || '50');
+          const delayDays = parseInt(delaySetting?.setting_value || '0', 10);
+          const totalDailyFine = rentFine + utilityFine;
+
+          const diffTime = now - due;
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          const lateFee = diffDays > delayDays ? (diffDays - delayDays) * totalDailyFine : 0;
+
+          const baseAmount = (Number(expense.rent_amount) || 0) + 
+                             (Number(expense.water_cost) || 0) + 
+                             (Number(expense.electricity_cost) || 0) + 
+                             (Number(expense.grease_trap_fee) || 0);
+
+          if (lateFee > 0) {
+            finalTotal = Math.max(expense.total_amount, baseAmount + lateFee);
+          }
+        }
+      }
+
       await prisma.monthlyExpense.update({
         where: { expense_id: payment.expense_id },
-        data: { status: 'PAID' }
+        data: { 
+          status: 'PAID',
+          ...(finalTotal !== undefined ? { total_amount: finalTotal } : {})
+        }
       });
     } else {
       // Bug #11: ปฏิเสธ → ลบ payment record เก่าออก เพื่อไม่ให้สลิปเก่าโผล่ซ้ำ

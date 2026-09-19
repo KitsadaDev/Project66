@@ -295,3 +295,127 @@ export function exportBillsReportPDF(bills, titleExtra, paidBills, waitingBills,
 
   openPrintWindow(html);
 }
+
+// -------------------------------------------------------
+// ฟังก์ชัน: exportSlotIncomeReportPDF
+// หน้าที่: สร้างและพิมพ์รายงานรายได้แยกค่าน้ำ ค่าไฟ ค่าเช่า และสถานะรายล็อค
+//   - คอลัมน์: ชื่อล็อค, ชื่อผู้เช่าล็อค, ค่าเช่าล็อค, ค่าน้ำ, ค่าไฟ, ค่าดักไขมัน(ถ้ามี), ยอดค้างชำระ(ถ้ามี)
+//   - แสดงกล่องสรุปสถานะรายล็อคและยอดค้างชำระรวม
+//   - แสดงแถวสรุปยอดรวมของทุกคอลัมน์ท้ายตาราง
+// -------------------------------------------------------
+export function exportSlotIncomeReportPDF(rows, titleExtra, stats) {
+  titleExtra = titleExtra || '';
+  rows = rows || [];
+  stats = stats || {};
+
+  var today = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  // คำนวณยอดรวมของแต่ละคอลัมน์
+  var totalRent = 0;
+  var totalWater = 0;
+  var totalElec = 0;
+  var totalGrease = 0;
+  var totalPending = 0;
+
+  var rowsHtml = '';
+  if (rows.length === 0) {
+    rowsHtml = '<tr><td colspan="7" style="text-align:center;color:#9CA3AF;padding:16px;">ไม่มีข้อมูลแผงค้าที่มีผู้เช่า</td></tr>';
+  } else {
+    rows.forEach(function(item) {
+      if (item.rent_amount != null) totalRent += Number(item.rent_amount || 0);
+      if (item.water_cost != null) totalWater += Number(item.water_cost || 0);
+      if (item.electricity_cost != null) totalElec += Number(item.electricity_cost || 0);
+      if (item.grease_trap_fee != null) totalGrease += Number(item.grease_trap_fee || 0);
+      if (item.pending_amount) totalPending += Number(item.pending_amount || 0);
+
+      var rentText = item.rent_amount != null ? '฿' + Number(item.rent_amount).toLocaleString() : '-';
+      var waterText = item.water_cost != null ? '฿' + Number(item.water_cost).toLocaleString() : '-';
+      var elecText = item.electricity_cost != null ? '฿' + Number(item.electricity_cost).toLocaleString() : '-';
+      var greaseText = (item.grease_trap_fee != null && Number(item.grease_trap_fee) > 0)
+        ? '฿' + Number(item.grease_trap_fee).toLocaleString()
+        : '-';
+
+      var pendingCell = '';
+      if (item.status === 'UNBILLED') {
+        pendingCell = '<span class="badge" style="background:#F3F4F6;color:#6B7280;">ยังไม่ออกบิล</span>';
+      } else if (item.status === 'PAID') {
+        pendingCell = '<span style="color:#059669;font-weight:bold;">ชำระแล้ว (฿0)</span>';
+      } else if (item.status === 'OVERDUE') {
+        pendingCell = '<span style="color:#DC2626;font-weight:bold;">฿' + Number(item.pending_amount || 0).toLocaleString() + '</span> <span class="badge" style="background:#FEE2E2;color:#991B1B;">เกินกำหนด</span>';
+      } else if (item.status === 'WAITING_VERIFICATION') {
+        pendingCell = '<span style="color:#D97706;font-weight:bold;">฿' + Number(item.pending_amount || 0).toLocaleString() + '</span> <span class="badge" style="background:#FEF3C7;color:#92400E;">รอยืนยัน</span>';
+      } else {
+        pendingCell = '<span style="color:#EA580C;font-weight:bold;">฿' + Number(item.pending_amount || 0).toLocaleString() + '</span> <span class="badge" style="background:#FFEDD5;color:#C2410C;">รอชำระ</span>';
+      }
+
+      rowsHtml += '<tr>';
+      rowsHtml += '<td style="text-align:center;font-weight:bold;">ล็อค ' + item.slot_number + '</td>';
+      rowsHtml += '<td><strong>' + item.tenant_name + '</strong></td>';
+      rowsHtml += '<td style="text-align:right;">' + rentText + '</td>';
+      rowsHtml += '<td style="text-align:right;">' + waterText + '</td>';
+      rowsHtml += '<td style="text-align:right;">' + elecText + '</td>';
+      rowsHtml += '<td style="text-align:right;">' + greaseText + '</td>';
+      rowsHtml += '<td style="text-align:right;">' + pendingCell + '</td>';
+      rowsHtml += '</tr>';
+    });
+  }
+
+  var extraCss = [
+    '.summary-box { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; background:#FAF5FF; border:1px solid #E9D5FF; border-radius:10px; padding:12px 18px; margin-bottom:20px; gap:12px; }',
+    '.summary-item { text-align:center; flex:1; min-width:80px; }',
+    '.summary-item .num { font-size:18px; font-weight:bold; }',
+    '.summary-item .label { font-size:11px; color:#6B7280; margin-top:2px; }',
+  ].join('\n');
+
+  var titleExtraText = titleExtra ? '(รอบเวลา: ' + titleExtra + ')' : '';
+  var html = '<!DOCTYPE html><html lang="th"><head><meta charset="utf-8"><title>รายงานรายได้แยกค่าน้ำ ค่าไฟ ค่าเช่า และสถานะรายล็อค</title>';
+  html += '<style>' + BASE_CSS + '\n' + extraCss + '\n';
+  html += '.header h1 { color:#7C3AED; } .header { border-bottom:2px solid #7C3AED; }';
+  html += '</style></head><body>';
+  html += '<div class="header"><h1>รายงานรายได้แยกค่าน้ำ ค่าไฟ ค่าเช่า และสถานะรายล็อค</h1>';
+  html += '<p>ระบบจัดการศูนย์อาหาร Food Court System ' + titleExtraText + '</p></div>';
+
+  // กล่องสรุปสถานะรายล็อค
+  html += '<div class="summary-box">';
+  html += '<div class="summary-item"><div class="num" style="color:#7C3AED;">' + (stats.totalOccupied || rows.length) + '</div><div class="label">ล็อคที่มีผู้เช่า</div></div>';
+  html += '<div class="summary-item"><div class="num" style="color:#059669;">' + (stats.paidSlots || 0) + '</div><div class="label">ชำระแล้ว</div></div>';
+  html += '<div class="summary-item"><div class="num" style="color:#DC2626;">' + (stats.pendingSlots || 0) + '</div><div class="label">ติดค้างชำระ</div></div>';
+  html += '<div class="summary-item"><div class="num" style="color:#6B7280;">' + (stats.unbilledSlots || 0) + '</div><div class="label">ยังไม่ออกบิล</div></div>';
+  html += '<div class="summary-item" style="border-left:1px solid #E9D5FF;padding-left:14px;"><div class="num" style="font-size:20px;color:#DC2626;">฿' + totalPending.toLocaleString() + '</div><div class="label">ยอดค้างชำระรวม (บาท)</div></div>';
+  html += '</div>';
+
+  // ตารางข้อมูลรายละเอียดรายล็อค
+  html += '<table>';
+  html += '<thead><tr>';
+  html += '<th style="width:10%;text-align:center;">ชื่อล็อค</th>';
+  html += '<th style="width:22%;">ชื่อผู้เช่าล็อค</th>';
+  html += '<th style="width:13%;text-align:right;">ค่าเช่าล็อค</th>';
+  html += '<th style="width:11%;text-align:right;">ค่าน้ำ</th>';
+  html += '<th style="width:11%;text-align:right;">ค่าไฟ</th>';
+  html += '<th style="width:13%;text-align:right;">ค่าดักไขมัน (ถ้ามี)</th>';
+  html += '<th style="width:20%;text-align:right;">ยอดค้างชำระ (ถ้ามี)</th>';
+  html += '</tr></thead>';
+
+  html += '<tbody>' + rowsHtml + '</tbody>';
+
+  // ส่วนท้ายตาราง: แถวสรุปยอดรวม
+  if (rows.length > 0) {
+    html += '<tfoot style="background:#F9FAFB;font-weight:bold;border-top:2px solid #E5E7EB;">';
+    html += '<tr>';
+    html += '<td colspan="2" style="text-align:center;font-weight:bold;">รวมทั้งหมด</td>';
+    html += '<td style="text-align:right;color:#6D28D9;">฿' + totalRent.toLocaleString() + '</td>';
+    html += '<td style="text-align:right;color:#0284C7;">฿' + totalWater.toLocaleString() + '</td>';
+    html += '<td style="text-align:right;color:#D97706;">฿' + totalElec.toLocaleString() + '</td>';
+    html += '<td style="text-align:right;color:#4B5563;">' + (totalGrease > 0 ? '฿' + totalGrease.toLocaleString() : '-') + '</td>';
+    html += '<td style="text-align:right;color:#DC2626;">฿' + totalPending.toLocaleString() + '</td>';
+    html += '</tr>';
+    html += '</tfoot>';
+  }
+
+  html += '</table>';
+  html += '<div class="footer">วันที่ออกเอกสาร: ' + today + ' | ออกรายงานโดยระบบอัตโนมัติ</div>';
+  html += '</body></html>';
+
+  openPrintWindow(html);
+}
+
