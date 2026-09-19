@@ -441,16 +441,25 @@ const Tenants = () => {
   /**
    * ลบข้อมูลผู้เช่าออกจากระบบ พร้อมแสดงกล่องยืนยัน
    * @param {number} id - รหัสผู้ใช้ของผู้เช่า
+   * @param {object} tenant - ข้อมูลผู้เช่า
    */
-  const handleDelete = async (id) => {
-    if (window.confirm("คุณต้องการลบข้อมูลผู้เช่านี้ใช่หรือไม่?")) {
+  const handleDelete = async (id, tenant) => {
+    const tenantName = tenant
+      ? `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim()
+      : "ผู้เช่านี้";
+    const hasStall = !!tenant?.stall;
+    const confirmMsg = hasStall
+      ? `คุณต้องการลบข้อมูลผู้เช่า "${tenantName}" ใช่หรือไม่?\n\n⚠️ คำเตือน: ผู้เช่านี้มีสัญญาเช่าอยู่ แผงค้า (${tenant.stall.slot_number}) จะถูกยกเลิกสัญญาและคืนสถานะเป็น "ว่าง" โดยอัตโนมัติ`
+      : `คุณต้องการลบข้อมูลผู้เช่า "${tenantName}" ใช่หรือไม่?`;
+
+    if (window.confirm(confirmMsg)) {
       try {
-        await usersAPI.delete(id);
-        toast.success("ลบข้อมูลสำเร็จ");
+        const res = await usersAPI.delete(id);
+        toast.success(res.data?.message || "ลบข้อมูลสำเร็จ");
         fetchData();
       } catch (error) {
         console.error(error);
-        toast.error("ไม่สามารถลบข้อมูลได้");
+        toast.error(error.response?.data?.message || "ไม่สามารถลบข้อมูลได้");
       }
     }
   };
@@ -677,6 +686,12 @@ const Tenants = () => {
           if (finalForm[key] !== null && finalForm[key] !== undefined) {
             formData.append("deposit_amount", finalForm[key]);
           }
+        } else if (key === "stallId") {
+          formData.append("stallId", finalForm[key]);
+          formData.append("slot_id", finalForm[key]);
+        } else if (key === "tenantId") {
+          formData.append("tenantId", finalForm[key]);
+          formData.append("tenant_id", finalForm[key]);
         } else if (finalForm[key] !== null && finalForm[key] !== undefined) {
           formData.append(key, finalForm[key]);
         }
@@ -1008,7 +1023,7 @@ const Tenants = () => {
                       <span className="text-gray-300">-</span>
                     ) : (
                       <button
-                        onClick={() => handleDelete(tenant.user_id)}
+                        onClick={() => handleDelete(tenant.user_id, tenant)}
                         className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center"
                         title="ลบผู้เช่า"
                       >

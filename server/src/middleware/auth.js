@@ -49,7 +49,8 @@ const authenticate = async (req, res, next) => {
         first_name: true,
         last_name: true,
         role: true,
-        phone: true
+        phone: true,
+        is_active: true
       }
     });
 
@@ -58,6 +59,14 @@ const authenticate = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         message: 'User not found.'
+      });
+    }
+
+    // ถ้าผู้ใช้ถูกระงับการใช้งาน
+    if (!user.is_active) {
+      return res.status(403).json({
+        success: false,
+        message: 'Account is deactivated. Access denied.'
       });
     }
 

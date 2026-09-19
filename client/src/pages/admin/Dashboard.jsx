@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   User,
@@ -8,6 +8,12 @@ import {
   Calendar,
   FileText,
   X,
+  Wrench,
+  Gauge,
+  Receipt,
+  UserPlus,
+  XCircle,
+  Eye,
 } from "lucide-react";
 import { stallsAPI } from "../../api";
 
@@ -110,6 +116,56 @@ const AdminDashboard = () => {
     setSelectedStall(stall ?? { slot_number, status: "EMPTY" });
   };
 
+  // สถานะล็อกที่เอาเมาส์ชี้อยู่ (Hover Popover) และ Timer สำหรับหน่วงเวลา 2 วินาทีก่อนหายไป
+  const [hoveredStall, setHoveredStall] = useState(null);
+  const hoverTimerRef = useRef(null);
+
+  /**
+   * เมาส์เข้าแผงค้า หรือ Popover -> เคลียร์ timer เพื่อให้เปิดค้างไว้
+   */
+  const handleStallMouseEnter = (id) => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setHoveredStall(id);
+  };
+
+  /**
+   * เมาส์ออกจากแผงค้า หรือ Popover -> ค้างไว้ 2 วินาทีค่อยหายไป เพื่อให้เลื่อนไปกดเมนูลัดทัน
+   */
+  const handleStallMouseLeave = () => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+    }
+    hoverTimerRef.current = setTimeout(() => {
+      setHoveredStall(null);
+      hoverTimerRef.current = null;
+    }, 2000);
+  };
+
+  // ล้าง timer เมื่อ unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimerRef.current) {
+        clearTimeout(hoverTimerRef.current);
+      }
+    };
+  }, []);
+
+  const getStatusLabel = (status) => {
+    switch (status?.toUpperCase()) {
+      case "OCCUPIED":
+        return { label: "มีผู้เช่า", color: "bg-red-100 text-red-700" };
+      case "VACANT":
+        return { label: "ว่าง", color: "bg-green-100 text-green-700" };
+      case "MAINTENANCE":
+        return { label: "ปิดปรับปรุง", color: "bg-yellow-100 text-yellow-700" };
+      default:
+        return { label: "ยังไม่เปิดบริการ", color: "bg-gray-100 text-gray-600" };
+    }
+  };
+
   // หน้าจอสำหรับเลือกศูนย์อาหาร (แสดงเมื่อ URL ไม่มี ?foodCourt=...)
   if (!foodCourt) {
     return (
@@ -123,7 +179,7 @@ const AdminDashboard = () => {
         {/* การ์ดเลือกศูนย์อาหาร 1 และ ศูนย์อาหาร 2 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
           <Link
-            to="/admin?foodCourt=1"
+            to="/admin/stalls?foodCourt=1"
             className="group relative block rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 bg-white"
           >
             <div className="h-48 overflow-hidden relative">
@@ -147,7 +203,7 @@ const AdminDashboard = () => {
           </Link>
 
           <Link
-            to="/admin?foodCourt=2"
+            to="/admin/stalls?foodCourt=2"
             className="group relative block rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 bg-white"
           >
             <div className="h-48 overflow-hidden relative">
@@ -181,15 +237,150 @@ const AdminDashboard = () => {
    * @param {number} w - ความกว้าง (พิกเซล)
    * @param {number} h - ความสูง (พิกเซล)
    */
-  const StallCell = ({ id, fixedSize = false, w = 44, h = 44 }) => (
-    <div
-      style={fixedSize ? { width: w, height: h } : {}}
-      className={`${fixedSize ? "text-xs font-bold" : "w-14 h-14 md:w-16 md:h-16 text-sm md:text-base"} rounded-xl flex items-center justify-center font-bold ${getStallColor(getStallStatus(id), selectedStall?.slot_number === id)}`}
-      onClick={() => handleStallClick(id)}
-    >
-      {id}
-    </div>
-  );
+  const StallCell = ({ id, fixedSize = false, w = 44, h = 44 }) => {
+    const stallInfo = getStallData(id);
+    const status = getStallStatus(id);
+    const isHovered = hoveredStall === id;
+    const isSelected = selectedStall?.slot_number === id;
+    const statusInfo = stallInfo ? getStatusLabel(stallInfo.status) : { label: "ยังไม่เปิดบริการ", color: "bg-gray-100 text-gray-500" };
+    const contract = stallInfo?.rental_contracts?.[0];
+    const tenant = contract?.tenant;
+
+    const isBottomStall = id.startsWith("D") || id.startsWith("E") || id === "F1" || id === "F2" || id === "F3" || id === "A10" || id === "A11";
+
+    return (
+      <div
+        style={fixedSize ? { width: w, height: h } : {}}
+        className={`${fixedSize ? "text-xs font-bold" : "w-14 h-14 md:w-16 md:h-16 text-sm md:text-base"} rounded-xl flex items-center justify-center font-bold relative transition-all duration-300 cursor-pointer border-2 shadow-sm ${getStallColor(status, isSelected)} ${isHovered ? "z-30 ring-2 ring-purple-300" : ""}`}
+        onClick={() => handleStallClick(id)}
+        onMouseEnter={() => handleStallMouseEnter(id)}
+        onMouseLeave={handleStallMouseLeave}
+      >
+        <span>{id}</span>
+
+        {/* ── Hover Popover (ค้างไว้ 2 วินาทีเมื่อเลื่อนเมาส์ออก เพื่อให้กดเมนูลัดได้ทัน) ── */}
+        {isHovered && (
+          <div
+            className={`absolute z-50 ${isBottomStall ? "bottom-full mb-2 before:-bottom-3" : "top-full mt-2 before:-top-3"} left-1/2 -translate-x-1/2 pointer-events-auto before:content-[''] before:absolute before:left-0 before:right-0 before:h-3`}
+            style={{ minWidth: 220 }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseEnter={() => handleStallMouseEnter(id)}
+            onMouseLeave={handleStallMouseLeave}
+          >
+            <div className="bg-white border border-gray-200 text-gray-800 text-xs rounded-2xl shadow-2xl p-3.5 flex flex-col gap-2 cursor-default font-normal">
+              {/* หัว Popover */}
+              <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-0.5">
+                <span className="font-extrabold text-sm text-gray-900">แผงที่ {id}</span>
+                <button
+                  type="button"
+                  onClick={() => handleStallClick(id)}
+                  className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 font-semibold transition-colors cursor-pointer"
+                >
+                  <Eye size={11} /> ดูข้อมูล
+                </button>
+              </div>
+
+              {/* ข้อมูลแผงค้า */}
+              <div className="flex flex-col gap-1.5 font-normal">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-gray-500">สถานะ</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${statusInfo.color}`}>
+                    {statusInfo.label}
+                  </span>
+                </div>
+                {stallInfo && (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-gray-500">ขนาด</span>
+                      <span className="font-medium text-gray-800">{stallInfo.slot_size ?? "-"} ตร.ม.</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-gray-500">ค่าเช่า</span>
+                      <span className="font-medium text-gray-800">
+                        {stallInfo.rent != null ? Number(stallInfo.rent).toLocaleString("th-TH") : "-"} บาท/เดือน
+                      </span>
+                    </div>
+                  </>
+                )}
+                {tenant && (
+                  <div className="mt-1 pt-1.5 border-t border-gray-100 flex flex-col gap-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-gray-500">ผู้เช่า</span>
+                      <span className="font-bold text-gray-900 truncate max-w-[120px]">
+                        {tenant.first_name} {tenant.last_name || ""}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* เมนูทางลัด */}
+              <div className="border-t border-gray-100 pt-2 mt-0.5">
+                <p className="text-gray-400 text-[10px] mb-1.5 font-medium">ทางลัดไป</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {stallInfo?.status === "OCCUPIED" && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); navigate(`/admin/contracts?slot=${encodeURIComponent(id)}`); }}
+                      className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors font-medium text-[11px] cursor-pointer"
+                    >
+                      <FileText size={12} /> สัญญา
+                    </button>
+                  )}
+                  {stallInfo?.status === "VACANT" && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); navigate("/admin/create-contract"); }}
+                      className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors font-medium text-[11px] cursor-pointer"
+                    >
+                      <UserPlus size={12} /> สร้างสัญญา
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); navigate("/admin/repairs"); }}
+                    className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-orange-50 text-orange-700 hover:bg-orange-100 transition-colors font-medium text-[11px] cursor-pointer"
+                  >
+                    <Wrench size={12} /> แจ้งซ่อม
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); navigate(`/admin/meter-recording?slot=${encodeURIComponent(id)}`); }}
+                    className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors font-medium text-[11px] cursor-pointer"
+                  >
+                    <Gauge size={12} /> บันทึกมิเตอร์
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); navigate(`/admin/bills?slot=${encodeURIComponent(id)}`); }}
+                    className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors font-medium text-[11px] cursor-pointer"
+                  >
+                    <Receipt size={12} /> ใบแจ้งหนี้
+                  </button>
+                  {stallInfo?.status === "OCCUPIED" && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); navigate("/admin/cancel-contracts"); }}
+                      className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition-colors font-medium text-[11px] cursor-pointer"
+                    >
+                      <XCircle size={12} /> ยกเลิกสัญญา
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* ปลาย popover */}
+              {isBottomStall ? (
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-white drop-shadow-sm" />
+              ) : (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-white drop-shadow-sm" />
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Layout for Food Court 1 & 2
   return (
@@ -280,14 +471,14 @@ const AdminDashboard = () => {
                     <div style={{ position: "absolute", right: 0, top: 100, bottom: 0, borderRight: "3px solid #4B5563" }} />
 
                     {/* ── B row ── */}
-                    <div style={{ position: "absolute", top: 10, left: 330, display: "flex", gap: 5 }}>
+                    <div style={{ position: "absolute", top: 10, left: 330, display: "flex", gap: 5, zIndex: hoveredStall?.startsWith("B") ? 40 : 1 }}>
                       {["B1","B2","B3","B4","B5","B6","B7","B8"].map((id) => (
                         <StallCell key={id} id={id} fixedSize w={44} h={44} />
                       ))}
                     </div>
 
                     {/* ── C row ── */}
-                    <div style={{ position: "absolute", top: 115, left: 134, display: "flex", gap: 5 }}>
+                    <div style={{ position: "absolute", top: 115, left: 134, display: "flex", gap: 5, zIndex: hoveredStall?.startsWith("C") ? 40 : 1 }}>
                       {["C1","C2","C3","C4","C5","C6"].map((id) => (
                         <StallCell key={id} id={id} fixedSize w={44} h={44} />
                       ))}
@@ -296,20 +487,20 @@ const AdminDashboard = () => {
                     {/* ── Dining zone ── */}
                     <div
                       className="absolute flex items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 text-gray-500 text-sm font-medium"
-                      style={{ top: 175, left: 100, width: 640, height: 315 }}
+                      style={{ top: 175, left: 100, width: 640, height: 315, zIndex: 0 }}
                     >
                       โซนโต๊ะนั่งทานอาหาร
                     </div>
 
                     {/* ── A column ── */}
-                    <div style={{ position: "absolute", top: 110, right: 10, display: "flex", flexDirection: "column", gap: 5 }}>
+                    <div style={{ position: "absolute", top: 110, right: 10, display: "flex", flexDirection: "column", gap: 5, zIndex: hoveredStall?.startsWith("A") ? 40 : 1 }}>
                       {["A1","A2","A3","A4","A5","A6","A7","A8","A9","A10","A11"].map((id) => (
                         <StallCell key={id} id={id} fixedSize w={44} h={44} />
                       ))}
                     </div>
 
                     {/* ── D row ── */}
-                    <div style={{ position: "absolute", top: 606, left: 294, display: "flex", gap: 5 }}>
+                    <div style={{ position: "absolute", top: 606, left: 294, display: "flex", gap: 5, zIndex: hoveredStall?.startsWith("D") ? 40 : 1 }}>
                       {["D1","D2","D3","D4","D5","D6"].map((id) => (
                         <StallCell key={id} id={id} fixedSize w={44} h={44} />
                       ))}
@@ -317,7 +508,7 @@ const AdminDashboard = () => {
                   </div>
 
                   {/* ═══ E row — OUTSIDE room ═══ */}
-                  <div style={{ marginTop: 10, display: "flex", gap: 5 }}>
+                  <div style={{ marginTop: 10, display: "flex", gap: 5, position: "relative", zIndex: hoveredStall?.startsWith("E") ? 40 : 1 }}>
                     {["E1","E2","E3","E4","E5","E6","E7","E8","E9","E10","E11","E12"].map((id) => (
                       <StallCell key={id} id={id} fixedSize w={44} h={44} />
                     ))}
@@ -328,7 +519,7 @@ const AdminDashboard = () => {
                 <div className="min-w-[650px] w-[650px] mx-auto">
                   <div style={{ position: "relative", width: 650, height: 540, border: "3px solid #4B5563" }}>
                     {/* ── Stall Column F (F10 down to F1) ── */}
-                    <div style={{ position: "absolute", top: 24, left: 24, display: "flex", flexDirection: "column", gap: 5 }}>
+                    <div style={{ position: "absolute", top: 24, left: 24, display: "flex", flexDirection: "column", gap: 5, zIndex: hoveredStall?.startsWith("F") ? 40 : 1 }}>
                       {["F10", "F9", "F8", "F7", "F6", "F5", "F4", "F3", "F2", "F1"].map((id) => (
                         <StallCell key={id} id={id} fixedSize w={44} h={44} />
                       ))}
@@ -514,7 +705,13 @@ const AdminDashboard = () => {
                       )}
                     </div>
 
-                    <div className="pt-2">
+                    <div className="pt-2 flex flex-col gap-2">
+                      <button
+                        onClick={() => navigate(`/admin/contracts?slot=${encodeURIComponent(selectedStall?.slot_number || selectedStallId)}`)}
+                        className="w-full py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-medium text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <FileText size={14} /> ดูรายละเอียดสัญญาของแผงนี้
+                      </button>
                       <button
                         onClick={() => navigate("/admin/tenants")}
                         className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-medium text-xs shadow-sm transition-colors flex items-center justify-center gap-1.5"

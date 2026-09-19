@@ -122,8 +122,12 @@ model UtilityMeter {
   total_cost       Float
   recorded_by      Int
   created_at       DateTime   @default(now())
+  billing_month    Int        @default(1)    // 1-12
+  billing_year     Int        @default(2025) // เช่น 2025
   recorder         User       @relation("RecordedByUser", fields: [recorded_by], references: [user_id])
   slot             RentalSlot @relation(fields: [slot_id], references: [slot_id])
+
+  @@unique([slot_id, meter_type, billing_month, billing_year])
 }
 
 model MonthlyExpense {

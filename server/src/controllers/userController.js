@@ -307,20 +307,138 @@ const updateUser = async (req, res, next) => {
 const deleteUser = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const userId = parseInt(id);
 
-    const existingUser = await prisma.user.findUnique({ where: { user_id: parseInt(id) } });
+    const existingUser = await prisma.user.findUnique({
+      where: { user_id: userId },
+      include: {
+        rental_contracts: {
+          select: {
+            contract_id: true,
+            slot_id: true,
+            status: true,
+            monthly_expenses: {
+              select: { expense_id: true }
+            }
+          }
+        },
+        maintenance_requests: {
+          select: { request_id: true }
+        }
+      }
+    });
+
     if (!existingUser) {
-      return res.status(404).json({ success: false, message: 'User not found.' });
+      return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลผู้ใช้งานในระบบ' });
     }
 
     // ป้องกันไม่ให้ Admin ลบ account Admin ด้วยกัน
     if (existingUser.role === 'ADMIN') {
-      return res.status(400).json({ success: false, message: 'Cannot delete admin users.' });
+      return res.status(400).json({ success: false, message: 'ไม่สามารถลบบัญชีผู้ดูแลระบบ (Admin) ได้' });
     }
 
-    await prisma.user.delete({ where: { user_id: parseInt(id) } });
-    res.json({ success: true, message: 'User deleted successfully.' });
+    await prisma.$transaction(async (tx) => {
+      // 1. จัดการสัญญาเช่าและคืนสถานะแผงค้า (ถ้ามีสัญญาที่ยัง ACTIVE)
+      const contractIds = existingUser.rental_contracts.map((c) => c.contract_id);
+      const activeSlotIds = existingUser.rental_contracts
+        .filter((c) => c.status === 'ACTIVE')
+        .map((c) => c.slot_id);
+
+      // คืนสถานะแผงค้าที่เป็น ACTIVE ให้กลับเป็น VACANT (ว่าง)
+      if (activeSlotIds.length > 0) {
+        await tx.rentalSlot.updateMany({
+          where: { slot_id: { in: activeSlotIds } },
+          data: { status: 'VACANT' }
+        });
+      }
+
+      if (contractIds.length > 0) {
+        // ดึง expense_ids ทั้งหมดของสัญญา
+        const expenseIds = existingUser.rental_contracts.flatMap((c) =>
+          c.monthly_expenses.map((e) => e.expense_id)
+        );
+
+        // ลบ payments
+        if (expenseIds.length > 0) {
+          await tx.payment.deleteMany({
+            where: { expense_id: { in: expenseIds } }
+          });
+          // ลบ monthly_expenses
+          await tx.monthlyExpense.deleteMany({
+            where: { expense_id: { in: expenseIds } }
+          });
+        }
+
+        // ลบ cancellation_requests
+        await tx.cancellationRequest.deleteMany({
+          where: { contract_id: { in: contractIds } }
+        });
+
+        // ลบ rental_contracts
+        await tx.rentalContract.deleteMany({
+          where: { contract_id: { in: contractIds } }
+        });
+      }
+
+      // 2. จัดการคำขอแจ้งซ่อม (Maintenance Requests)
+      const requestIds = existingUser.maintenance_requests.map((r) => r.request_id);
+      if (requestIds.length > 0) {
+        await tx.maintenanceUpdate.deleteMany({
+          where: { request_id: { in: requestIds } }
+        });
+        await tx.maintenanceImage.deleteMany({
+          where: { request_id: { in: requestIds } }
+        });
+        await tx.maintenanceAssignment.deleteMany({
+          where: { request_id: { in: requestIds } }
+        });
+        await tx.maintenanceRequest.deleteMany({
+          where: { request_id: { in: requestIds } }
+        });
+      }
+
+      // ลบความสัมพันธ์อื่นๆ ที่ชี้มายัง user นี้
+      await tx.maintenanceUpdate.deleteMany({
+        where: { updated_by: userId }
+      });
+      await tx.maintenanceAssignment.deleteMany({
+        where: { OR: [{ assigned_to: userId }, { assigned_by: userId }] }
+      });
+      await tx.payment.updateMany({
+        where: { verified_by: userId },
+        data: { verified_by: null }
+      });
+      await tx.systemSetting.updateMany({
+        where: { updated_by: userId },
+        data: { updated_by: null }
+      });
+
+      // จัดการ utility_meters ถ้ามีผู้ใช้คนนี้เป็นคนบันทึก
+      const metersRecorded = await tx.utilityMeter.count({ where: { recorded_by: userId } });
+      if (metersRecorded > 0) {
+        const adminUser = await tx.user.findFirst({ where: { role: 'ADMIN', user_id: { not: userId } } });
+        if (adminUser) {
+          await tx.utilityMeter.updateMany({
+            where: { recorded_by: userId },
+            data: { recorded_by: adminUser.user_id }
+          });
+        }
+      }
+
+      // 3. ลบการแจ้งเตือน (Notifications)
+      await tx.notification.deleteMany({
+        where: { user_id: userId }
+      });
+
+      // 4. ลบ User
+      await tx.user.delete({
+        where: { user_id: userId }
+      });
+    });
+
+    res.json({ success: true, message: 'ลบข้อมูลผู้เช่าและคืนสถานะแผงค้าเรียบร้อยแล้ว' });
   } catch (error) {
+    console.error('Error deleting user:', error);
     next(error);
   }
 };

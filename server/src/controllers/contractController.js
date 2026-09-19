@@ -41,6 +41,10 @@ const getAllContracts = async (req, res, next) => {
         },
         tenant: {
           select: { user_id: true, first_name: true, last_name: true, email: true, phone: true }
+        },
+        cancellation_requests: {
+          orderBy: { requested_at: 'desc' },
+          take: 1
         }
       },
       orderBy: { created_at: 'desc' }
@@ -71,6 +75,10 @@ const getContractById = async (req, res, next) => {
         },
         tenant: {
           select: { user_id: true, first_name: true, last_name: true, email: true, phone: true }
+        },
+        cancellation_requests: {
+          orderBy: { requested_at: 'desc' },
+          take: 1
         }
       }
     });
@@ -110,14 +118,29 @@ const createContract = async (req, res, next) => {
       lateRentFine, lateUtilityFine, menuType, contract_number, contractNumber
     } = req.body;
 
+    // รองรับ fallback จากการเรียกผ่านหน้าจัดการผู้เช่า (stallId, tenantId)
+    const rawSlotId = slot_id || req.body.stallId || req.body.stall_id;
+    const rawTenantId = tenant_id || req.body.tenantId;
+
+    if (!rawSlotId || !rawTenantId) {
+      return res.status(400).json({ success: false, message: 'กรุณาระบุข้อมูลแผงค้าและผู้เช่า' });
+    }
+
+    const slotIdNum = parseInt(rawSlotId);
+    const tenantIdNum = parseInt(rawTenantId);
+
+    if (isNaN(slotIdNum) || isNaN(tenantIdNum)) {
+      return res.status(400).json({ success: false, message: 'รหัสแผงค้าหรือผู้เช่าไม่ถูกต้อง' });
+    }
+
     // ตรวจสอบว่า slot มีอยู่ในระบบหรือไม่
-    const slot = await prisma.rentalSlot.findUnique({ where: { slot_id: parseInt(slot_id) } });
+    const slot = await prisma.rentalSlot.findUnique({ where: { slot_id: slotIdNum } });
     if (!slot) {
       return res.status(404).json({ success: false, message: 'Slot not found.' });
     }
 
     // ตรวจสอบว่า tenant มีอยู่ และเป็น role TENANT จริง
-    const tenant = await prisma.user.findUnique({ where: { user_id: parseInt(tenant_id) } });
+    const tenant = await prisma.user.findUnique({ where: { user_id: tenantIdNum } });
     if (!tenant || tenant.role !== 'TENANT') {
       return res.status(400).json({ success: false, message: 'Invalid tenant.' });
     }
@@ -125,15 +148,24 @@ const createContract = async (req, res, next) => {
     // ตรวจสอบว่า tenant มีสัญญา ACTIVE อยู่แล้วหรือไม่
     // 1 คนมีได้แค่ 1 สัญญาที่ active ในเวลาเดียวกัน
     const existingActiveTenantContract = await prisma.rentalContract.findFirst({
-      where: { tenant_id: parseInt(tenant_id), status: 'ACTIVE' }
+      where: { tenant_id: tenantIdNum, status: 'ACTIVE' }
     });
     if (existingActiveTenantContract) {
       return res.status(400).json({ success: false, message: 'ผู้เช่ารายนี้มีสัญญาที่กำลังดำเนินการอยู่แล้ว ไม่สามารถเพิ่มสัญญาซ้อนได้' });
     }
 
-    // ตรวจสอบระยะเวลาสัญญา: ต้องไม่เกิน 3 ปีนับจากวันเริ่ม
+    // ตรวจสอบความถูกต้องของวันที่เริ่มและสิ้นสุดสัญญา
     const start = new Date(startDate);
     const end = new Date(endDate);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({ success: false, message: 'รูปแบบวันที่เริ่มหรือสิ้นสุดสัญญาไม่ถูกต้อง' });
+    }
+
+    if (end <= start) {
+      return res.status(400).json({ success: false, message: 'วันที่สิ้นสุดสัญญาต้องอยู่หลังวันเริ่มต้นสัญญา' });
+    }
+
+    // ตรวจสอบระยะเวลาสัญญา: ต้องไม่เกิน 3 ปีนับจากวันเริ่ม
     const maxEnd = new Date(start);
     maxEnd.setFullYear(maxEnd.getFullYear() + 3);
     
@@ -144,7 +176,7 @@ const createContract = async (req, res, next) => {
     // ยกเลิกสัญญาเก่าที่ยังมีสถานะ ACTIVE สำหรับ slot นี้
     // (กรณีสร้างสัญญาใหม่ทับสัญญาเก่า)
     await prisma.rentalContract.updateMany({
-      where: { slot_id: parseInt(slot_id), status: 'ACTIVE' },
+      where: { slot_id: slotIdNum, status: 'ACTIVE' },
       data: { status: 'TERMINATED' }
     });
 
@@ -156,11 +188,11 @@ const createContract = async (req, res, next) => {
     const [contract] = await prisma.$transaction([
       prisma.rentalContract.create({
         data: {
-          slot_id: parseInt(slot_id),
-          tenant_id: parseInt(tenant_id),
+          slot_id: slotIdNum,
+          tenant_id: tenantIdNum,
           contract_number: customContractNum && customContractNum.trim() !== '' ? customContractNum.trim() : `CTR-${slot.slot_number}-${Date.now().toString().slice(-6)}`,
-          start_date: new Date(startDate),
-          end_date: new Date(endDate),
+          start_date: start,
+          end_date: end,
           monthly_rent: parseFloat(slot.rent),
           deposit_amount: deposit_amount && deposit_amount !== '' ? parseFloat(deposit_amount) : 0,
           idCard: idCard && idCard !== '' ? idCard : null,
@@ -182,7 +214,7 @@ const createContract = async (req, res, next) => {
       }),
       // อัปเดตสถานะ slot → OCCUPIED (ไม่ว่าง)
       prisma.rentalSlot.update({
-        where: { slot_id: parseInt(slot_id) },
+        where: { slot_id: slotIdNum },
         data: { status: 'OCCUPIED' }
       })
     ]);
@@ -216,6 +248,15 @@ const updateContract = async (req, res, next) => {
 
     const newStart = startDate && startDate !== '' ? new Date(startDate) : existing.start_date;
     const newEnd = endDate && endDate !== '' ? new Date(endDate) : existing.end_date;
+
+    if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime())) {
+      return res.status(400).json({ success: false, message: 'รูปแบบวันที่เริ่มหรือสิ้นสุดสัญญาไม่ถูกต้อง' });
+    }
+
+    if (newEnd <= newStart) {
+      return res.status(400).json({ success: false, message: 'วันที่สิ้นสุดสัญญาต้องอยู่หลังวันเริ่มต้นสัญญา' });
+    }
+
     const maxEnd = new Date(newStart);
     maxEnd.setFullYear(maxEnd.getFullYear() + 3);
 
@@ -286,16 +327,21 @@ const terminateContract = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Contract not found.' });
     }
 
-    await prisma.$transaction([
-      prisma.rentalContract.update({
+    await prisma.$transaction(async (tx) => {
+      await tx.rentalContract.update({
         where: { contract_id: parseInt(id) },
         data: { status: 'TERMINATED' }
-      }),
-      prisma.rentalSlot.update({
+      });
+      await tx.rentalSlot.update({
         where: { slot_id: contract.slot_id },
         data: { status: 'VACANT' }
-      })
-    ]);
+      });
+      // อัปเดตคำขอยกเลิกสัญญาของสัญญานี้ที่ยัง PENDING ให้เป็น APPROVED
+      await tx.cancellationRequest.updateMany({
+        where: { contract_id: parseInt(id), status: 'PENDING' },
+        data: { status: 'APPROVED', reviewed_at: new Date() }
+      });
+    });
 
     try {
         const tenant = await prisma.user.findUnique({ where: { user_id: contract.tenant_id } });
@@ -461,18 +507,25 @@ const getCancellationRequests = async (req, res, next) => {
     
     // แปลง (map) ข้อมูลให้อยู่ในรูปแบบที่ frontend ต้องการ
     // เนื่องจาก DB schema ใช้ CancellationRequest แยกต่างหาก
-    // แต่ frontend คาดหวัง field ชื่อเดิม เช่น cancellation_reason, tenant_id
+    // แต่ frontend คาดหวัง field ชื่อเดิม เช่น cancellation_reason, tenant_id, contract_number, start_date
     const mapped = requests.map(r => ({
       id: r.request_id,
       contract_id: r.contract_id,
-      tenant_id: r.contract.tenant_id,
+      tenant_id: r.contract?.tenant_id,
+      contract_number: r.contract?.contract_number || null,
+      start_date: r.contract?.start_date || null,
+      end_date: r.contract?.end_date || null,
       cancellation_reason: r.reason,
       cancellation_note: r.note,
       cancellation_requested_at: r.requested_at,
-      // แปลง 'PENDING' → 'PENDING_TERMINATION' ให้ตรงกับ status ของ contract
-      status: r.status === 'PENDING' ? 'PENDING_TERMINATION' : r.status,
-      tenant: r.contract.tenant,
-      slot: r.contract.slot
+      reviewed_at: r.reviewed_at,
+      // แปลง status ให้ตรงกับที่ frontend (CancelContracts.jsx และ CancelContract.jsx) คาดหวัง
+      // PENDING -> PENDING_TERMINATION
+      // APPROVED -> TERMINATED (ตรงกับแท็บ HISTORY ในหน้า Admin และ badge อนุมัติแล้วในหน้า Tenant)
+      status: r.status === 'PENDING' ? 'PENDING_TERMINATION' : (r.status === 'APPROVED' ? 'TERMINATED' : r.status),
+      tenant: r.contract?.tenant,
+      slot: r.contract?.slot,
+      contract: r.contract
     }));
     res.json({ success: true, data: mapped });
   } catch (error) {

@@ -143,6 +143,11 @@ const login = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'Invalid credentials.' });
     }
 
+    // ตรวจสอบว่าบัญชีถูกระงับการใช้งานหรือไม่
+    if (user.is_active === false) {
+      return res.status(403).json({ success: false, message: 'บัญชีผู้ใช้นี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ' });
+    }
+
     // สร้าง JWT token สำหรับ session นี้
     const token = jwt.sign(
       { user_id: user.user_id },

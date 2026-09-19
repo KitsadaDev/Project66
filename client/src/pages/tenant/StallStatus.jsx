@@ -11,9 +11,19 @@
 //   - Modal แสดงรายละเอียดสถานะของแผงเมื่อผู้เช่าคลิกเลือกล็อค
 // ======================================================
 
-import { useEffect, useState } from "react";
-import { useSearchParams, Link } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Store, X } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { useSearchParams, Link, useNavigate } from "react-router-dom";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Store,
+  X,
+  FileText,
+  Receipt,
+  Wrench,
+  ClipboardList,
+  Eye,
+} from "lucide-react";
 import { stallsAPI } from "../../api";
 
 const StallStatus = () => {
@@ -62,9 +72,65 @@ const StallStatus = () => {
   // ฟังก์ชัน: handleClick
   // หน้าที่: จัดการเมื่อผู้ใช้คลิกเลือกล็อคแผงค้า เพื่อเปิด Modal แสดงรายละเอียด
   // -------------------------------------------------------
-  const handleClick = (id) => {
+  const navigate = useNavigate();
+
+  // สถานะล็อกที่เอาเมาส์ชี้อยู่ (Hover Popover) และ Timer สำหรับหน่วงเวลา 2 วินาทีก่อนหายไป
+  const [hoveredStall, setHoveredStall] = useState(null);
+  const hoverTimerRef = useRef(null);
+
+  /**
+   * เมาส์เข้าแผงค้า หรือ Popover -> เคลียร์ timer เพื่อให้เปิดค้างไว้
+   */
+  const handleStallMouseEnter = (id) => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setHoveredStall(id);
+  };
+
+  /**
+   * เมาส์ออกจากแผงค้า หรือ Popover -> ค้างไว้ 2 วินาทีค่อยหายไป เพื่อให้เลื่อนไปกดเมนูลัดทัน
+   */
+  const handleStallMouseLeave = () => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+    }
+    hoverTimerRef.current = setTimeout(() => {
+      setHoveredStall(null);
+      hoverTimerRef.current = null;
+    }, 2000);
+  };
+
+  // ล้าง timer เมื่อ unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimerRef.current) {
+        clearTimeout(hoverTimerRef.current);
+      }
+    };
+  }, []);
+
+  const getStatusLabel = (status) => {
+    switch (status?.toUpperCase()) {
+      case "OCCUPIED":
+        return { label: "มีผู้เช่าแล้ว", color: "bg-red-100 text-red-700" };
+      case "VACANT":
+        return { label: "ว่าง (พร้อมเช่า)", color: "bg-green-100 text-green-700" };
+      case "MAINTENANCE":
+        return { label: "ปิดปรับปรุง", color: "bg-yellow-100 text-yellow-700" };
+      default:
+        return { label: "ยังไม่เปิดบริการ", color: "bg-gray-100 text-gray-600" };
+    }
+  };
+
+  const getStallData = (id) => {
     const fcId = parseInt(foodCourt);
-    const s = stalls.find((s) => s.slot_number === id && s.food_court_id === fcId);
+    return stalls.find((s) => s.slot_number === id && s.food_court_id === fcId);
+  };
+
+  const handleClick = (id) => {
+    const s = getStallData(id);
     setSelectedStall(s ?? { slot_number: id, status: "EMPTY" });
   };
 
@@ -73,8 +139,14 @@ const StallStatus = () => {
   // หน้าที่: กล่องสี่เหลี่ยมแสดงแผงค้าแต่ละล็อคบนแผนผัง พร้อมสีตามสถานะและ Effect ตอนคลิก
   // -------------------------------------------------------
   const Cell = ({ id, w = 44, h = 44 }) => {
+    const stallInfo = getStallData(id);
     const status = getStatus(id);
+    const isHovered = hoveredStall === id;
     const sel = selectedStall?.slot_number === id;
+    const statusInfo = stallInfo ? getStatusLabel(stallInfo.status) : { label: "ยังไม่เปิดบริการ", color: "bg-gray-100 text-gray-500" };
+
+    const isBottomStall = id.startsWith("D") || id.startsWith("E") || id === "F1" || id === "F2" || id === "F3" || id === "A10" || id === "A11";
+
     const color =
       status === "occupied"    ? "bg-red-100 border-red-300 text-red-700" :
       status === "vacant"      ? "bg-green-100 border-green-300 text-green-700" :
@@ -83,10 +155,103 @@ const StallStatus = () => {
     return (
       <div
         onClick={() => handleClick(id)}
-        className={`flex items-center justify-center font-bold text-xs border-2 rounded-lg cursor-pointer transition-all hover:scale-105 hover:shadow-md flex-shrink-0 ${color} ${sel ? "ring-4 ring-purple-300 scale-110 shadow-xl" : ""}`}
+        onMouseEnter={() => handleStallMouseEnter(id)}
+        onMouseLeave={handleStallMouseLeave}
+        className={`relative flex items-center justify-center font-bold text-xs border-2 rounded-lg cursor-pointer transition-all hover:scale-105 hover:shadow-md flex-shrink-0 ${color} ${sel ? "ring-4 ring-purple-300 scale-110 shadow-xl" : ""} ${isHovered ? "z-30 ring-2 ring-purple-300" : ""}`}
         style={{ width: w, height: h }}
       >
-        {id}
+        <span>{id}</span>
+
+        {/* ── Hover Popover (ค้างไว้ 2 วินาทีเมื่อเลื่อนเมาส์ออก เพื่อให้กดเมนูลัดได้ทัน) ── */}
+        {isHovered && (
+          <div
+            className={`absolute z-50 ${isBottomStall ? "bottom-full mb-2 before:-bottom-3" : "top-full mt-2 before:-top-3"} left-1/2 -translate-x-1/2 pointer-events-auto before:content-[''] before:absolute before:left-0 before:right-0 before:h-3`}
+            style={{ minWidth: 220 }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseEnter={() => handleStallMouseEnter(id)}
+            onMouseLeave={handleStallMouseLeave}
+          >
+            <div className="bg-white border border-gray-200 text-gray-800 text-xs rounded-2xl shadow-2xl p-3.5 flex flex-col gap-2 cursor-default font-normal">
+              {/* หัว Popover */}
+              <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-0.5">
+                <span className="font-extrabold text-sm text-gray-900">แผงที่ {id}</span>
+                <button
+                  type="button"
+                  onClick={() => handleClick(id)}
+                  className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 font-semibold transition-colors cursor-pointer"
+                >
+                  <Eye size={11} /> ดูข้อมูล
+                </button>
+              </div>
+
+              {/* ข้อมูลแผงค้า */}
+              <div className="flex flex-col gap-1.5 font-normal">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-gray-500">สถานะ</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${statusInfo.color}`}>
+                    {statusInfo.label}
+                  </span>
+                </div>
+                {stallInfo && (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-gray-500">ขนาด</span>
+                      <span className="font-medium text-gray-800">{stallInfo.slot_size ?? "-"} ตร.ม.</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-gray-500">ค่าเช่า</span>
+                      <span className="font-medium text-gray-800">
+                        {stallInfo.rent != null ? Number(stallInfo.rent).toLocaleString("th-TH") : "-"} บาท/เดือน
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* เมนูทางลัด */}
+              <div className="border-t border-gray-100 pt-2 mt-0.5">
+                <p className="text-gray-400 text-[10px] mb-1.5 font-medium">ทางลัดไป</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); navigate("/tenant/contracts"); }}
+                    className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors font-medium text-[11px] cursor-pointer"
+                  >
+                    <FileText size={12} /> สัญญาเช่า
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); navigate("/tenant/expenses"); }}
+                    className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors font-medium text-[11px] cursor-pointer"
+                  >
+                    <Receipt size={12} /> ค่าใช้จ่าย
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); navigate("/tenant/report-repair"); }}
+                    className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-orange-50 text-orange-700 hover:bg-orange-100 transition-colors font-medium text-[11px] cursor-pointer"
+                  >
+                    <Wrench size={12} /> แจ้งซ่อม
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); navigate("/tenant/track-repairs"); }}
+                    className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors font-medium text-[11px] cursor-pointer"
+                  >
+                    <ClipboardList size={12} /> ติดตามซ่อม
+                  </button>
+                </div>
+              </div>
+
+              {/* ปลาย popover */}
+              {isBottomStall ? (
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-white drop-shadow-sm" />
+              ) : (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-white drop-shadow-sm" />
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -130,37 +295,37 @@ const StallStatus = () => {
 
 
         {/* ── แถว B (ล็อค B1-B8 ด้านบน) ── */}
-        <div style={{ position:"absolute", top:10, left:330, display:"flex", gap:5 }}>
+        <div style={{ position:"absolute", top:10, left:330, display:"flex", gap:5, zIndex: hoveredStall?.startsWith("B") ? 40 : 1 }}>
           {["B1","B2","B3","B4","B5","B6","B7","B8"].map((id) => <Cell key={id} id={id} />)}
         </div>
 
         {/* ── แถว C (ล็อค C1-C6) ── */}
-        <div style={{ position:"absolute", top:115, left:134, display:"flex", gap:5 }}>
+        <div style={{ position:"absolute", top:115, left:134, display:"flex", gap:5, zIndex: hoveredStall?.startsWith("C") ? 40 : 1 }}>
           {["C1","C2","C3","C4","C5","C6"].map((id) => <Cell key={id} id={id} />)}
         </div>
 
         {/* ── โซนโต๊ะรับประทานอาหารตรงกลาง ── */}
         <div
           className="absolute flex items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 text-gray-500 text-sm font-medium"
-          style={{ top:175, left:100, width:640, height:315 }}
+          style={{ top:175, left:100, width:640, height:315, zIndex: 0 }}
         >
           โซนโต๊ะนั่งทานอาหาร
         </div>
 
         {/* ── แถวแนวตั้ง A (กำแพงขวา A1-A11) ── */}
-        <div style={{ position:"absolute", top:110, right:10, display:"flex", flexDirection:"column", gap:5 }}>
+        <div style={{ position:"absolute", top:110, right:10, display:"flex", flexDirection:"column", gap:5, zIndex: hoveredStall?.startsWith("A") ? 40 : 1 }}>
           {["A1","A2","A3","A4","A5","A6","A7","A8","A9","A10","A11"].map((id) => <Cell key={id} id={id} />)}
         </div>
 
         {/* ── แถว D (ล็อค D1-D6 ด้านล่างติดกำแพง) ── */}
-        <div style={{ position:"absolute", top:606, left:294, display:"flex", gap:5 }}>
+        <div style={{ position:"absolute", top:606, left:294, display:"flex", gap:5, zIndex: hoveredStall?.startsWith("D") ? 40 : 1 }}>
           {["D1","D2","D3","D4","D5","D6"].map((id) => <Cell key={id} id={id} />)}
         </div>
 
       </div>
 
       {/* ═══ แถว E (ล็อค E1-E12 อยู่นอกห้อง ใต้กำแพงล่าง) ═══ */}
-      <div style={{ marginTop: 10, display:"flex", gap:5 }}>
+      <div style={{ marginTop: 10, display:"flex", gap:5, position: "relative", zIndex: hoveredStall?.startsWith("E") ? 40 : 1 }}>
         {["E1","E2","E3","E4","E5","E6","E7","E8","E9","E10","E11","E12"].map((id) => <Cell key={id} id={id} />)}
       </div>
     </div>
@@ -261,7 +426,7 @@ const StallStatus = () => {
               <div className="min-w-[650px] w-[650px] mx-auto">
                 <div style={{ position: "relative", width: 650, height: 540, border: "3px solid #4B5563" }}>
                   {/* ── เสาล็อค F (F10 ลงมา F1 ด้านซ้าย) ── */}
-                  <div style={{ position: "absolute", top: 24, left: 24, display: "flex", flexDirection: "column", gap: 5 }}>
+                  <div style={{ position: "absolute", top: 24, left: 24, display: "flex", flexDirection: "column", gap: 5, zIndex: hoveredStall?.startsWith("F") ? 40 : 1 }}>
                     {["F10", "F9", "F8", "F7", "F6", "F5", "F4", "F3", "F2", "F1"].map((id) => (
                       <Cell key={id} id={id} />
                     ))}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Search,
   Droplets,
@@ -9,6 +10,7 @@ import {
   ChevronDown,
   ChevronUp,
   History,
+  CalendarDays,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { stallsAPI, settingsAPI } from "../../api";
@@ -38,11 +40,41 @@ const MeterRecording = () => {
   // อัตราค่าน้ำและค่าไฟต่อหน่วยปัจจุบัน
   const [rates, setRates] = useState({ water: 14, electric: 6 });
 
+  // รองรับการรับ Query Parameter เช่น ?slot=B2 เพื่อโฟกัสและเปิดโหมดบันทึกของแผงนั้นทันที
+  const [searchParams, setSearchParams] = useSearchParams();
+  const slotParam = searchParams.get("slot");
+
+  const clearSlotFilter = () => {
+    setSearch("");
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete("slot");
+    setSearchParams(newParams, { replace: true });
+  };
+
   // โหลดรายการแผงค้าและอัตราค่าบริการเมื่อเริ่มต้น
   useEffect(() => {
     fetchStalls();
     fetchRates();
   }, []);
+
+  // เมื่อเปิดหน้ามาพร้อม ?slot=... ให้ค้นหาและเปิดโหมดบันทึกมิเตอร์ของแผงค้านั้นอัตโนมัติ
+  useEffect(() => {
+    if (stalls.length > 0 && slotParam) {
+      const cleanSlot = slotParam
+        .replace(/^(แผงที่|แผง)\s*/i, "")
+        .trim()
+        .toLowerCase();
+      const target = stalls.find(
+        (s) => s.slot_number?.trim().toLowerCase() === cleanSlot
+      );
+      if (target) {
+        setSearch(target.slot_number);
+        setEditingStalls({ [target.slot_id]: true });
+      } else {
+        setSearch(cleanSlot);
+      }
+    }
+  }, [stalls, slotParam]);
 
   /**
    * ดึงอัตราค่าน้ำและไฟฟ้าต่อหน่วยจาก API
@@ -72,6 +104,7 @@ const MeterRecording = () => {
       setStalls(occupiedStalls);
 
       const readings = {};
+      const now = new Date();
       occupiedStalls.forEach((stall) => {
         const lastWater = stall.utility_meters?.find(
           (m) => m.meter_type === "WATER"
@@ -84,6 +117,8 @@ const MeterRecording = () => {
           electricMeter: "",
           waterMeterNumber: lastWater?.meter_number || "",
           electricMeterNumber: lastElec?.meter_number || "",
+          billingMonth: now.getMonth() + 1,  // 1-12
+          billingYear: now.getFullYear(),
         };
       });
       setMeterReadings(readings);
@@ -150,6 +185,8 @@ const MeterRecording = () => {
         electricMeter: reading.electricMeter !== "" ? parseFloat(reading.electricMeter) : undefined,
         waterMeterNumber: reading.waterMeterNumber || undefined,
         electricMeterNumber: reading.electricMeterNumber || undefined,
+        billingMonth: reading.billingMonth,
+        billingYear: reading.billingYear,
       });
       toast.success("บันทึกมิเตอร์สำเร็จ");
       setEditingStalls((prev) => ({ ...prev, [stallId]: false }));
@@ -179,6 +216,8 @@ const MeterRecording = () => {
           electricMeter: reading.electricMeter !== "" ? parseFloat(reading.electricMeter) : undefined,
           waterMeterNumber: reading.waterMeterNumber || undefined,
           electricMeterNumber: reading.electricMeterNumber || undefined,
+          billingMonth: reading.billingMonth,
+          billingYear: reading.billingYear,
         });
       }));
       toast.success("บันทึกมิเตอร์ทั้งหมดสำเร็จ");
@@ -272,6 +311,24 @@ const MeterRecording = () => {
           </select>
         </div>
 
+        {/* Active Slot Filter Banner */}
+        {slotParam && (
+          <div className="mb-4 flex items-center justify-between p-3.5 bg-purple-50 border border-purple-200 rounded-xl text-xs sm:text-sm text-purple-800 animate-fadeIn">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold">กำลังบันทึกมิเตอร์ของแผง:</span>
+              <span className="px-2.5 py-0.5 bg-purple-600 text-white font-bold rounded-lg font-mono">
+                {slotParam}
+              </span>
+            </div>
+            <button
+              onClick={clearSlotFilter}
+              className="text-purple-600 hover:text-purple-800 font-medium hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <X size={14} /> แสดงแผงทั้งหมด
+            </button>
+          </div>
+        )}
+
         {/* Stall Cards */}
         <div className="space-y-4">
           {filteredStalls.map((stall) => {
@@ -322,6 +379,34 @@ const MeterRecording = () => {
                       ประวัติ
                       {showHistory ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                     </button>
+                  {/* ── เลือกรอบเดือนที่บันทึก ── */}
+                    {isEditing && (
+                      <div className="flex items-center gap-1.5 bg-purple-50 border border-purple-200 rounded-xl px-3 py-1.5">
+                        <CalendarDays size={14} className="text-purple-500 flex-shrink-0" />
+                        <span className="text-xs text-purple-600 font-medium whitespace-nowrap">รอบเดือน</span>
+                        <select
+                          className="text-xs border-none bg-transparent text-purple-700 font-semibold focus:outline-none cursor-pointer"
+                          value={reading.billingMonth ?? new Date().getMonth() + 1}
+                          onChange={(e) => handleInputChange(stall.slot_id, "billingMonth", parseInt(e.target.value))}
+                        >
+                          {[
+                            "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+                            "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
+                          ].map((m, i) => (
+                            <option key={i + 1} value={i + 1}>{m}</option>
+                          ))}
+                        </select>
+                        <select
+                          className="text-xs border-none bg-transparent text-purple-700 font-semibold focus:outline-none cursor-pointer"
+                          value={reading.billingYear ?? new Date().getFullYear()}
+                          onChange={(e) => handleInputChange(stall.slot_id, "billingYear", parseInt(e.target.value))}
+                        >
+                          {Array.from({ length: 3 }, (_, i) => new Date().getFullYear() - 1 + i).map((y) => (
+                            <option key={y} value={y}>{y + 543}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     {isEditing ? (
                       <>
                         <button

@@ -12,6 +12,7 @@ import {
   ChevronRight,
   ChevronLeft,
   ChevronDown,
+  ChevronUp,
   X,
   AlertTriangle,
   CheckCircle2,
@@ -19,6 +20,10 @@ import {
   ArrowUpRight,
   TrendingUp,
   MapPin,
+  Droplets,
+  Zap,
+  Search,
+  Store,
 } from "lucide-react";
 import { stallsAPI, usersAPI, billsAPI, maintenanceAPI } from "../../api";
 
@@ -39,6 +44,11 @@ const ExecutiveDashboard = () => {
   const [globalMonth, setGlobalMonth] = useState("ALL");
   // ตัวกรองเดือนการเงิน ('SYNC' คือตามภาพรวม, 'ALL', หรือ 'YYYY-MM')
   const [financeMonth, setFinanceMonth] = useState("SYNC");
+
+  // สถานะสำหรับตารางรายละเอียดสถานะรายล็อก
+  const [stallStatusFilter, setStallStatusFilter] = useState("ALL"); // 'ALL' | 'PAID' | 'PENDING' | 'UNBILLED'
+  const [stallSearchQuery, setStallSearchQuery] = useState("");
+  const [isStallTableExpanded, setIsStallTableExpanded] = useState(true);
 
   // สถานะสำหรับหน้าต่างเลือกเดือน (Month Picker Modal)
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
@@ -82,6 +92,28 @@ const ExecutiveDashboard = () => {
     fc2Vacant: 0,
     fc2Maint: 0,
     fc2Rate: 0,
+    // รายได้แยกตามประเภท (ค่าเช่า, ค่าน้ำ, ค่าไฟ)
+    rentRevenue: 0,
+    rentBilled: 0,
+    rentPending: 0,
+    rentRate: 0,
+    waterRevenue: 0,
+    waterBilled: 0,
+    waterPending: 0,
+    waterRate: 0,
+    elecRevenue: 0,
+    elecBilled: 0,
+    elecPending: 0,
+    elecRate: 0,
+    greaseRevenue: 0,
+    greaseBilled: 0,
+    greasePending: 0,
+    // สถานะรายล็อก
+    occupiedSlotsCount: 0,
+    paidSlotsCount: 0,
+    pendingSlotsCount: 0,
+    unbilledSlotsCount: 0,
+    stallPaymentList: [],
   });
 
   // รายการบิลและงานซ่อมล่าสุด และรายการเฝ้าระวัง
@@ -370,6 +402,219 @@ const ExecutiveDashboard = () => {
       (r) => r.status === "PENDING" || r.status === "IN_PROGRESS"
     );
 
+    // 6. คำนวณรายได้แยกตามประเภท (ค่าเช่า, ค่าน้ำ, ค่าไฟ) จาก globalBills
+    let rentRevenue = 0;
+    let rentBilled = 0;
+    let rentPending = 0;
+
+    let waterRevenue = 0;
+    let waterBilled = 0;
+    let waterPending = 0;
+
+    let elecRevenue = 0;
+    let elecBilled = 0;
+    let elecPending = 0;
+
+    let greaseRevenue = 0;
+    let greaseBilled = 0;
+    let greasePending = 0;
+
+    globalBills.forEach((b) => {
+      const rent = Number(b.rent_amount || 0);
+      const water = Number(b.water_cost || 0);
+      const elec = Number(b.electricity_cost || 0);
+      const grease = Number(b.grease_trap_fee || 0);
+
+      rentBilled += rent;
+      waterBilled += water;
+      elecBilled += elec;
+      greaseBilled += grease;
+
+      if (b.status === "PAID") {
+        rentRevenue += rent;
+        waterRevenue += water;
+        elecRevenue += elec;
+        greaseRevenue += grease;
+      } else {
+        rentPending += rent;
+        waterPending += water;
+        elecPending += elec;
+        greasePending += grease;
+      }
+    });
+
+    const rentRate = rentBilled > 0 ? Math.round((rentRevenue / rentBilled) * 100) : 0;
+    const waterRate = waterBilled > 0 ? Math.round((waterRevenue / waterBilled) * 100) : 0;
+    const elecRate = elecBilled > 0 ? Math.round((elecRevenue / elecBilled) * 100) : 0;
+
+    // 7. คำนวณสถานะรายล็อก (เช่ากี่ล็อก, จ่ายกี่ล็อก, ติดค้างกี่ล็อก, ยังไม่ออกบิลกี่ล็อก)
+    const occupiedSlotsList = currentStalls.filter(
+      (s) => (s.status || "").toUpperCase() === "OCCUPIED"
+    );
+    const occupiedSlotsCount = occupiedSlotsList.length;
+
+    // รวบรวมบิลตามล็อก (slot_id หรือ slot_number)
+    const slotBillsMap = new Map();
+    globalBills.forEach((b) => {
+      const sId = b.contract?.slot?.slot_id || b.contract?.slot_id || b.slot_id;
+      const sNum = b.contract?.slot?.slot_number || b.slot?.slot_number;
+      const key = sId ? String(sId) : sNum;
+      if (key) {
+        if (!slotBillsMap.has(key)) {
+          slotBillsMap.set(key, []);
+        }
+        slotBillsMap.get(key).push(b);
+      }
+    });
+
+    let paidSlotsCount = 0;
+    let pendingSlotsCount = 0;
+    let unbilledSlotsCount = 0;
+    const stallPaymentList = [];
+    const processedSlotNumbers = new Set();
+
+    occupiedSlotsList.forEach((slot) => {
+      const sIdKey = slot.slot_id ? String(slot.slot_id) : null;
+      const sNumKey = slot.slot_number;
+      const slotBills = (sIdKey && slotBillsMap.get(sIdKey)) || (sNumKey && slotBillsMap.get(sNumKey)) || [];
+      processedSlotNumbers.add(slot.slot_number);
+
+      const firstBill = slotBills[0];
+      const tenantName = firstBill?.contract?.tenant?.first_name
+        ? `${firstBill.contract.tenant.first_name} ${firstBill.contract.tenant.last_name || ""}`.trim()
+        : slot.tenant?.name || slot.tenant_name || "-";
+
+      if (slotBills.length === 0) {
+        unbilledSlotsCount++;
+        stallPaymentList.push({
+          slot_id: slot.slot_id,
+          slot_number: slot.slot_number,
+          food_court_id: slot.food_court_id,
+          tenantName,
+          status: "UNBILLED",
+          statusText: "ยังไม่ออกบิล",
+          rent: Number(slot.rent || 0),
+          water: 0,
+          electricity: 0,
+          total: Number(slot.rent || 0),
+          paid: 0,
+          pending: 0,
+        });
+      } else {
+        const hasPending = slotBills.some((b) => b.status !== "PAID");
+        const allPaid = slotBills.every((b) => b.status === "PAID");
+
+        const slotRent = slotBills.reduce((acc, b) => acc + Number(b.rent_amount || 0), 0);
+        const slotWater = slotBills.reduce((acc, b) => acc + Number(b.water_cost || 0), 0);
+        const slotElec = slotBills.reduce((acc, b) => acc + Number(b.electricity_cost || 0), 0);
+        const slotTotal = slotBills.reduce((acc, b) => acc + Number(b.total_amount || 0), 0);
+        const slotPaid = slotBills
+          .filter((b) => b.status === "PAID")
+          .reduce((acc, b) => acc + Number(b.total_amount || 0), 0);
+        const slotPending = slotBills
+          .filter((b) => b.status !== "PAID")
+          .reduce((acc, b) => acc + Number(b.total_amount || 0), 0);
+
+        if (allPaid) {
+          paidSlotsCount++;
+          stallPaymentList.push({
+            slot_id: slot.slot_id,
+            slot_number: slot.slot_number,
+            food_court_id: slot.food_court_id,
+            tenantName,
+            status: "PAID",
+            statusText: "จ่ายแล้ว",
+            rent: slotRent,
+            water: slotWater,
+            electricity: slotElec,
+            total: slotTotal,
+            paid: slotPaid,
+            pending: 0,
+          });
+        } else {
+          pendingSlotsCount++;
+          stallPaymentList.push({
+            slot_id: slot.slot_id,
+            slot_number: slot.slot_number,
+            food_court_id: slot.food_court_id,
+            tenantName,
+            status: "PENDING",
+            statusText: "ติดค้าง",
+            rent: slotRent,
+            water: slotWater,
+            electricity: slotElec,
+            total: slotTotal,
+            paid: slotPaid,
+            pending: slotPending,
+          });
+        }
+      }
+    });
+
+    // ตรวจสอบล็อกที่มีบิลแต่ไม่ได้อยู่ใน occupiedSlotsList (ถ้ามี)
+    slotBillsMap.forEach((billsList) => {
+      const b = billsList[0];
+      const sNum = b.contract?.slot?.slot_number || b.slot?.slot_number;
+      if (sNum && !processedSlotNumbers.has(sNum)) {
+        processedSlotNumbers.add(sNum);
+        const sFcId = getSlotFoodCourtId(b);
+        const hasPending = billsList.some((item) => item.status !== "PAID");
+        const allPaid = billsList.every((item) => item.status === "PAID");
+
+        const slotRent = billsList.reduce((acc, item) => acc + Number(item.rent_amount || 0), 0);
+        const slotWater = billsList.reduce((acc, item) => acc + Number(item.water_cost || 0), 0);
+        const slotElec = billsList.reduce((acc, item) => acc + Number(item.electricity_cost || 0), 0);
+        const slotTotal = billsList.reduce((acc, item) => acc + Number(item.total_amount || 0), 0);
+        const slotPaid = billsList.filter((item) => item.status === "PAID").reduce((acc, item) => acc + Number(item.total_amount || 0), 0);
+        const slotPending = billsList.filter((item) => item.status !== "PAID").reduce((acc, item) => acc + Number(item.total_amount || 0), 0);
+
+        const tenantName = b.contract?.tenant?.first_name
+          ? `${b.contract.tenant.first_name} ${b.contract.tenant.last_name || ""}`.trim()
+          : b.tenant_name || "-";
+
+        if (allPaid) {
+          paidSlotsCount++;
+          stallPaymentList.push({
+            slot_id: b.contract?.slot?.slot_id,
+            slot_number: sNum,
+            food_court_id: sFcId,
+            tenantName,
+            status: "PAID",
+            statusText: "จ่ายแล้ว",
+            rent: slotRent,
+            water: slotWater,
+            electricity: slotElec,
+            total: slotTotal,
+            paid: slotPaid,
+            pending: 0,
+          });
+        } else {
+          pendingSlotsCount++;
+          stallPaymentList.push({
+            slot_id: b.contract?.slot?.slot_id,
+            slot_number: sNum,
+            food_court_id: sFcId,
+            tenantName,
+            status: "PENDING",
+            statusText: "ติดค้าง",
+            rent: slotRent,
+            water: slotWater,
+            electricity: slotElec,
+            total: slotTotal,
+            paid: slotPaid,
+            pending: slotPending,
+          });
+        }
+      }
+    });
+
+    stallPaymentList.sort((a, b) => {
+      return (a.slot_number || "").localeCompare(b.slot_number || "", undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+    });
+
     setDashboardStats({
       totalStalls: currentStalls.length,
       occupiedStalls: occupied,
@@ -398,6 +643,26 @@ const ExecutiveDashboard = () => {
       fc2Vacant,
       fc2Maint,
       fc2Rate,
+      rentRevenue,
+      rentBilled,
+      rentPending,
+      rentRate,
+      waterRevenue,
+      waterBilled,
+      waterPending,
+      waterRate,
+      elecRevenue,
+      elecBilled,
+      elecPending,
+      elecRate,
+      greaseRevenue,
+      greaseBilled,
+      greasePending,
+      occupiedSlotsCount,
+      paidSlotsCount,
+      pendingSlotsCount,
+      unbilledSlotsCount,
+      stallPaymentList,
     });
 
     setActiveBillsList(currentBills.slice(0, 5));
@@ -875,6 +1140,509 @@ const ExecutiveDashboard = () => {
           >
             ดูรายงานบิลทั้งหมด <ArrowUpRight size={14} />
           </Link>
+        </div>
+      </div>
+
+      {/* ─── รายงานรายได้แยกประเภท & สถานะการชำระรายล็อก ─── */}
+      <div className="bg-white rounded-3xl p-6 md:p-8 border border-gray-100 shadow-sm space-y-6">
+        {/* หัวข้อส่วนรายงาน */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-gray-100">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <span className="p-2.5 rounded-2xl bg-purple-100 text-purple-700 shadow-xs">
+                <Receipt size={20} />
+              </span>
+              <div>
+                <h2 className="text-lg md:text-xl font-black text-gray-800 tracking-tight">
+                  รายงานรายได้แยกประเภท & สถานะการชำระรายล็อก
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  แจกแจงรายได้ค่าน้ำ ค่าไฟ ค่าเช่า และสถานะการชำระเงินของแต่ละแผงค้า
+                  {globalMonth !== "ALL" ? ` • รอบเดือน ${formatMonthTH(globalMonth)}` : " • ยอดสะสมทุกช่วงเวลา"}
+                  {selectedFoodCourt !== "ALL" ? ` (ศูนย์อาหาร ${selectedFoodCourt})` : ""}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-purple-700 bg-purple-50 px-3 py-1.5 rounded-xl border border-purple-100">
+              {globalMonth === "ALL" ? "ข้อมูลทั้งหมด" : formatButtonMonth(globalMonth)}
+            </span>
+          </div>
+        </div>
+
+        {/* 1. สรุปสถานะรายล็อก (เช่ากี่ล็อก / จ่ายกี่ล็อก / ติดค้างกี่ล็อก) */}
+        <div>
+          <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Store size={14} className="text-purple-600" />
+            <span>สรุปสถานะการชำระรายล็อก (Occupancy & Payment Status)</span>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-4">
+            {/* เช่ากี่ล็อก */}
+            <div className="bg-purple-50/70 border border-purple-100/80 rounded-2xl p-4 transition-all hover:shadow-xs">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-semibold text-purple-700">เช่าทั้งหมด</span>
+                <span className="w-7 h-7 rounded-lg bg-purple-200/70 text-purple-800 flex items-center justify-center text-xs font-bold">
+                  <Store size={14} />
+                </span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-black text-purple-900">{dashboardStats.occupiedSlotsCount}</span>
+                <span className="text-xs text-purple-600 font-medium">จาก {dashboardStats.totalStalls} ล็อค</span>
+              </div>
+              <span className="text-[11px] text-purple-600 mt-1 block">
+                อัตราครองแผง {dashboardStats.occupancyRate}%
+              </span>
+            </div>
+
+            {/* จ่ายแล้วกี่ล็อก */}
+            <div className="bg-emerald-50/70 border border-emerald-100/80 rounded-2xl p-4 transition-all hover:shadow-xs">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-semibold text-emerald-700">จ่ายค่าต่างๆ แล้ว</span>
+                <span className="w-7 h-7 rounded-lg bg-emerald-200/70 text-emerald-800 flex items-center justify-center text-xs font-bold">
+                  <CheckCircle2 size={14} />
+                </span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-black text-emerald-700">{dashboardStats.paidSlotsCount}</span>
+                <span className="text-xs text-emerald-600 font-medium">ล็อค</span>
+              </div>
+              <span className="text-[11px] text-emerald-600 mt-1 block">
+                ชำระครบถ้วน {dashboardStats.occupiedSlotsCount > 0 ? Math.round((dashboardStats.paidSlotsCount / dashboardStats.occupiedSlotsCount) * 100) : 0}%
+              </span>
+            </div>
+
+            {/* ติดค้างกี่ล็อก */}
+            <div className="bg-rose-50/70 border border-rose-100/80 rounded-2xl p-4 transition-all hover:shadow-xs">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-semibold text-rose-700">ติดค้างชำระ</span>
+                <span className="w-7 h-7 rounded-lg bg-rose-200/70 text-rose-800 flex items-center justify-center text-xs font-bold">
+                  <Clock size={14} />
+                </span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-black text-rose-600">{dashboardStats.pendingSlotsCount}</span>
+                <span className="text-xs text-rose-600 font-medium">ล็อค</span>
+              </div>
+              <span className="text-[11px] text-rose-600 mt-1 block">
+                ค้างชำระ / รอตรวจสลิป
+              </span>
+            </div>
+
+            {/* ยังไม่ออกบิลกี่ล็อก */}
+            <div className="bg-gray-50/90 border border-gray-200/70 rounded-2xl p-4 transition-all hover:shadow-xs">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-semibold text-gray-600">ยังไม่ออกบิล</span>
+                <span className="w-7 h-7 rounded-lg bg-gray-200/70 text-gray-600 flex items-center justify-center text-xs font-bold">
+                  <AlertTriangle size={14} />
+                </span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-black text-gray-700">{dashboardStats.unbilledSlotsCount}</span>
+                <span className="text-xs text-gray-500 font-medium">ล็อค</span>
+              </div>
+              <span className="text-[11px] text-gray-500 mt-1 block">
+                {globalMonth === "ALL" ? "ไม่มีรายการบิล" : "รอบเดือนนี้ยังไม่ออกบิล"}
+              </span>
+            </div>
+          </div>
+
+          {/* หลอดสีแสดงสัดส่วนรายล็อก (Multi-segment bar) */}
+          <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100">
+            <div className="flex items-center justify-between text-xs font-semibold text-gray-600 mb-1.5">
+              <span>สัดส่วนสถานะการชำระของล็อกที่เช่า ({dashboardStats.occupiedSlotsCount} ล็อค)</span>
+              <div className="flex items-center gap-3 text-[11px]">
+                <span className="flex items-center gap-1 text-emerald-700">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> จ่ายแล้ว ({dashboardStats.paidSlotsCount})
+                </span>
+                <span className="flex items-center gap-1 text-rose-700">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span> ติดค้าง ({dashboardStats.pendingSlotsCount})
+                </span>
+                {dashboardStats.unbilledSlotsCount > 0 && (
+                  <span className="flex items-center gap-1 text-gray-500">
+                    <span className="w-2.5 h-2.5 rounded-full bg-gray-400"></span> ยังไม่ออกบิล ({dashboardStats.unbilledSlotsCount})
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="h-3 w-full bg-gray-200 rounded-full overflow-hidden flex">
+              {dashboardStats.occupiedSlotsCount > 0 ? (
+                <>
+                  <div
+                    style={{ width: `${(dashboardStats.paidSlotsCount / dashboardStats.occupiedSlotsCount) * 100}%` }}
+                    className="h-full bg-emerald-500 transition-all duration-500"
+                    title={`จ่ายแล้ว: ${dashboardStats.paidSlotsCount} ล็อค`}
+                  ></div>
+                  <div
+                    style={{ width: `${(dashboardStats.pendingSlotsCount / dashboardStats.occupiedSlotsCount) * 100}%` }}
+                    className="h-full bg-rose-500 transition-all duration-500"
+                    title={`ติดค้าง: ${dashboardStats.pendingSlotsCount} ล็อค`}
+                  ></div>
+                  <div
+                    style={{ width: `${(dashboardStats.unbilledSlotsCount / dashboardStats.occupiedSlotsCount) * 100}%` }}
+                    className="h-full bg-gray-400 transition-all duration-500"
+                    title={`ยังไม่ออกบิล: ${dashboardStats.unbilledSlotsCount} ล็อค`}
+                  ></div>
+                </>
+              ) : (
+                <div className="h-full w-full bg-gray-300"></div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 2. การ์ดรายงานรายได้แยก 3 หมวด (ค่าเช่า, ค่าน้ำ, ค่าไฟ) */}
+        <div>
+          <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <DollarSign size={14} className="text-emerald-600" />
+            <span>รายงานรายได้แยกตามประเภท (Revenue Breakdown by Utility & Rent)</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* Card 1: ค่าเช่าแผง */}
+            <div className="bg-gradient-to-br from-purple-50/70 via-white to-purple-50/30 rounded-3xl p-6 border border-purple-100 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-purple-100/50 rounded-bl-full -z-0 group-hover:scale-110 transition-transform"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-10 h-10 rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-md shadow-purple-200">
+                      <Store size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-800 text-base">ค่าเช่าแผง</h3>
+                      <span className="text-[11px] text-gray-400">Stall Rental Revenue</span>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold text-purple-700 bg-purple-100/80 px-2.5 py-1 rounded-lg">
+                    {dashboardStats.rentRate}% สำเร็จ
+                  </span>
+                </div>
+
+                <div className="mt-4 mb-3">
+                  <span className="text-xs text-gray-500 block font-medium">รายได้ค่าเช่าที่จัดเก็บได้</span>
+                  <h4 className="text-2xl sm:text-3xl font-black text-purple-700 tracking-tight mt-0.5">
+                    ฿{dashboardStats.rentRevenue.toLocaleString()}
+                  </h4>
+                </div>
+
+                {/* Progress bar */}
+                <div className="w-full h-2 bg-purple-100 rounded-full overflow-hidden mb-4">
+                  <div
+                    className="h-full bg-purple-600 rounded-full transition-all duration-500"
+                    style={{ width: `${dashboardStats.rentRate}%` }}
+                  ></div>
+                </div>
+
+                <div className="space-y-2 text-xs border-t border-purple-50 pt-3">
+                  <div className="flex justify-between items-center text-gray-600">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-purple-600"></span> ยอดเรียกเก็บรวม
+                    </span>
+                    <span className="font-bold text-gray-800">
+                      ฿{dashboardStats.rentBilled.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-gray-600">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-rose-500"></span> ค่าเช่าค้างชำระ
+                    </span>
+                    <span className="font-bold text-rose-600">
+                      ฿{dashboardStats.rentPending.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2: ค่าน้ำประปา */}
+            <div className="bg-gradient-to-br from-sky-50/70 via-white to-sky-50/30 rounded-3xl p-6 border border-sky-100 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-sky-100/50 rounded-bl-full -z-0 group-hover:scale-110 transition-transform"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-10 h-10 rounded-2xl bg-sky-500 text-white flex items-center justify-center shadow-md shadow-sky-200">
+                      <Droplets size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-800 text-base">ค่าน้ำประปา</h3>
+                      <span className="text-[11px] text-gray-400">Water Utility Revenue</span>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold text-sky-700 bg-sky-100/80 px-2.5 py-1 rounded-lg">
+                    {dashboardStats.waterRate}% สำเร็จ
+                  </span>
+                </div>
+
+                <div className="mt-4 mb-3">
+                  <span className="text-xs text-gray-500 block font-medium">รายได้ค่าน้ำที่จัดเก็บได้</span>
+                  <h4 className="text-2xl sm:text-3xl font-black text-sky-600 tracking-tight mt-0.5">
+                    ฿{dashboardStats.waterRevenue.toLocaleString()}
+                  </h4>
+                </div>
+
+                {/* Progress bar */}
+                <div className="w-full h-2 bg-sky-100 rounded-full overflow-hidden mb-4">
+                  <div
+                    className="h-full bg-sky-500 rounded-full transition-all duration-500"
+                    style={{ width: `${dashboardStats.waterRate}%` }}
+                  ></div>
+                </div>
+
+                <div className="space-y-2 text-xs border-t border-sky-50 pt-3">
+                  <div className="flex justify-between items-center text-gray-600">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-sky-500"></span> ยอดเรียกเก็บรวม
+                    </span>
+                    <span className="font-bold text-gray-800">
+                      ฿{dashboardStats.waterBilled.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-gray-600">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-rose-500"></span> ค่าน้ำค้างชำระ
+                    </span>
+                    <span className="font-bold text-rose-600">
+                      ฿{dashboardStats.waterPending.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: ค่าไฟฟ้า */}
+            <div className="bg-gradient-to-br from-amber-50/70 via-white to-amber-50/30 rounded-3xl p-6 border border-amber-100 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-amber-100/50 rounded-bl-full -z-0 group-hover:scale-110 transition-transform"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-200">
+                      <Zap size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-800 text-base">ค่าไฟฟ้า</h3>
+                      <span className="text-[11px] text-gray-400">Electricity Utility Revenue</span>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold text-amber-700 bg-amber-100/80 px-2.5 py-1 rounded-lg">
+                    {dashboardStats.elecRate}% สำเร็จ
+                  </span>
+                </div>
+
+                <div className="mt-4 mb-3">
+                  <span className="text-xs text-gray-500 block font-medium">รายได้ค่าไฟที่จัดเก็บได้</span>
+                  <h4 className="text-2xl sm:text-3xl font-black text-amber-600 tracking-tight mt-0.5">
+                    ฿{dashboardStats.elecRevenue.toLocaleString()}
+                  </h4>
+                </div>
+
+                {/* Progress bar */}
+                <div className="w-full h-2 bg-amber-100 rounded-full overflow-hidden mb-4">
+                  <div
+                    className="h-full bg-amber-500 rounded-full transition-all duration-500"
+                    style={{ width: `${dashboardStats.elecRate}%` }}
+                  ></div>
+                </div>
+
+                <div className="space-y-2 text-xs border-t border-amber-50 pt-3">
+                  <div className="flex justify-between items-center text-gray-600">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amber-500"></span> ยอดเรียกเก็บรวม
+                    </span>
+                    <span className="font-bold text-gray-800">
+                      ฿{dashboardStats.elecBilled.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-gray-600">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-rose-500"></span> ค่าไฟค้างชำระ
+                    </span>
+                    <span className="font-bold text-rose-600">
+                      ฿{dashboardStats.elecPending.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. ตาราง/รายการแจกแจงสถานะรายล็อก (Stall Breakdown List) */}
+        <div className="border border-gray-100 rounded-2xl overflow-hidden bg-gray-50/40">
+          <div className="p-4 bg-white border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center justify-between w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => setIsStallTableExpanded(!isStallTableExpanded)}
+                className="flex items-center gap-2 font-bold text-gray-800 text-sm hover:text-purple-600 transition-colors cursor-pointer"
+              >
+                <span>รายละเอียดสถานะรายล็อก ({dashboardStats.stallPaymentList.length} แผง)</span>
+                {isStallTableExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+            </div>
+
+            {/* กรองแท็บ & ค้นหา */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center bg-gray-100 p-1 rounded-xl text-xs font-semibold text-gray-600">
+                <button
+                  type="button"
+                  onClick={() => setStallStatusFilter("ALL")}
+                  className={`px-2.5 py-1 rounded-lg transition-colors ${
+                    stallStatusFilter === "ALL" ? "bg-white text-purple-700 shadow-xs font-bold" : "hover:text-gray-900"
+                  }`}
+                >
+                  ทั้งหมด ({dashboardStats.stallPaymentList.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStallStatusFilter("PAID")}
+                  className={`px-2.5 py-1 rounded-lg transition-colors ${
+                    stallStatusFilter === "PAID" ? "bg-white text-emerald-700 shadow-xs font-bold" : "hover:text-gray-900"
+                  }`}
+                >
+                  จ่ายแล้ว ({dashboardStats.paidSlotsCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStallStatusFilter("PENDING")}
+                  className={`px-2.5 py-1 rounded-lg transition-colors ${
+                    stallStatusFilter === "PENDING" ? "bg-white text-rose-700 shadow-xs font-bold" : "hover:text-gray-900"
+                  }`}
+                >
+                  ติดค้าง ({dashboardStats.pendingSlotsCount})
+                </button>
+                {dashboardStats.unbilledSlotsCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setStallStatusFilter("UNBILLED")}
+                    className={`px-2.5 py-1 rounded-lg transition-colors ${
+                      stallStatusFilter === "UNBILLED" ? "bg-white text-gray-700 shadow-xs font-bold" : "hover:text-gray-900"
+                    }`}
+                  >
+                    ยังไม่ออกบิล ({dashboardStats.unbilledSlotsCount})
+                  </button>
+                )}
+              </div>
+
+              {/* ค้นหา */}
+              <div className="relative">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="ค้นหาล็อก/ผู้เช่า..."
+                  value={stallSearchQuery}
+                  onChange={(e) => setStallSearchQuery(e.target.value)}
+                  className="pl-8 pr-6 py-1 bg-white border border-gray-200 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-purple-400 w-36 sm:w-44"
+                />
+                {stallSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setStallSearchQuery("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ตารางข้อมูลรายล็อก */}
+          {isStallTableExpanded && (
+            <div className="overflow-x-auto max-h-96">
+              <table className="w-full text-left text-xs">
+                <thead className="sticky top-0 bg-gray-100 z-10">
+                  <tr className="border-b border-gray-200 text-gray-500 font-bold uppercase text-[11px]">
+                    <th className="py-3 px-4">รหัสล็อก</th>
+                    <th className="py-3 px-3">ศูนย์อาหาร</th>
+                    <th className="py-3 px-3">ผู้เช่า</th>
+                    <th className="py-3 px-3 text-right">ค่าเช่า</th>
+                    <th className="py-3 px-3 text-right">ค่าน้ำ</th>
+                    <th className="py-3 px-3 text-right">ค่าไฟ</th>
+                    <th className="py-3 px-3 text-right">ยอดรวม</th>
+                    <th className="py-3 px-4 text-center">สถานะการชำระ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {dashboardStats.stallPaymentList
+                    .filter((item) => {
+                      if (stallStatusFilter !== "ALL" && item.status !== stallStatusFilter) {
+                        return false;
+                      }
+                      if (stallSearchQuery.trim()) {
+                        const q = stallSearchQuery.toLowerCase().trim();
+                        const sNum = (item.slot_number || "").toLowerCase();
+                        const tName = (item.tenantName || "").toLowerCase();
+                        return sNum.includes(q) || tName.includes(q);
+                      }
+                      return true;
+                    })
+                    .map((item, idx) => {
+                      const isPaid = item.status === "PAID";
+                      const isPending = item.status === "PENDING";
+                      return (
+                        <tr key={idx} className="hover:bg-purple-50/30 transition-colors">
+                          <td className="py-2.5 px-4">
+                            <span className="inline-flex items-center justify-center font-bold px-2 py-0.5 rounded-lg bg-purple-100 text-purple-700 text-xs">
+                              {item.slot_number}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-gray-500">
+                            ศ.อาหาร {item.food_court_id || "-"}
+                          </td>
+                          <td className="py-2.5 px-3 font-medium text-gray-800">
+                            {item.tenantName}
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-gray-700 font-semibold">
+                            ฿{Number(item.rent || 0).toLocaleString()}
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-sky-600 font-semibold">
+                            ฿{Number(item.water || 0).toLocaleString()}
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-amber-600 font-semibold">
+                            ฿{Number(item.electricity || 0).toLocaleString()}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-extrabold text-gray-800">
+                            ฿{Number(item.total || 0).toLocaleString()}
+                          </td>
+                          <td className="py-2.5 px-4 text-center">
+                            {isPaid ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                <CheckCircle2 size={12} /> จ่ายแล้ว
+                              </span>
+                            ) : isPending ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
+                                <Clock size={12} /> ติดค้าง (฿{Number(item.pending || 0).toLocaleString()})
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                                ยังไม่ออกบิล
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                  {dashboardStats.stallPaymentList.filter((item) => {
+                    if (stallStatusFilter !== "ALL" && item.status !== stallStatusFilter) return false;
+                    if (stallSearchQuery.trim()) {
+                      const q = stallSearchQuery.toLowerCase().trim();
+                      return (item.slot_number || "").toLowerCase().includes(q) || (item.tenantName || "").toLowerCase().includes(q);
+                    }
+                    return true;
+                  }).length === 0 && (
+                    <tr>
+                      <td colSpan="8" className="py-8 text-center text-gray-400 text-xs">
+                        ไม่พบรายการแผงค้าตามเงื่อนไขที่เลือก
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 

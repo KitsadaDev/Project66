@@ -1,14 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  Search,
-  Building2,
-  MapPin,
-  CheckCircle,
+  FileText,
+  Wrench,
+  Gauge,
+  Receipt,
+  UserPlus,
   XCircle,
   Edit,
-  Save,
   X,
-  Plus,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { stallsAPI } from "../../api";
@@ -23,8 +23,11 @@ const Stalls = () => {
   // สถานะข้อมูลแผงค้าทั้งหมด และสถานะการโหลด
   const [stalls, setStalls] = useState([]);
   const [loading, setLoading] = useState(true);
-  // ศูนย์อาหารที่เลือกดูผัง (ค่าเริ่มต้นคือศูนย์อาหาร 1)
-  const [selectedFoodCourt, setSelectedFoodCourt] = useState("1");
+  const [searchParams] = useSearchParams();
+  // ศูนย์อาหารที่เลือกดูผัง — อ่านจาก URL query ?foodCourt= หากมี, ค่าเริ่มต้นคือ 1
+  const [selectedFoodCourt, setSelectedFoodCourt] = useState(
+    searchParams.get("foodCourt") ?? "1"
+  );
   const [search, setSearch] = useState("");
 
   // สถานะสำหรับควบคุมหน้าต่างป๊อปอัป (Modal) สร้าง/แก้ไขข้อมูลแผงค้า
@@ -39,7 +42,8 @@ const Stalls = () => {
     status: "VACANT",
   });
 
-  // ดึงข้อมูลแผงค้าทั้งหมดเมื่อเริ่มต้นหน้าจอ
+  const navigate = useNavigate();
+
   useEffect(() => {
     fetchStalls();
   }, []);
@@ -146,8 +150,121 @@ const Stalls = () => {
   /**
    * คอมโพเนนต์ย่อยแสดงช่องเซลล์แผงค้าแต่ละช่องในผัง
    */
+  const [hoveredStall, setHoveredStall] = useState(null);
+  const hoverTimerRef = useRef(null);
+
+  /**
+   * เมาส์เข้าแผงค้า หรือ Popover -> เคลียร์ timer เพื่อให้เปิดค้างไว้
+   */
+  const handleStallMouseEnter = (id) => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setHoveredStall(id);
+  };
+
+  /**
+   * เมาส์ออกจากแผงค้า หรือ Popover -> ค้างไว้ 2 วินาทีค่อยหายไป เพื่อให้เลื่อนไปกดเมนูลัดทัน
+   */
+  const handleStallMouseLeave = () => {
+    if (editingStall) return;
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+    }
+    hoverTimerRef.current = setTimeout(() => {
+      setHoveredStall(null);
+      hoverTimerRef.current = null;
+    }, 2000);
+  };
+
+  // ล้าง timer เมื่อ unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimerRef.current) {
+        clearTimeout(hoverTimerRef.current);
+      }
+    };
+  }, []);
+
+  // สถานะของแผงที่กำลังแก้ไข inline
+  const [editingStall, setEditingStall] = useState(null);
+  // ข้อมูลฟอร์มสำหรับการแก้ไข inline
+  const [inlineForm, setInlineForm] = useState({ size: "", rent: "", status: "VACANT" });
+  const [inlineSaving, setInlineSaving] = useState(false);
+
+  /**
+   * ดึงข้อมูลรายละเอียดแผงค้าเพื่อแสดงใน Tooltip
+   */
+  const getStallInfo = (slot_number) => {
+    return stalls.find(
+      (s) =>
+        s.slot_number === slot_number &&
+        s.food_court_id === parseInt(selectedFoodCourt),
+    );
+  };
+
+  /**
+   * แปลงสถานะเป็นข้อความภาษาไทยและสีสำหรับ Tooltip
+   */
+  const getStatusLabel = (status) => {
+    switch (status?.toUpperCase()) {
+      case "OCCUPIED":
+        return { label: "มีผู้เช่า", color: "bg-red-100 text-red-700" };
+      case "VACANT":
+        return { label: "ว่าง", color: "bg-green-100 text-green-700" };
+      case "MAINTENANCE":
+        return { label: "ปิดปรับปรุง", color: "bg-yellow-100 text-yellow-700" };
+      default:
+        return { label: "ไม่ทราบสถานะ", color: "bg-gray-100 text-gray-600" };
+    }
+  };
+
+  /**
+   * เปิดโหมดแก้ไข inline สำหรับแผงที่มีข้อมูลแล้ว
+   */
+  const handleInlineEdit = (e, stallInfo) => {
+    e.stopPropagation();
+    setEditingStall(stallInfo.slot_number);
+    setInlineForm({
+      size: stallInfo.slot_size ?? "",
+      rent: stallInfo.rent ?? "",
+      status: stallInfo.status ?? "VACANT",
+    });
+  };
+
+  /**
+   * บันทึกการแก้ไข inline ไปยัง API
+   */
+  const handleInlineSave = async (e, stallInfo) => {
+    e.stopPropagation();
+    setInlineSaving(true);
+    try {
+      await stallsAPI.update(stallInfo.slot_id, {
+        slot_number: stallInfo.slot_number,
+        food_court_id: stallInfo.food_court_id,
+        slot_size: parseFloat(inlineForm.size).toString(),
+        rent: parseFloat(inlineForm.rent),
+        status: inlineForm.status,
+      });
+      toast.success("แก้ไขข้อมูลสำเร็จ");
+      setEditingStall(null);
+      setHoveredStall(null);
+      if (hoverTimerRef.current) {
+        clearTimeout(hoverTimerRef.current);
+        hoverTimerRef.current = null;
+      }
+      fetchStalls();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "ไม่สามารถแก้ไขข้อมูลได้");
+    } finally {
+      setInlineSaving(false);
+    }
+  };
+
   const StallCell = ({ id, small = false, w = 44, h = 44, fixedSize = false }) => {
     const status = getStallStatus(id);
+    const stallInfo = getStallInfo(id);
     let colorClass = "";
     const sizeClass = small ? "w-12 h-12 text-xs" : "w-16 h-16 text-sm";
 
@@ -166,13 +283,203 @@ const Stalls = () => {
           "bg-gray-50 border-dashed border-gray-300 text-gray-400 hover:border-purple-400 hover:text-purple-500";
     }
 
+    const isHovered = hoveredStall === id;
+    const isEditing = editingStall === id;
+    const statusInfo = stallInfo ? getStatusLabel(stallInfo.status) : null;
+
+    // สำหรับแถวด้านล่าง ให้เปิดป๊อปอัปขึ้นด้านบน เพื่อไม่ให้ล้นตกขอบล่าง
+    const isBottomStall = id.startsWith("D") || id.startsWith("E") || id === "F1" || id === "F2" || id === "F3" || id === "A10" || id === "A11";
+
     return (
       <div
-        onClick={() => handleStallClick(id)}
         style={fixedSize ? { width: w, height: h } : {}}
-        className={`${fixedSize ? "text-xs font-bold" : sizeClass} rounded-xl border-2 flex flex-col items-center justify-center cursor-pointer transition-all hover:scale-105 hover:shadow-md flex-shrink-0 ${colorClass}`}
+        className={`${fixedSize ? "text-xs font-bold" : sizeClass} relative rounded-xl border-2 flex flex-col items-center justify-center cursor-pointer transition-all hover:scale-105 hover:shadow-md flex-shrink-0 ${colorClass} ${(isHovered || isEditing) ? "z-30 ring-2 ring-purple-300" : ""}`}
+        onClick={() => !isEditing && handleStallClick(id)}
+        onMouseEnter={() => handleStallMouseEnter(id)}
+        onMouseLeave={handleStallMouseLeave}
       >
         <span className="font-bold">{id}</span>
+
+        {/* ── Hover Popover (ค้างไว้ 2 วินาทีเมื่อเลื่อนเมาส์ออก เพื่อให้กดเมนูลัดได้ทัน) ── */}
+        {(isHovered || isEditing) && (
+          <div
+            className={`absolute z-50 ${isBottomStall ? "bottom-full mb-2 before:-bottom-3" : "top-full mt-2 before:-top-3"} left-1/2 -translate-x-1/2 pointer-events-auto before:content-[''] before:absolute before:left-0 before:right-0 before:h-3`}
+            style={{ minWidth: 220 }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseEnter={() => handleStallMouseEnter(id)}
+            onMouseLeave={handleStallMouseLeave}
+          >
+            <div className="bg-white border border-gray-200 text-gray-800 text-xs rounded-2xl shadow-2xl p-3.5 flex flex-col gap-2">
+
+              {/* ── หัว popover ── */}
+              <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-0.5">
+                <span className="font-bold text-sm text-gray-900">แผงที่ {id}</span>
+                {stallInfo && !isEditing && (
+                  <button
+                    onClick={(e) => handleInlineEdit(e, stallInfo)}
+                    className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 font-semibold transition-colors"
+                  >
+                    <Edit size={11} /> แก้ไข
+                  </button>
+                )}
+              </div>
+
+              {/* ── โหมดดูข้อมูล ── */}
+              {!isEditing && stallInfo && (
+                <>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-500">สถานะ</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusInfo.color}`}>
+                      {statusInfo.label}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-500">ขนาด</span>
+                    <span className="font-medium">{stallInfo.slot_size ?? "-"} ตร.ม.</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-500">ค่าเช่า</span>
+                    <span className="font-medium">
+                      {stallInfo.rent != null ? stallInfo.rent.toLocaleString("th-TH") : "-"} บาท/เดือน
+                    </span>
+                  </div>
+
+                  {/* ── ปุ่ม Shortcut ── */}
+                  <div className="border-t border-gray-100 pt-2 mt-0.5">
+                    <p className="text-gray-400 text-[10px] mb-1.5 font-medium">ทางลัดไป</p>
+                    <div className="grid grid-cols-2 gap-1.5">
+
+                      {/* สัญญา - แสดงเมื่อมีผู้เช่า */}
+                      {stallInfo.status === "OCCUPIED" && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/admin/contracts?slot=${encodeURIComponent(stallInfo.slot_number || id)}`); }}
+                          className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors font-medium text-[11px]"
+                        >
+                          <FileText size={12} /> สัญญา
+                        </button>
+                      )}
+
+                      {/* สร้างสัญญา - แสดงเมื่อว่าง */}
+                      {stallInfo.status === "VACANT" && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate("/admin/create-contract"); }}
+                          className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors font-medium text-[11px]"
+                        >
+                          <UserPlus size={12} /> สร้างสัญญา
+                        </button>
+                      )}
+
+                      {/* แจ้งซ่อม */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigate("/admin/repairs"); }}
+                        className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-orange-50 text-orange-700 hover:bg-orange-100 transition-colors font-medium text-[11px]"
+                      >
+                        <Wrench size={12} /> แจ้งซ่อม
+                      </button>
+
+                      {/* บันทึกมิเตอร์ */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigate(`/admin/meter-recording?slot=${encodeURIComponent(stallInfo.slot_number || id)}`); }}
+                        className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors font-medium text-[11px]"
+                      >
+                        <Gauge size={12} /> บันทึกมิเตอร์
+                      </button>
+
+                      {/* ใบแจ้งหนี้ */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigate(`/admin/bills?slot=${encodeURIComponent(stallInfo.slot_number || id)}`); }}
+                        className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors font-medium text-[11px]"
+                      >
+                        <Receipt size={12} /> ใบแจ้งหนี้
+                      </button>
+
+                      {/* ยกเลิกสัญญา - แสดงเมื่อมีผู้เช่า */}
+                      {stallInfo.status === "OCCUPIED" && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate("/admin/cancel-contracts"); }}
+                          className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition-colors font-medium text-[11px]"
+                        >
+                          <XCircle size={12} /> ยกเลิกสัญญา
+                        </button>
+                      )}
+
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* ── โหมดแก้ไข inline ── */}
+              {isEditing && stallInfo && (
+                <>
+                  {/* ขนาด */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-gray-500 font-medium">ขนาด (ตร.ม.)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="0.1"
+                      value={inlineForm.size}
+                      onChange={(e) => setInlineForm({ ...inlineForm, size: e.target.value })}
+                      className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-purple-300 text-gray-800"
+                    />
+                  </div>
+                  {/* ค่าเช่า */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-gray-500 font-medium">ค่าเช่า (บาท/เดือน)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={inlineForm.rent}
+                      onChange={(e) => setInlineForm({ ...inlineForm, rent: e.target.value })}
+                      className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-purple-300 text-gray-800"
+                    />
+                  </div>
+                  {/* สถานะ */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-gray-500 font-medium">สถานะ</label>
+                    <select
+                      value={inlineForm.status}
+                      onChange={(e) => setInlineForm({ ...inlineForm, status: e.target.value })}
+                      className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-purple-300 text-gray-800"
+                    >
+                      <option value="VACANT">ว่าง (Vacant)</option>
+                      <option value="OCCUPIED">มีผู้เช่า (Occupied)</option>
+                      <option value="MAINTENANCE">ปิดปรับปรุง (Maintenance)</option>
+                    </select>
+                  </div>
+                  {/* ปุ่ม */}
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEditingStall(null); }}
+                      className="flex-1 py-1.5 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 font-medium text-xs transition-colors"
+                    >
+                      ยกเลิก
+                    </button>
+                    <button
+                      onClick={(e) => handleInlineSave(e, stallInfo)}
+                      disabled={inlineSaving}
+                      className="flex-1 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-xs transition-colors disabled:opacity-60"
+                    >
+                      {inlineSaving ? "กำลังบันทึก..." : "บันทึก"}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* ── แผงที่ยังไม่ได้กำหนด ── */}
+              {!stallInfo && (
+                <div className="text-gray-400 italic text-center py-1">ยังไม่ได้กำหนดข้อมูล</div>
+              )}
+
+              {/* ปลาย popover */}
+              {isBottomStall ? (
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-white drop-shadow-sm" />
+              ) : (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-white drop-shadow-sm" />
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   };

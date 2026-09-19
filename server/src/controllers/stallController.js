@@ -251,11 +251,61 @@ const deleteSlot = async (req, res, next) => {
 const recordMeterReading = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { waterMeter, electricMeter, waterMeterNumber, electricMeterNumber } = req.body;
+    const { waterMeter, electricMeter, waterMeterNumber, electricMeterNumber, billingMonth, billingYear } = req.body;
+
+    // ใช้เดือน/ปีปัจจุบันเป็น fallback ถ้าไม่ส่งมา
+    const now = new Date();
+    const month = billingMonth ? parseInt(billingMonth) : now.getMonth() + 1;
+    const year  = billingYear  ? parseInt(billingYear)  : now.getFullYear();
+
+    if (month < 1 || month > 12) {
+      return res.status(400).json({ success: false, message: 'billingMonth ต้องอยู่ระหว่าง 1-12' });
+    }
 
     const slot = await prisma.rentalSlot.findUnique({ where: { slot_id: parseInt(id) } });
     if (!slot) {
       return res.status(404).json({ success: false, message: 'Slot not found.' });
+    }
+
+    // -------------------------------------------------------
+    // ตรวจสอบว่าเคยบันทึกมิเตอร์รอบนี้แล้วหรือยัง (1 ล็อก : 1 ครั้ง / เดือน / ประเภทมิเตอร์)
+    // -------------------------------------------------------
+    const duplicateChecks = [];
+    if (waterMeter !== undefined && waterMeter !== '') {
+      duplicateChecks.push(
+        prisma.utilityMeter.findFirst({
+          where: { slot_id: parseInt(id), meter_type: 'WATER', billing_month: month, billing_year: year }
+        })
+      );
+    } else {
+      duplicateChecks.push(Promise.resolve(null));
+    }
+    if (electricMeter !== undefined && electricMeter !== '') {
+      duplicateChecks.push(
+        prisma.utilityMeter.findFirst({
+          where: { slot_id: parseInt(id), meter_type: 'ELECTRICITY', billing_month: month, billing_year: year }
+        })
+      );
+    } else {
+      duplicateChecks.push(Promise.resolve(null));
+    }
+
+    const [existingWater, existingElec] = await Promise.all(duplicateChecks);
+
+    const thMonth = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][month - 1];
+    const thYear  = year + 543;
+
+    if (existingWater) {
+      return res.status(409).json({
+        success: false,
+        message: `แผงนี้บันทึกมิเตอร์น้ำรอบ ${thMonth} ${thYear} ไปแล้ว ไม่สามารถบันทึกซ้ำได้`
+      });
+    }
+    if (existingElec) {
+      return res.status(409).json({
+        success: false,
+        message: `แผงนี้บันทึกมิเตอร์ไฟรอบ ${thMonth} ${thYear} ไปแล้ว ไม่สามารถบันทึกซ้ำได้`
+      });
     }
 
     // ดึงราคาต่อหน่วยจาก SystemSetting (fallback เป็น default ถ้าไม่มี)
@@ -291,7 +341,9 @@ const recordMeterReading = async (req, res, next) => {
           unit_used: usedWater,
           unit_price: waterPrice,
           total_cost: usedWater * waterPrice,
-          recorded_by: req.user.user_id
+          recorded_by: req.user.user_id,
+          billing_month: month,
+          billing_year: year,
         }
       });
       results.water = record;
@@ -319,7 +371,9 @@ const recordMeterReading = async (req, res, next) => {
           unit_used: usedElectric,
           unit_price: electricPrice,
           total_cost: usedElectric * electricPrice,
-          recorded_by: req.user.user_id
+          recorded_by: req.user.user_id,
+          billing_month: month,
+          billing_year: year,
         }
       });
       results.electricity = record;
@@ -330,6 +384,7 @@ const recordMeterReading = async (req, res, next) => {
     next(error);
   }
 };
+
 
 // -------------------------------------------------------
 // ฟังก์ชัน: getMeterReadings

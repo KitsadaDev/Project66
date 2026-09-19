@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Search,
   FileText,
@@ -13,6 +14,7 @@ import {
   Eye,
   X,
   AlertCircle,
+  Receipt,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { billsAPI, stallsAPI } from "../../api";
@@ -57,11 +59,63 @@ const Bills = () => {
   const [isSlipModalOpen, setIsSlipModalOpen] = useState(false);
   const [verifying, setVerifying] = useState(false);
 
+  // สถานะสำหรับหน้าต่างป๊อปอัปดูรายละเอียดบิลฉบับเต็ม
+  const [selectedBillDetail, setSelectedBillDetail] = useState(null);
+
+  // รองรับ Query Parameter เช่น ?slot=B2 เพื่อค้นหาและเปิดดูบิลของแผงนั้นทันที
+  const [searchParams, setSearchParams] = useSearchParams();
+  const slotParam = searchParams.get("slot");
+
+  const handleCloseBillDetail = () => {
+    setSelectedBillDetail(null);
+    if (slotParam) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete("slot");
+      setSearchParams(newParams, { replace: true });
+    }
+  };
+
+  const clearSlotFilter = () => {
+    setSearch("");
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete("slot");
+    setSearchParams(newParams, { replace: true });
+  };
+
   // ดึงรายการบิลและแผงค้าเมื่อเปิดหน้าจอ
   useEffect(() => {
     fetchBills();
     fetchStalls();
   }, []);
+
+  // ตรวจจับ ?slot=... เพื่อค้นหาและเปิดดูบิลล่าสุดของแผงค้านั้นทันที
+  useEffect(() => {
+    if (bills.length > 0 && slotParam) {
+      const cleanSlot = slotParam
+        .replace(/^(แผงที่|แผง)\s*/i, "")
+        .trim()
+        .toLowerCase();
+
+      const slotBills = bills.filter((b) => {
+        const sNum =
+          b.contract?.slot?.slot_number ||
+          b.rental_slot?.slot_number ||
+          b.rental_contract?.rental_slot?.slot_number ||
+          "";
+        return sNum.trim().toLowerCase() === cleanSlot;
+      });
+
+      setSearch(slotParam);
+
+      if (slotBills.length > 0) {
+        // เรียงเอาบิลล่าสุด (รอบเดือนล่าสุด)
+        const sorted = [...slotBills].sort(
+          (a, b) => new Date(b.billing_month) - new Date(a.billing_month)
+        );
+        setSelectedBillDetail(sorted[0]);
+      }
+    }
+  }, [bills, slotParam]);
 
   /**
    * ดึงรายการบิลทั้งหมดจาก API
@@ -323,6 +377,24 @@ const Bills = () => {
         </select>
       </div>
 
+      {/* Active Slot Filter Banner */}
+      {slotParam && (
+        <div className="mb-4 flex items-center justify-between p-3.5 bg-purple-50 border border-purple-200 rounded-xl text-xs sm:text-sm text-purple-800 animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold">กำลังแสดงบิลของแผง:</span>
+            <span className="px-2.5 py-0.5 bg-purple-600 text-white font-bold rounded-lg font-mono">
+              {slotParam}
+            </span>
+          </div>
+          <button
+            onClick={clearSlotFilter}
+            className="text-purple-600 hover:text-purple-800 font-medium hover:underline flex items-center gap-1 cursor-pointer"
+          >
+            <X size={14} /> แสดงบิลทั้งหมด
+          </button>
+        </div>
+      )}
+
       {/* Bills Table */}
       <div className="bg-white rounded-2xl shadow-lg border border-purple-100 overflow-hidden">
         <div className="overflow-x-auto">
@@ -344,8 +416,11 @@ const Bills = () => {
                 <th className="text-center py-4 px-6 font-semibold text-gray-600">
                   สถานะ
                 </th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-600">
-                  จัดการ
+                <th className="text-center py-4 px-6 font-semibold text-gray-600">
+                  รายละเอียด
+                </th>
+                <th className="text-center py-4 px-6 font-semibold text-gray-600">
+                  สลิป
                 </th>
               </tr>
             </thead>
@@ -409,26 +484,38 @@ const Bills = () => {
                       <option value="OVERDUE">เกินกำหนด</option>
                     </select>
                   </td>
-                  <td className="py-4 px-6 text-right whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1">
-                      {bill.payments && bill.payments.length > 0 && (
-                        <button
-                          onClick={() => {
-                            setSelectedBill(bill);
-                            setIsSlipModalOpen(true);
-                          }}
-                          className="bg-purple-50 hover:bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
-                        >
-                          แสดงสลิป
-                        </button>
-                      )}
-                    </div>
+                  <td className="py-4 px-6 text-center whitespace-nowrap">
+                    <button
+                      onClick={() => setSelectedBillDetail(bill)}
+                      className="inline-flex items-center gap-1 bg-purple-50 hover:bg-purple-100 text-purple-700 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer border border-purple-200/60"
+                      title="ดูรายละเอียดใบแจ้งหนี้"
+                    >
+                      <Eye size={13} />
+                      <span>รายละเอียด</span>
+                    </button>
+                  </td>
+                  <td className="py-4 px-6 text-center whitespace-nowrap">
+                    {bill.payments && bill.payments.length > 0 ? (
+                      <button
+                        onClick={() => {
+                          setSelectedBill(bill);
+                          setIsSlipModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer border border-emerald-200/60"
+                        title="ดูสลิปการโอนเงิน"
+                      >
+                        <FileText size={13} />
+                        <span>สลิป</span>
+                      </button>
+                    ) : (
+                      <span className="text-gray-300 text-xs font-medium">-</span>
+                    )}
                   </td>
                 </tr>
               ))}
               {filteredBills.length === 0 && (
                 <tr>
-                  <td colSpan="6" className="py-12 text-center text-gray-400">
+                  <td colSpan="7" className="py-12 text-center text-gray-400">
                     ไม่พบข้อมูลบิล
                   </td>
                 </tr>
@@ -735,6 +822,140 @@ const Bills = () => {
                   <p>ไม่พบรูปภาพหลักฐานการชำระเงิน</p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ------------------------------------------------------- */}
+      {/* Modal แสดงรายละเอียดบิล / ใบแจ้งหนี้ (Bill Detail Modal) */}
+      {/* ------------------------------------------------------- */}
+      {selectedBillDetail && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
+          onClick={handleCloseBillDetail}
+        >
+          <div
+            className="bg-white rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden border border-gray-100 my-auto flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-purple-700 to-indigo-600 text-white p-5 sm:p-6 flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white shrink-0 border border-white/20">
+                  <Receipt size={24} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">รายละเอียดใบแจ้งหนี้</h2>
+                  <p className="text-purple-100 text-xs sm:text-sm mt-0.5">
+                    แผงค้า {selectedBillDetail.contract?.slot?.slot_number || selectedBillDetail.rental_slot?.slot_number || "-"} •{" "}
+                    รอบเดือน {new Date(selectedBillDetail.billing_month).toLocaleDateString("th-TH", { month: "long", year: "numeric" })}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleCloseBillDetail}
+                className="p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5">
+              {/* Quick Info */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                <div>
+                  <span className="text-xs text-gray-500 block">ผู้เช่า:</span>
+                  <span className="font-bold text-gray-800 text-sm">
+                    {selectedBillDetail.contract?.tenant?.first_name || selectedBillDetail.rental_contract?.tenant?.first_name || "-"} {selectedBillDetail.contract?.tenant?.last_name || ""}
+                  </span>
+                  <span className="text-xs text-gray-500 block">
+                    โทร: {selectedBillDetail.contract?.tenant?.phone || selectedBillDetail.contract?.phone || "-"}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-gray-500 block mb-1">สถานะบิล:</span>
+                  {getStatusBadge(selectedBillDetail.status)}
+                </div>
+              </div>
+
+              {/* Items Breakdown */}
+              <div className="border border-gray-100 rounded-2xl overflow-hidden divide-y divide-gray-100 text-sm">
+                <div className="p-3.5 bg-gray-50 font-semibold text-gray-700 flex justify-between text-xs">
+                  <span>รายการค่าใช้จ่าย</span>
+                  <span>จำนวนเงิน</span>
+                </div>
+                <div className="p-3.5 flex justify-between">
+                  <span className="text-gray-600">ค่าเช่าพื้นที่แผงค้า</span>
+                  <span className="font-semibold text-gray-800">
+                    ฿{Number(selectedBillDetail.rent_amount || 0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="p-3.5 flex justify-between">
+                  <span className="text-gray-600">ค่าน้ำประปา</span>
+                  <span className="font-semibold text-blue-600">
+                    ฿{Number(selectedBillDetail.water_cost || 0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="p-3.5 flex justify-between">
+                  <span className="text-gray-600">ค่าไฟฟ้า</span>
+                  <span className="font-semibold text-amber-600">
+                    ฿{Number(selectedBillDetail.electricity_cost || 0).toLocaleString()}
+                  </span>
+                </div>
+                {selectedBillDetail.grease_trap_fee > 0 && (
+                  <div className="p-3.5 flex justify-between">
+                    <span className="text-gray-600">ค่าบำบัดน้ำเสีย / ดักไขมัน</span>
+                    <span className="font-semibold text-gray-800">
+                      ฿{Number(selectedBillDetail.grease_trap_fee).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+                <div className="p-4 bg-purple-50/60 flex justify-between items-center">
+                  <span className="font-bold text-gray-900">ยอดรวมทั้งสิ้น</span>
+                  <span className="font-extrabold text-xl text-purple-700">
+                    ฿{Number(selectedBillDetail.total_amount || 0).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              {/* Payment Slip (if exists) */}
+              {selectedBillDetail.payments && selectedBillDetail.payments.length > 0 && (
+                <div className="p-4 bg-emerald-50/70 border border-emerald-100 rounded-2xl flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle className="text-emerald-600" size={20} />
+                    <div>
+                      <span className="font-semibold text-emerald-900 text-sm block">
+                        มีการแนบสลิปการโอนเงินแล้ว
+                      </span>
+                      <span className="text-xs text-emerald-700">
+                        {selectedBillDetail.payments[0].payment_date
+                          ? new Date(selectedBillDetail.payments[0].payment_date).toLocaleDateString("th-TH")
+                          : "รอตรวจสอบ"}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedBill(selectedBillDetail);
+                      setIsSlipModalOpen(true);
+                    }}
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+                  >
+                    ตรวจสอบสลิป
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+              <button
+                onClick={handleCloseBillDetail}
+                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                ปิดหน้าต่าง
+              </button>
             </div>
           </div>
         </div>

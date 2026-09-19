@@ -442,8 +442,13 @@ const deleteRequest = async (req, res, next) => {
       }
     }
 
-    // ลบรายการออกจากฐานข้อมูล
-    await prisma.maintenanceRequest.delete({ where: { request_id: parseInt(id) } });
+    // ลบรายการลูกที่เกี่ยวข้องใน Transaction เพื่อป้องกัน Foreign Key Constraint error (P2003)
+    await prisma.$transaction(async (tx) => {
+      await tx.maintenanceUpdate.deleteMany({ where: { request_id: parseInt(id) } });
+      await tx.maintenanceImage.deleteMany({ where: { request_id: parseInt(id) } });
+      await tx.maintenanceAssignment.deleteMany({ where: { request_id: parseInt(id) } });
+      await tx.maintenanceRequest.delete({ where: { request_id: parseInt(id) } });
+    });
     res.json({ success: true, message: 'Request deleted.' });
   } catch (error) {
     next(error);

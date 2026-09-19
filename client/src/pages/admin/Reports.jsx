@@ -1,9 +1,16 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Building2,
   DollarSign,
   Wrench,
   FileText,
+  Droplets,
+  Zap,
+  Store,
+  Receipt,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
 } from "lucide-react";
 import { stallsAPI, billsAPI, maintenanceAPI } from "../../api";
 import { exportMaintenanceReportPDF, exportBillsReportPDF } from "../../utils/pdfExport";
@@ -22,6 +29,10 @@ const Reports = () => {
     totalStalls: 0, occupied: 0, vacant: 0, maintenance: 0, occupancyRate: 0,
     totalBills: 0, paidBills: 0, waitingBills: 0, pendingBills: 0,
     unbilledBills: 0, targetBase: 0, paidRate: 0,
+    rentPaid: 0, rentPending: 0, rentTotal: 0, rentRate: 0,
+    waterPaid: 0, waterPending: 0, waterTotal: 0, waterRate: 0,
+    elecPaid: 0, elecPending: 0, elecTotal: 0, elecRate: 0,
+    occupiedSlotsCount: 0, paidSlotsCount: 0, pendingSlotsCount: 0, unbilledSlotsCount: 0,
     pendingRepairs: 0, completedRepairs: 0,
     categoryList: [], slotList: [], maxSlotCount: 1,
     tableBills: [], tableRepairs: [],
@@ -140,6 +151,79 @@ const Reports = () => {
     const unbilledCount = Math.max(0, targetBase - currentBills.length);
     const paidRate = targetBase > 0 ? Math.round((paidCount / targetBase) * 100) : 0;
 
+    // 3.1 คำนวณรายได้แยกตามประเภท (ค่าเช่า, ค่าน้ำ, ค่าไฟ)
+    let rentPaid = 0;
+    let rentPending = 0;
+    let rentTotal = 0;
+
+    let waterPaid = 0;
+    let waterPending = 0;
+    let waterTotal = 0;
+
+    let elecPaid = 0;
+    let elecPending = 0;
+    let elecTotal = 0;
+
+    currentBills.forEach((b) => {
+      const rent = Number(b.rent_amount || 0);
+      const water = Number(b.water_cost || 0);
+      const elec = Number(b.electricity_cost || 0);
+
+      rentTotal += rent;
+      waterTotal += water;
+      elecTotal += elec;
+
+      if (b.status === "PAID") {
+        rentPaid += rent;
+        waterPaid += water;
+        elecPaid += elec;
+      } else {
+        rentPending += rent;
+        waterPending += water;
+        elecPending += elec;
+      }
+    });
+
+    const rentRate = rentTotal > 0 ? Math.round((rentPaid / rentTotal) * 100) : 0;
+    const waterRate = waterTotal > 0 ? Math.round((waterPaid / waterTotal) * 100) : 0;
+    const elecRate = elecTotal > 0 ? Math.round((elecPaid / elecTotal) * 100) : 0;
+
+    // 3.2 คำนวณสถานะรายล็อก (เช่ากี่ล็อก, จ่ายกี่ล็อก, ติดค้างกี่ล็อก)
+    const occupiedSlotsList = stalls.filter((s) => (s.status || "").toUpperCase() === "OCCUPIED");
+    const occupiedSlotsCount = occupiedSlotsList.length;
+
+    const slotBillsMap = new Map();
+    currentBills.forEach((b) => {
+      const sId = b.contract?.slot?.slot_id || b.contract?.slot_id || b.slot_id;
+      const sNum = b.contract?.slot?.slot_number || b.slot?.slot_number;
+      const key = sId ? String(sId) : sNum;
+      if (key) {
+        if (!slotBillsMap.has(key)) slotBillsMap.set(key, []);
+        slotBillsMap.get(key).push(b);
+      }
+    });
+
+    let paidSlotsCount = 0;
+    let pendingSlotsCount = 0;
+    let unbilledSlotsCount = 0;
+
+    occupiedSlotsList.forEach((slot) => {
+      const sIdKey = slot.slot_id ? String(slot.slot_id) : null;
+      const sNumKey = slot.slot_number;
+      const slotBills = (sIdKey && slotBillsMap.get(sIdKey)) || (sNumKey && slotBillsMap.get(sNumKey)) || [];
+
+      if (slotBills.length === 0) {
+        unbilledSlotsCount++;
+      } else {
+        const allPaid = slotBills.every((b) => b.status === "PAID");
+        if (allPaid) {
+          paidSlotsCount++;
+        } else {
+          pendingSlotsCount++;
+        }
+      }
+    });
+
     // 4. จำแนกสถานะงานซ่อม และจัดกลุ่มประเภทปัญหา/ล็อกที่พบบ่อย
     const pendingRepairs = currentRepairs.filter((r) => r.status === "PENDING").length;
     const completedRepairs = currentRepairs.filter((r) => r.status === "COMPLETED").length;
@@ -181,6 +265,10 @@ const Reports = () => {
       totalStalls: stalls.length, occupied: occ, vacant: vac, maintenance: maint, occupancyRate,
       totalBills: currentBills.length, paidBills: paidCount, waitingBills: waitingCount,
       pendingBills: pendingCount, unbilledBills: unbilledCount, targetBase, paidRate,
+      rentPaid, rentPending, rentTotal, rentRate,
+      waterPaid, waterPending, waterTotal, waterRate,
+      elecPaid, elecPending, elecTotal, elecRate,
+      occupiedSlotsCount, paidSlotsCount, pendingSlotsCount, unbilledSlotsCount,
       pendingRepairs, completedRepairs, categoryList, slotList, maxSlotCount,
       tableBills: currentBills, tableRepairs: currentRepairs,
     });
@@ -451,6 +539,226 @@ const Reports = () => {
         </div>
 
       </div>
+
+      {/* ─── ส่วนรายงานสรุปรายได้แยกตามประเภท & สถานะการชำระรายล็อก ─── */}
+      <div className="mt-8 bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <Receipt size={20} className="text-purple-600" />
+              รายงานรายได้แยกค่าน้ำ ค่าไฟ ค่าเช่า และสถานะรายล็อก
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              สรุปภาพรวมรายรับตามประเภทค่าใช้จ่ายและจำนวนล็อกตามสถานะการชำระเงิน
+            </p>
+          </div>
+          <span className="text-xs font-semibold text-purple-700 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-100">
+            รอบเวลา: {getFilterLabel()}
+          </span>
+        </div>
+
+        {/* สรุปสถานะรายล็อก */}
+        <div>
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Store size={14} className="text-purple-600" />
+            <span>สถานะการชำระเงินรายล็อก</span>
+          </h3>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            <div className="bg-purple-50 rounded-xl p-3.5 border border-purple-100">
+              <span className="text-xs text-purple-700 font-semibold block mb-1">เช่าทั้งหมด</span>
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl font-black text-purple-900">{data.occupiedSlotsCount}</span>
+                <span className="text-xs text-purple-600">/ {data.totalStalls} ล็อค</span>
+              </div>
+              <span className="text-[11px] text-purple-600 mt-1 block">ครองแผง {data.occupancyRate}%</span>
+            </div>
+
+            <div className="bg-emerald-50 rounded-xl p-3.5 border border-emerald-100">
+              <span className="text-xs text-emerald-700 font-semibold block mb-1">จ่ายค่าต่างๆ แล้ว</span>
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl font-black text-emerald-700">{data.paidSlotsCount}</span>
+                <span className="text-xs text-emerald-600">ล็อค</span>
+              </div>
+              <span className="text-[11px] text-emerald-600 mt-1 block">ชำระครบถ้วน</span>
+            </div>
+
+            <div className="bg-rose-50 rounded-xl p-3.5 border border-rose-100">
+              <span className="text-xs text-rose-700 font-semibold block mb-1">ติดค้างชำระ</span>
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl font-black text-rose-600">{data.pendingSlotsCount}</span>
+                <span className="text-xs text-rose-600">ล็อค</span>
+              </div>
+              <span className="text-[11px] text-rose-600 mt-1 block">รอชำระ / รอยืนยัน</span>
+            </div>
+
+            <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-200">
+              <span className="text-xs text-gray-600 font-semibold block mb-1">ยังไม่ออกบิล</span>
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl font-black text-gray-700">{data.unbilledSlotsCount}</span>
+                <span className="text-xs text-gray-500">ล็อค</span>
+              </div>
+              <span className="text-[11px] text-gray-500 mt-1 block">ไม่มีบิลในรอบนี้</span>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
+            <div className="flex items-center justify-between text-xs font-semibold text-gray-600 mb-1.5">
+              <span>สัดส่วนล็อกที่มีผู้เช่า ({data.occupiedSlotsCount} ล็อค)</span>
+              <div className="flex items-center gap-3 text-[11px]">
+                <span className="flex items-center gap-1 text-emerald-700">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> จ่ายแล้ว ({data.paidSlotsCount})
+                </span>
+                <span className="flex items-center gap-1 text-rose-700">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span> ติดค้าง ({data.pendingSlotsCount})
+                </span>
+                {data.unbilledSlotsCount > 0 && (
+                  <span className="flex items-center gap-1 text-gray-500">
+                    <span className="w-2.5 h-2.5 rounded-full bg-gray-400"></span> ยังไม่ออกบิล ({data.unbilledSlotsCount})
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="h-2.5 w-full bg-gray-200 rounded-full overflow-hidden flex">
+              {data.occupiedSlotsCount > 0 ? (
+                <>
+                  <div
+                    style={{ width: `${(data.paidSlotsCount / data.occupiedSlotsCount) * 100}%` }}
+                    className="h-full bg-emerald-500 transition-all duration-500"
+                  ></div>
+                  <div
+                    style={{ width: `${(data.pendingSlotsCount / data.occupiedSlotsCount) * 100}%` }}
+                    className="h-full bg-rose-500 transition-all duration-500"
+                  ></div>
+                  <div
+                    style={{ width: `${(data.unbilledSlotsCount / data.occupiedSlotsCount) * 100}%` }}
+                    className="h-full bg-gray-400 transition-all duration-500"
+                  ></div>
+                </>
+              ) : (
+                <div className="h-full w-full bg-gray-300"></div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* การ์ดรายงานรายได้แยก 3 หมวด */}
+        <div>
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <DollarSign size={14} className="text-emerald-600" />
+            <span>รายได้แยกตามประเภทค่าใช้จ่าย</span>
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* ค่าเช่าแผง */}
+            <div className="bg-gradient-to-br from-purple-50/50 to-white rounded-2xl p-5 border border-purple-100 shadow-xs">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-xs">
+                    <Store size={18} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-800 text-sm">ค่าเช่าแผง</h4>
+                    <span className="text-[11px] text-gray-400">Stall Rent</span>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-purple-700 bg-purple-100/70 px-2 py-0.5 rounded-md">
+                  {data.rentRate}%
+                </span>
+              </div>
+              <div className="mb-2">
+                <span className="text-xs text-gray-500 block">รายได้ที่จัดเก็บได้</span>
+                <span className="text-2xl font-black text-purple-700">฿{Number(data.rentPaid || 0).toLocaleString()}</span>
+              </div>
+              <div className="w-full h-1.5 bg-purple-100 rounded-full overflow-hidden mb-3">
+                <div className="h-full bg-purple-600 rounded-full" style={{ width: `${data.rentRate}%` }}></div>
+              </div>
+              <div className="space-y-1.5 text-xs text-gray-600 border-t border-purple-50 pt-2.5">
+                <div className="flex justify-between">
+                  <span>ยอดเรียกเก็บรวม</span>
+                  <span className="font-bold text-gray-800">฿{Number(data.rentTotal || 0).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>ยอดค้างชำระ</span>
+                  <span className="font-bold text-rose-600">฿{Number(data.rentPending || 0).toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* ค่าน้ำประปา */}
+            <div className="bg-gradient-to-br from-sky-50/50 to-white rounded-2xl p-5 border border-sky-100 shadow-xs">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-sky-500 text-white flex items-center justify-center shadow-xs">
+                    <Droplets size={18} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-800 text-sm">ค่าน้ำประปา</h4>
+                    <span className="text-[11px] text-gray-400">Water Cost</span>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-sky-700 bg-sky-100/70 px-2 py-0.5 rounded-md">
+                  {data.waterRate}%
+                </span>
+              </div>
+              <div className="mb-2">
+                <span className="text-xs text-gray-500 block">รายได้ที่จัดเก็บได้</span>
+                <span className="text-2xl font-black text-sky-600">฿{Number(data.waterPaid || 0).toLocaleString()}</span>
+              </div>
+              <div className="w-full h-1.5 bg-sky-100 rounded-full overflow-hidden mb-3">
+                <div className="h-full bg-sky-500 rounded-full" style={{ width: `${data.waterRate}%` }}></div>
+              </div>
+              <div className="space-y-1.5 text-xs text-gray-600 border-t border-sky-50 pt-2.5">
+                <div className="flex justify-between">
+                  <span>ยอดเรียกเก็บรวม</span>
+                  <span className="font-bold text-gray-800">฿{Number(data.waterTotal || 0).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>ยอดค้างชำระ</span>
+                  <span className="font-bold text-rose-600">฿{Number(data.waterPending || 0).toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* ค่าไฟฟ้า */}
+            <div className="bg-gradient-to-br from-amber-50/50 to-white rounded-2xl p-5 border border-amber-100 shadow-xs">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                    <Zap size={18} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-800 text-sm">ค่าไฟฟ้า</h4>
+                    <span className="text-[11px] text-gray-400">Electricity Cost</span>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-amber-700 bg-amber-100/70 px-2 py-0.5 rounded-md">
+                  {data.elecRate}%
+                </span>
+              </div>
+              <div className="mb-2">
+                <span className="text-xs text-gray-500 block">รายได้ที่จัดเก็บได้</span>
+                <span className="text-2xl font-black text-amber-600">฿{Number(data.elecPaid || 0).toLocaleString()}</span>
+              </div>
+              <div className="w-full h-1.5 bg-amber-100 rounded-full overflow-hidden mb-3">
+                <div className="h-full bg-amber-500 rounded-full" style={{ width: `${data.elecRate}%` }}></div>
+              </div>
+              <div className="space-y-1.5 text-xs text-gray-600 border-t border-amber-50 pt-2.5">
+                <div className="flex justify-between">
+                  <span>ยอดเรียกเก็บรวม</span>
+                  <span className="font-bold text-gray-800">฿{Number(data.elecTotal || 0).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>ยอดค้างชำระ</span>
+                  <span className="font-bold text-rose-600">฿{Number(data.elecPending || 0).toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 };

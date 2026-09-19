@@ -245,6 +245,29 @@ const createBill = async (req, res, next) => {
     // ยอดรวม = ค่าเช่า + น้ำ + ไฟ + ดักไขมัน
     const total_amount = parseFloat(rent_amount) + parseFloat(water_cost) + parseFloat(electricity_cost) + greaseTrapFee;
 
+    // -------------------------------------------------------
+    // ตรวจสอบ: 1 ล็อก ออกบิลได้ 1 ครั้ง/เดือนเท่านั้น
+    // เปรียบเทียบกับ billing_month ทีละเดือน (ต้นเดือน–สิ้นเดือน)
+    // -------------------------------------------------------
+    const billingDate = new Date(billing_month);
+    const monthStart = new Date(billingDate.getFullYear(), billingDate.getMonth(), 1);
+    const monthEnd   = new Date(billingDate.getFullYear(), billingDate.getMonth() + 1, 1);
+
+    const existingBill = await prisma.monthlyExpense.findFirst({
+      where: {
+        contract_id: contract.contract_id,
+        billing_month: { gte: monthStart, lt: monthEnd }
+      }
+    });
+
+    if (existingBill) {
+      const monthLabel = billingDate.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
+      return res.status(409).json({
+        success: false,
+        message: `แผงนี้มีบิลประจำเดือน${monthLabel}อยู่แล้ว ไม่สามารถออกบิลซ้ำได้`
+      });
+    }
+
     const expense = await prisma.monthlyExpense.create({
       data: {
         contract_id: contract.contract_id,
