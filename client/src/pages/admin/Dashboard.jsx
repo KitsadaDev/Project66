@@ -350,13 +350,18 @@ const AdminDashboard = () => {
                   >
                     <Gauge size={12} /> บันทึกมิเตอร์
                   </button>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); navigate(`/admin/bills?slot=${encodeURIComponent(id)}`); }}
-                    className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors font-medium text-[11px] cursor-pointer"
-                  >
-                    <Receipt size={12} /> ใบแจ้งหนี้
-                  </button>
+                  {stallInfo?.status === "OCCUPIED" && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/admin/bills?slot=${encodeURIComponent(stallInfo?.slot_number || id)}&slotId=${stallInfo?.slot_id || ""}&action=create`);
+                      }}
+                      className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors font-medium text-[11px] cursor-pointer"
+                    >
+                      <Receipt size={12} /> ใบแจ้งหนี้
+                    </button>
+                  )}
                   {stallInfo?.status === "OCCUPIED" && (
                     <button
                       type="button"

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Search,
@@ -15,9 +15,41 @@ import {
   X,
   AlertCircle,
   Receipt,
+  Gauge,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { billsAPI, stallsAPI } from "../../api";
+
+/**
+ * คำนวณรอบเดือนเริ่มต้น:
+ * ถ้าเป็นวันที่ 1-10 ของเดือน ให้ Default เป็นเดือนก่อนหน้า (เช่น 1-10 ก.ย. ให้เป็นรอบ ส.ค.)
+ */
+const getDefaultBillingMonth = () => {
+  const now = new Date();
+  if (now.getDate() <= 10) {
+    const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const y = prevMonth.getFullYear();
+    const m = String(prevMonth.getMonth() + 1).padStart(2, "0");
+    return `${y}-${m}`;
+  }
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+};
+
+/**
+ * แปลงวันที่เป็นรูปแบบภาษาไทยแบบไม่มีเวลา (เช่น 30 ส.ค. 69)
+ */
+const formatReadingDate = (dateString) => {
+  if (!dateString) return "-";
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString("th-TH", {
+    day: "numeric",
+    month: "short",
+    year: "2-digit",
+  });
+};
 
 /**
  * คอมโพเนนต์หน้าจัดการบิลค่าใช้จ่ายรายเดือนสำหรับผู้ดูแลระบบ (Admin Bills)
@@ -43,7 +75,7 @@ const Bills = () => {
   // ข้อมูลฟอร์มสำหรับออกบิล
   const [formData, setFormData] = useState({
     slot_id: "",
-    billing_month: new Date().toISOString().slice(0, 7),
+    billing_month: getDefaultBillingMonth(),
     water_cost: "",
     electricity_cost: "",
     rent_amount: "",
@@ -65,12 +97,27 @@ const Bills = () => {
   // รองรับ Query Parameter เช่น ?slot=B2 เพื่อค้นหาและเปิดดูบิลของแผงนั้นทันที
   const [searchParams, setSearchParams] = useSearchParams();
   const slotParam = searchParams.get("slot");
+  const slotIdParam = searchParams.get("slotId");
+  const actionParam = searchParams.get("action");
+  const hasAutoOpenedRef = useRef(false);
 
   const handleCloseBillDetail = () => {
     setSelectedBillDetail(null);
     if (slotParam) {
       const newParams = new URLSearchParams(searchParams);
       newParams.delete("slot");
+      newParams.delete("slotId");
+      setSearchParams(newParams, { replace: true });
+    }
+  };
+
+  const handleCloseCreateModal = () => {
+    setIsModalOpen(false);
+    if (slotParam || actionParam || slotIdParam) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete("slot");
+      newParams.delete("slotId");
+      newParams.delete("action");
       setSearchParams(newParams, { replace: true });
     }
   };
@@ -79,6 +126,8 @@ const Bills = () => {
     setSearch("");
     const newParams = new URLSearchParams(searchParams);
     newParams.delete("slot");
+    newParams.delete("slotId");
+    newParams.delete("action");
     setSearchParams(newParams, { replace: true });
   };
 
@@ -88,9 +137,46 @@ const Bills = () => {
     fetchStalls();
   }, []);
 
-  // ตรวจจับ ?slot=... เพื่อค้นหาและเปิดดูบิลล่าสุดของแผงค้านั้นทันที
+  // ตรวจจับ ?action=create เพื่อเปิดหน้าต่างออกบิลทันที
   useEffect(() => {
-    if (bills.length > 0 && slotParam) {
+    if (actionParam === "create" && !hasAutoOpenedRef.current) {
+      hasAutoOpenedRef.current = true;
+      setIsModalOpen(true);
+    }
+  }, [actionParam]);
+
+  // เมื่อโหลด stalls เสร็จแล้ว ถ้ามาจาก action=create ให้เลือกล็อคในฟอร์มอัตโนมัติ
+  useEffect(() => {
+    if (stalls.length > 0 && actionParam === "create") {
+      let targetStall = null;
+      if (slotIdParam) {
+        targetStall = stalls.find((s) => s.slot_id === parseInt(slotIdParam));
+      }
+      if (!targetStall && slotParam) {
+        const cleanSlot = slotParam
+          .replace(/^(แผงที่|แผง)\s*/i, "")
+          .trim()
+          .toLowerCase();
+        targetStall = stalls.find(
+          (s) => s.slot_number?.trim().toLowerCase() === cleanSlot
+        );
+      }
+
+      if (targetStall) {
+        setFormData((prev) => ({
+          ...prev,
+          slot_id: targetStall.slot_id.toString(),
+        }));
+        setCalculationResult(null);
+      } else if (slotParam) {
+        toast.warn(`แผงค้า ${slotParam} ยังไม่มีสัญญาเช่าที่เปิดใช้งาน`);
+      }
+    }
+  }, [stalls, slotParam, slotIdParam, actionParam]);
+
+  // ตรวจจับ ?slot=... เพื่อค้นหาและเปิดดูบิลล่าสุดของแผงค้านั้นทันที (กรณีไม่ได้ระบุ action=create)
+  useEffect(() => {
+    if (bills.length > 0 && slotParam && actionParam !== "create") {
       const cleanSlot = slotParam
         .replace(/^(แผงที่|แผง)\s*/i, "")
         .trim()
@@ -115,7 +201,7 @@ const Bills = () => {
         setSelectedBillDetail(sorted[0]);
       }
     }
-  }, [bills, slotParam]);
+  }, [bills, slotParam, actionParam]);
 
   /**
    * ดึงรายการบิลทั้งหมดจาก API
@@ -204,14 +290,15 @@ const Bills = () => {
         water_rate: calculationResult?.rates?.water,
         electricity_rate: calculationResult?.rates?.electric,
         grease_trap_fee: formData.grease_trap_fee,
+        dueDate: calculationResult?.meterDetails?.due_date,
       });
       toast.success("สร้างบิลสำเร็จ");
-      setIsModalOpen(false);
+      handleCloseCreateModal();
       fetchBills();
       // ล้างค่าฟอร์มกลับสู่ค่าเริ่มต้น
       setFormData({
         slot_id: "",
-        billing_month: new Date().toISOString().slice(0, 7),
+        billing_month: getDefaultBillingMonth(),
         water_cost: "",
         electricity_cost: "",
         rent_amount: "",
@@ -435,7 +522,7 @@ const Bills = () => {
                   className="border-b border-gray-50 hover:bg-purple-50/30 transition-colors"
                 >
                   <td className="py-4 px-6">
-                    <span className="font-medium text-gray-800">
+                    <span className="font-medium text-gray-800 block">
                       {new Date(bill.billing_month).toLocaleDateString(
                         "th-TH",
                         {
@@ -444,6 +531,11 @@ const Bills = () => {
                         },
                       )}
                     </span>
+                    {bill.due_date && (
+                      <span className="text-xs text-gray-400 block mt-0.5">
+                        ครบกำหนด: {formatReadingDate(bill.due_date)}
+                      </span>
+                    )}
                   </td>
                   <td className="py-4 px-6">
                     <div className="flex flex-col">
@@ -539,7 +631,7 @@ const Bills = () => {
                 ออกบิลการชำระเงิน
               </h2>
               <button
-                onClick={() => setIsModalOpen(false)}
+                onClick={handleCloseCreateModal}
                 className="text-gray-400 hover:text-gray-600"
               >
                 <XCircle size={24} />
@@ -550,7 +642,7 @@ const Bills = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    เลือกแผงค้า *
+                    เลือกล็อค *
                   </label>
                   <select
                     required
@@ -627,6 +719,110 @@ const Bills = () => {
                   {calculating ? "กำลังคำนวณ..." : "ดึงยอดเงิน"}
                 </button>
               </div>
+
+              {/* Meter Calculation Details Card */}
+              {calculationResult?.meterDetails && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5 text-xs animate-in fade-in duration-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-200 pb-2">
+                    <span className="font-semibold text-slate-800 flex items-center gap-1.5">
+                      <Gauge size={14} className="text-blue-600" />
+                      รายละเอียดมิเตอร์รอบเดือน{" "}
+                      {new Date(formData.billing_month + "-01").toLocaleDateString(
+                        "th-TH",
+                        { month: "long", year: "numeric" },
+                      )}
+                    </span>
+                    {calculationResult.meterDetails.due_date && (
+                      <span className="text-purple-700 font-semibold bg-purple-50 px-2.5 py-0.5 rounded-lg border border-purple-100 text-[11px] w-fit">
+                        กำหนดชำระ: {formatReadingDate(calculationResult.meterDetails.due_date)}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    {/* มิเตอร์น้ำ */}
+                    <div className="bg-white p-2.5 rounded-lg border border-slate-200 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-blue-700 flex items-center gap-1 text-xs">
+                          💧 มิเตอร์น้ำ
+                        </span>
+                        {calculationResult.meterDetails.water && (
+                          <span className="text-[11px] text-slate-500 font-medium">
+                            จดเมื่อ {formatReadingDate(calculationResult.meterDetails.water.reading_date)}
+                          </span>
+                        )}
+                      </div>
+                      {calculationResult.meterDetails.water ? (
+                        <div className="text-[11px] text-slate-600 flex justify-between items-center bg-blue-50/50 px-2 py-1 rounded-md">
+                          <span>
+                            เลขมิเตอร์:{" "}
+                            <span className="font-medium text-slate-700">
+                              {calculationResult.meterDetails.water.previous_reading} ➔ {calculationResult.meterDetails.water.current_reading}
+                            </span>
+                          </span>
+                          <span className="font-bold text-blue-600">
+                            {calculationResult.meterDetails.water.unit_used} หน่วย
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-slate-400 block">
+                          ไม่พบข้อมูลการจดมิเตอร์น้ำ
+                        </span>
+                      )}
+                    </div>
+
+                    {/* มิเตอร์ไฟ */}
+                    <div className="bg-white p-2.5 rounded-lg border border-slate-200 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-amber-700 flex items-center gap-1 text-xs">
+                          ⚡ มิเตอร์ไฟ
+                        </span>
+                        {calculationResult.meterDetails.electric && (
+                          <span className="text-[11px] text-slate-500 font-medium">
+                            จดเมื่อ {formatReadingDate(calculationResult.meterDetails.electric.reading_date)}
+                          </span>
+                        )}
+                      </div>
+                      {calculationResult.meterDetails.electric ? (
+                        <div className="text-[11px] text-slate-600 flex justify-between items-center bg-amber-50/50 px-2 py-1 rounded-md">
+                          <span>
+                            เลขมิเตอร์:{" "}
+                            <span className="font-medium text-slate-700">
+                              {calculationResult.meterDetails.electric.previous_reading} ➔ {calculationResult.meterDetails.electric.current_reading}
+                            </span>
+                          </span>
+                          <span className="font-bold text-amber-600">
+                            {calculationResult.meterDetails.electric.unit_used} หน่วย
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-slate-400 block">
+                          ไม่พบข้อมูลการจดมิเตอร์ไฟ
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* แถบแจ้งเตือนสถานะช่วงเวลา 28 ถึงสิ้นเดือน */}
+                  <div className="pt-0.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 text-[11px]">
+                    {calculationResult.meterDetails.water?.is_in_period !== false &&
+                    calculationResult.meterDetails.electric?.is_in_period !== false ? (
+                      <span className="text-emerald-700 flex items-center gap-1 font-medium bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        <CheckCircle size={12} />
+                        ข้อมูลมิเตอร์ถูกบันทึกในช่วงวันที่ 28 ถึงสิ้นเดือน
+                      </span>
+                    ) : (
+                      <span className="text-amber-700 flex items-center gap-1 font-medium bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                        <AlertCircle size={12} />
+                        ข้อมูลมิเตอร์ถูกบันทึกก่อนวันที่ 28 ของเดือน
+                      </span>
+                    )}
+                    <span className="text-slate-400 text-[11px]">
+                      ครบกำหนดชำระช้าสุดไม่เกินวันที่ 10
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Amount Fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
@@ -880,6 +1076,11 @@ const Bills = () => {
                 <div className="text-right">
                   <span className="text-xs text-gray-500 block mb-1">สถานะบิล:</span>
                   {getStatusBadge(selectedBillDetail.status)}
+                  {selectedBillDetail.due_date && (
+                    <span className="text-[11px] text-gray-500 block mt-1.5 font-medium">
+                      ครบกำหนด: {formatReadingDate(selectedBillDetail.due_date)}
+                    </span>
+                  )}
                 </div>
               </div>
 

@@ -43,7 +43,7 @@ const getAllSlots = async (req, res, next) => {
         },
         utility_meters: {
           orderBy: { created_at: 'desc' },
-          take: 2 // Assuming we might get one water and one electric recently
+          take: 6 // ดึงประวัติมิเตอร์ล่าสุดให้ครอบคลุมทั้งน้ำและไฟ
         }
       },
       orderBy: { slot_number: 'asc' }

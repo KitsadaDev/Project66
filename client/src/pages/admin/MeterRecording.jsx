@@ -16,6 +16,20 @@ import { toast } from "react-toastify";
 import { stallsAPI, settingsAPI } from "../../api";
 
 /**
+ * จัดรูปแบบวันที่บันทึกมิเตอร์เป็นภาษาไทยแบบย่อ เช่น (15 มี.ค. 69)
+ */
+const formatReadingDate = (dateStr) => {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("th-TH", {
+    day: "numeric",
+    month: "short",
+    year: "2-digit",
+  });
+};
+
+/**
  * คอมโพเนนต์หน้าบันทึกค่ามิเตอร์น้ำและไฟฟ้าประจำเดือน (Admin Meter Recording)
  * - แสดงรายการเฉพาะแผงค้าที่มีผู้เช่า (OCCUPIED)
  * - บันทึกเลขอ่านมิเตอร์น้ำประปาและไฟฟ้าครั้งล่าสุด
@@ -155,6 +169,8 @@ const MeterRecording = () => {
 
     const prevWater = lastWater ? parseFloat(lastWater.current_reading) : 0;
     const prevElec = lastElec ? parseFloat(lastElec.current_reading) : 0;
+    const prevWaterDate = lastWater?.created_at || null;
+    const prevElecDate = lastElec?.created_at || null;
 
     const currWater = parseFloat(reading.waterMeter) || 0;
     const currElec = parseFloat(reading.electricMeter) || 0;
@@ -165,6 +181,8 @@ const MeterRecording = () => {
     return {
       prevWater,
       prevElec,
+      prevWaterDate,
+      prevElecDate,
       usedWater,
       usedElec,
       costWater: usedWater !== null ? usedWater * rates.water : null,
@@ -433,7 +451,7 @@ const MeterRecording = () => {
                           setEditingStalls((prev) => ({ ...prev, [stall.slot_id]: true }))
                         }
                       >
-                        <Edit size={14} /> แก้ไข
+                        <Edit size={14} /> กรอกเลขมิเตอร์
                       </button>
                     )}
                   </div>
@@ -449,7 +467,7 @@ const MeterRecording = () => {
                     </div>
                     {isEditing && (
                       <div className="mb-2">
-                        <label className="text-xs text-gray-500 mb-0.5 block">เลขมิเตอร์ (หมายเลขประจำมิเตอร์)</label>
+                        <label className="text-xs text-gray-500 mb-0.5 block">หมายเลขประจำมิเตอร์</label>
                         <input
                           type="text"
                           className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-400"
@@ -464,7 +482,7 @@ const MeterRecording = () => {
                     <div className="flex items-center gap-2">
                       <div className="flex-1">
                         <label className="text-xs text-gray-500 mb-0.5 block">
-                          ค่ามิเตอร์ปัจจุบัน (หน่วย)
+                          เลขมิเตอร์ปัจจุบัน (หน่วย)
                         </label>
                         <input
                           type="number"
@@ -483,7 +501,14 @@ const MeterRecording = () => {
                       </div>
                     </div>
                     <div className="mt-2 flex justify-between text-xs text-gray-500">
-                      <span>ค่าก่อนหน้า: <strong className="text-gray-700">{preview.prevWater}</strong></span>
+                      <span>
+                        เลขมิเตอร์ก่อนหน้า: <strong className="text-gray-700">{preview.prevWater}</strong>
+                        {preview.prevWaterDate && (
+                          <span className="text-gray-400 font-normal ml-1">
+                            ({formatReadingDate(preview.prevWaterDate)})
+                          </span>
+                        )}
+                      </span>
                       {preview.usedWater !== null && (
                         <span className="text-blue-600 font-semibold">
                           ใช้ {preview.usedWater} หน่วย ≈ {preview.costWater?.toLocaleString()} ฿
@@ -500,7 +525,7 @@ const MeterRecording = () => {
                     </div>
                     {isEditing && (
                       <div className="mb-2">
-                        <label className="text-xs text-gray-500 mb-0.5 block">เลขมิเตอร์ (หมายเลขประจำมิเตอร์)</label>
+                        <label className="text-xs text-gray-500 mb-0.5 block">หมายเลขประจำมิเตอร์</label>
                         <input
                           type="text"
                           className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-yellow-400"
@@ -515,7 +540,7 @@ const MeterRecording = () => {
                     <div className="flex items-center gap-2">
                       <div className="flex-1">
                         <label className="text-xs text-gray-500 mb-0.5 block">
-                          ค่ามิเตอร์ปัจจุบัน (หน่วย)
+                          เลขมิเตอร์ปัจจุบัน (หน่วย)
                         </label>
                         <input
                           type="number"
@@ -534,7 +559,14 @@ const MeterRecording = () => {
                       </div>
                     </div>
                     <div className="mt-2 flex justify-between text-xs text-gray-500">
-                      <span>ค่าก่อนหน้า: <strong className="text-gray-700">{preview.prevElec}</strong></span>
+                      <span>
+                        เลขมิเตอร์ก่อนหน้า: <strong className="text-gray-700">{preview.prevElec}</strong>
+                        {preview.prevElecDate && (
+                          <span className="text-gray-400 font-normal ml-1">
+                            ({formatReadingDate(preview.prevElecDate)})
+                          </span>
+                        )}
+                      </span>
                       {preview.usedElec !== null && (
                         <span className="text-yellow-600 font-semibold">
                           ใช้ {preview.usedElec} หน่วย ≈ {preview.costElec?.toLocaleString()} ฿

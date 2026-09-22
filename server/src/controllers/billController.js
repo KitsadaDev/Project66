@@ -254,11 +254,14 @@ const createBill = async (req, res, next) => {
       greaseTrapFee = (contract.menuType === 'ของคาว' || isTargetSlot) ? baseGreaseTrapFee : 0;
     }
 
-    // คำนวณ due_date = billing_month + BILL_DUE_DAYS (default 10 วัน)
+    // คำนวณ due_date = วันที่ 10 ของเดือนถัดไป (หรือตาม BILL_DUE_DAYS setting) เช่น บิลรอบ ส.ค. -> ครบกำหนด 10 ก.ย.
     const dueDaysSetting = await prisma.systemSetting.findUnique({ where: { setting_key: 'BILL_DUE_DAYS' } });
     const dueDays = parseInt(dueDaysSetting?.setting_value || '10', 10);
-    const calculatedDueDate = new Date(billing_month);
-    calculatedDueDate.setDate(calculatedDueDate.getDate() + dueDays);
+    const billingDate = new Date(billing_month);
+    const calculatedDueDate = (dueDate && !isNaN(new Date(dueDate).getTime()))
+      ? new Date(dueDate)
+      : new Date(billingDate.getFullYear(), billingDate.getMonth() + 1, dueDays, 23, 59, 59, 999);
+
 
     // ยอดรวม = ค่าเช่า + น้ำ + ไฟ + ดักไขมัน
     const total_amount = parseFloat(rent_amount) + parseFloat(water_cost) + parseFloat(electricity_cost) + greaseTrapFee;
@@ -267,7 +270,6 @@ const createBill = async (req, res, next) => {
     // ตรวจสอบ: 1 ล็อก ออกบิลได้ 1 ครั้ง/เดือนเท่านั้น
     // เปรียบเทียบกับ billing_month ทีละเดือน (ต้นเดือน–สิ้นเดือน)
     // -------------------------------------------------------
-    const billingDate = new Date(billing_month);
     const monthStart = new Date(billingDate.getFullYear(), billingDate.getMonth(), 1);
     const monthEnd   = new Date(billingDate.getFullYear(), billingDate.getMonth() + 1, 1);
 
@@ -727,6 +729,9 @@ const calculateAmount = async (req, res, next) => {
     }
 
     const date = new Date(month);
+    const bMonth = date.getMonth() + 1; // 1-12
+    const bYear = date.getFullYear();
+
     const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
     // End of the billing month
     const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
@@ -734,28 +739,57 @@ const calculateAmount = async (req, res, next) => {
     const gracePeriod = new Date(endOfMonth);
     gracePeriod.setDate(gracePeriod.getDate() + 15);
 
-    // ดึงมิเตอร์น้ำล่าสุดในช่วง [startOfMonth, gracePeriod]
-    const waterMeter = await prisma.utilityMeter.findFirst({
+    // ดึงมิเตอร์น้ำ: ค้นหาตามรอบเดือน (billing_month, billing_year) ก่อน ถ้าไม่เจอจึงค้นหาตามช่วงวันที่
+    let waterMeter = await prisma.utilityMeter.findFirst({
       where: { 
         slot_id: parseInt(slot_id), 
         meter_type: 'WATER',
-        created_at: { gte: startOfMonth, lte: gracePeriod }
+        billing_month: bMonth,
+        billing_year: bYear
       },
       orderBy: { created_at: 'desc' }
     });
 
-    // ดึงมิเตอร์ไฟล่าสุดในช่วงเดียวกัน
-    const electricMeter = await prisma.utilityMeter.findFirst({
+    if (!waterMeter) {
+      waterMeter = await prisma.utilityMeter.findFirst({
+        where: { 
+          slot_id: parseInt(slot_id), 
+          meter_type: 'WATER',
+          created_at: { gte: startOfMonth, lte: gracePeriod }
+        },
+        orderBy: { created_at: 'desc' }
+      });
+    }
+
+    // ดึงมิเตอร์ไฟ: ค้นหาตามรอบเดือน (billing_month, billing_year) ก่อน ถ้าไม่เจอจึงค้นหาตามช่วงวันที่
+    let electricMeter = await prisma.utilityMeter.findFirst({
       where: { 
         slot_id: parseInt(slot_id), 
         meter_type: 'ELECTRICITY',
-        created_at: { gte: startOfMonth, lte: gracePeriod }
+        billing_month: bMonth,
+        billing_year: bYear
       },
       orderBy: { created_at: 'desc' }
     });
 
+    if (!electricMeter) {
+      electricMeter = await prisma.utilityMeter.findFirst({
+        where: { 
+          slot_id: parseInt(slot_id), 
+          meter_type: 'ELECTRICITY',
+          created_at: { gte: startOfMonth, lte: gracePeriod }
+        },
+        orderBy: { created_at: 'desc' }
+      });
+    }
+
     if (!waterMeter && !electricMeter) {
-      return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลการจดมิเตอร์' });
+      const thMonths = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+      const monthLabel = thMonths[bMonth - 1] || '';
+      return res.status(404).json({ 
+        success: false, 
+        message: `ไม่พบข้อมูลการจดมิเตอร์รอบเดือน${monthLabel} ${bYear + 543} (ต้องบันทึกมิเตอร์ช่วงวันที่ 28 ถึงสิ้นเดือน)` 
+      });
     }
 
     const waterCost = waterMeter ? waterMeter.total_cost : 0;
@@ -772,6 +806,15 @@ const calculateAmount = async (req, res, next) => {
     const greaseTrapFee = (contract.menuType === 'ของคาว' || isTargetSlot) ? baseGreaseTrapFee : 0;
 
     const total = rent + waterCost + electricCost + greaseTrapFee;
+
+    // คำนวณวันครบกำหนดชำระ (วันที่ 10 ของเดือนถัดไป เวลา 23:59:59)
+    const dueDaysSetting = await prisma.systemSetting.findUnique({ where: { setting_key: 'BILL_DUE_DAYS' } });
+    const dueDays = parseInt(dueDaysSetting?.setting_value || '10', 10);
+    const calculatedDueDate = new Date(date.getFullYear(), date.getMonth() + 1, dueDays, 23, 59, 59, 999);
+
+    // ตรวจสอบว่าบันทึกในช่วงวันที่ 28 ถึงสิ้นเดือนหรือไม่
+    const isWaterInPeriod = waterMeter ? (new Date(waterMeter.created_at).getDate() >= 28) : false;
+    const isElecInPeriod = electricMeter ? (new Date(electricMeter.created_at).getDate() >= 28) : false;
 
     res.json({
       success: true,
@@ -790,6 +833,25 @@ const calculateAmount = async (req, res, next) => {
         rates: {
           water: waterMeter ? waterMeter.unit_price : 0,
           electric: electricMeter ? electricMeter.unit_price : 0
+        },
+        meterDetails: {
+          billing_month: bMonth,
+          billing_year: bYear,
+          due_date: calculatedDueDate,
+          water: waterMeter ? {
+            reading_date: waterMeter.created_at,
+            previous_reading: waterMeter.previous_reading,
+            current_reading: waterMeter.current_reading,
+            unit_used: waterMeter.unit_used,
+            is_in_period: isWaterInPeriod
+          } : null,
+          electric: electricMeter ? {
+            reading_date: electricMeter.created_at,
+            previous_reading: electricMeter.previous_reading,
+            current_reading: electricMeter.current_reading,
+            unit_used: electricMeter.unit_used,
+            is_in_period: isElecInPeriod
+          } : null
         }
       }
     });
